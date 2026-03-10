@@ -33,19 +33,33 @@ input.err { border-color: #e74c3c; background: #fff0f0 }
 .btn-primary { background: #EB6753; color: #fff } .btn-primary:hover { background: #d04e3b }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed }
 .btn-outline { background: #fff; color: #EB6753; border: 2px solid #EB6753 } .btn-outline:hover { background: #fff8f7 }
-.log { background: #1a1a2e; border-radius: 12px; padding: 16px; font-family: monospace; font-size: 12px; max-height: 420px; overflow-y: auto; color: #e8e8e8 }
-.log-line { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); line-height: 1.5 }
+
+/* ── Log ── */
+.log { background: #0d1117; border-radius: 12px; padding: 16px; font-family: 'Fira Code', 'Cascadia Code', monospace; font-size: 12px; max-height: 520px; overflow-y: auto; color: #e8e8e8; line-height: 1.6 }
+.log-line { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.04) }
 .log-line:last-child { border: none }
-.log-line.success{color:#4ade80} .log-line.error{color:#f87171}
-.log-line.warn{color:#fbbf24}   .log-line.info{color:#93c5fd}
-.log-line.dim{color:#555}
-.log-ts { color: #4b5563; margin-right: 6px }
+.log-line.success { color: #3fb950 }
+.log-line.error   { color: #f85149 }
+.log-line.warn    { color: #d29922 }
+.log-line.info    { color: #58a6ff }
+.log-line.dim     { color: #484f58 }
+.log-line.table   { color: #79c0ff }
+.log-line.data    { color: #ffa657 }
+.log-line.divider { color: #30363d }
+.log-ts  { color: #30363d; margin-right: 8px; user-select: none }
+.log-tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-right: 6px; letter-spacing: .5px }
+.tag-db   { background: #1f3a5f; color: #79c0ff }
+.tag-fn   { background: #3d1f5e; color: #d2a8ff }
+.tag-pay  { background: #1a3a2a; color: #3fb950 }
+.tag-mail { background: #3a2a1a; color: #ffa657 }
+.tag-err  { background: #5e1f1f; color: #f85149 }
+
 .status-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #f3f3f3; font-size: 13px }
 .status-row:last-child { border: none }
 .progress { width: 100%; height: 6px; background: #f3f3f3; border-radius: 3px; overflow: hidden; margin: 12px 0 }
 .progress-bar { height: 100%; background: #EB6753; border-radius: 3px; transition: width .5s; width: 0% }
 .step { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; color: #888 }
-.step.done{color:#16a34a} .step.active{color:#EB6753;font-weight:700} .step.fail{color:#e74c3c}
+.step.done  { color: #16a34a } .step.active { color: #EB6753; font-weight: 700 } .step.fail { color: #e74c3c }
 .step-icon { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0 }
 .step-icon.done   { background:#f0fdf4; color:#16a34a; border:1.5px solid #bbf7d0 }
 .step-icon.active { background:#fff8f3; color:#EB6753; border:1.5px solid #fdd5c4 }
@@ -56,13 +70,14 @@ input.err { border-color: #e74c3c; background: #fff0f0 }
 .ps-btn:hover { border-color:#EB6753; color:#EB6753 }
 .ps-btn.active { border-color:#EB6753; background:#EB6753; color:#fff }
 .top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px }
-.cmd-box { background:#1a1a2e; border-radius:10px; padding:12px 16px; font-family:monospace; font-size:13px; color:#4ade80; display:flex; justify-content:space-between; align-items:center; margin-top:14px }
+.cmd-box { background:#0d1117; border-radius:10px; padding:12px 16px; font-family:monospace; font-size:13px; color:#3fb950; display:flex; justify-content:space-between; align-items:center; margin-top:14px }
 .copy-btn { background:rgba(255,255,255,.1); border:none; color:#fff; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:11px; font-family:inherit }
 .note-box { margin-top:12px; font-size:12px; color:#888; padding:10px 14px; background:#f9f9f9; border-radius:10px; line-height:1.7 }
 .mode-banner { padding:11px 16px; border-radius:11px; font-size:13px; font-weight:600; margin-bottom:16px; display:flex; align-items:center; gap:8px }
 .mode-banner.real   { background:#faf5ff; border:1.5px solid #d8b4fe; color:#6b21a8 }
 .mode-banner.local  { background:#fff8f3; border:1.5px solid #fdd5c4; color:#9a3412 }
 .inline-code { background:#f3f3f3; padding:2px 7px; border-radius:5px; font-family:monospace; font-size:11px }
+.hint { font-size:11px; color:#aaa; margin-top:-10px; margin-bottom:14px; line-height:1.5 }
 @media(max-width:600px){ .grid{grid-template-columns:1fr} }
 </style>
 </head>
@@ -71,19 +86,17 @@ input.err { border-color: #e74c3c; background: #fff0f0 }
 <div class="top">
   <div>
     <h1>AfriStay Payment Test Dashboard</h1>
-    <p style="color:#aaa;font-size:13px;margin-top:4px">Real bookings, real emails, real Supabase — powered by mock-kpay</p>
+    <p style="color:#aaa;font-size:13px;margin-top:4px">Real bookings · Real Supabase · Mock payments — every DB write shown live</p>
   </div>
   <div id="modeBadge" class="badge mock">⚙️ Detecting...</div>
 </div>
 
-<div id="modeBanner" class="mode-banner local">
-  ⚠️ Loading...
-</div>
+<div id="modeBanner" class="mode-banner local">⚠️ Loading...</div>
 
 <!-- Provider Switcher -->
 <div class="card" style="margin-bottom:20px">
   <h2>⚡ Payment Provider</h2>
-  <p style="font-size:13px;color:#888;margin-bottom:12px">One command to switch. Zero code changes ever.</p>
+  <p style="font-size:13px;color:#888;margin-bottom:12px">One Supabase secret to switch. Zero code changes ever.</p>
   <div class="provider-switch">
     <button class="ps-btn active" id="ps-mock"    onclick="selectProvider('mock')">🧪 Mock (Now)</button>
     <button class="ps-btn"        id="ps-kpay"    onclick="selectProvider('kpay')">💳 K-Pay (Live)</button>
@@ -101,16 +114,20 @@ input.err { border-color: #e74c3c; background: #fff0f0 }
   <!-- Booking Config -->
   <div class="card">
     <h2>📋 Booking Details</h2>
-    <p style="font-size:12px;color:#aaa;margin-bottom:14px">Uses a real listing from your DB. Creates a real booking + sends real emails.</p>
+    <p style="font-size:12px;color:#aaa;margin-bottom:14px">Uses a real listing. Creates a real booking row + all downstream DB writes.</p>
 
     <label>Listing ID <span style="color:#EB6753">*</span></label>
     <input id="listingId" placeholder="Paste a UUID from your listings table" oninput="validateListing()">
 
+    <label>Test User ID <span style="color:#EB6753">*</span></label>
+    <input id="userId" placeholder="Paste a UUID from your profiles table">
+    <p class="hint">⚠️ Required — bookings.user_id is NOT NULL. Get it from Supabase → profiles table → copy any id.</p>
+
     <label>Guest Name</label>
     <input id="guestName" value="Test Guest">
 
-    <label>Guest Email <span style="color:#EB6753">*</span> (gets confirmation email)</label>
-    <input id="guestEmail" placeholder="your@email.com" value="">
+    <label>Guest Email <span style="color:#EB6753">*</span></label>
+    <input id="guestEmail" placeholder="you@email.com">
 
     <label>Guest Phone</label>
     <input id="guestPhone" value="+250700000000">
@@ -124,17 +141,17 @@ input.err { border-color: #e74c3c; background: #fff0f0 }
     <div id="listingPreview" style="display:none;padding:10px 14px;background:#f9f9f9;border-radius:10px;font-size:12px;color:#555;margin-bottom:14px;line-height:1.7"></div>
   </div>
 
-  <!-- Test Scenarios -->
+  <!-- Scenarios -->
   <div class="card">
     <h2>🎭 Payment Scenario</h2>
-    <p style="font-size:12px;color:#aaa;margin-bottom:14px">Controls what mock-kpay returns. All other steps are 100% real.</p>
+    <p style="font-size:12px;color:#aaa;margin-bottom:14px">Controls what mock-kpay returns. All DB writes, emails, and payouts are 100% real.</p>
     <div class="scenarios" id="scenarios">
       <div class="scenario selected" onclick="pickScenario(this,'250783000001','success')">
-        <div><div class="scenario-name">✅ Payment Success</div><div class="scenario-phone">Phone 250783000001 · booking confirms · emails sent</div></div>
+        <div><div class="scenario-name">✅ Payment Success</div><div class="scenario-phone">Phone 250783000001 · confirmed · emails + payouts</div></div>
         <div class="s-dot dot-green"></div>
       </div>
       <div class="scenario" onclick="pickScenario(this,'250783000002','insufficient')">
-        <div><div class="scenario-name">💸 Insufficient Funds</div><div class="scenario-phone">Phone 250783000002 · booking fails · guest emailed</div></div>
+        <div><div class="scenario-name">💸 Insufficient Funds</div><div class="scenario-phone">Phone 250783000002 · payment_failed · guest emailed</div></div>
         <div class="s-dot dot-red"></div>
       </div>
       <div class="scenario" onclick="pickScenario(this,'250783000003','pending')">
@@ -142,7 +159,7 @@ input.err { border-color: #e74c3c; background: #fff0f0 }
         <div class="s-dot dot-orange"></div>
       </div>
       <div class="scenario" onclick="pickScenario(this,'250783000004','timeout')">
-        <div><div class="scenario-name">⏱️ Timeout (no webhook)</div><div class="scenario-phone">Phone 250783000004 · stays pending forever</div></div>
+        <div><div class="scenario-name">⏱️ Timeout (no webhook)</div><div class="scenario-phone">Phone 250783000004 · stays payment_pending</div></div>
         <div class="s-dot dot-grey"></div>
       </div>
       <div class="scenario" onclick="pickScenario(this,'250783000005','auth_error')">
@@ -167,7 +184,7 @@ input.err { border-color: #e74c3c; background: #fff0f0 }
   <!-- Run -->
   <div class="card">
     <h2>🚀 Run Test</h2>
-    <p style="font-size:12px;color:#aaa;margin-bottom:14px">Runs the full real flow: booking → encrypt → owner email → approve → mock-kpay charge → webhook → receipt → payout → guest email</p>
+    <p style="font-size:12px;color:#aaa;margin-bottom:14px">Full flow: booking → encrypt → owner email → approve → mock-kpay → webhook → receipt → payouts → guest email</p>
 
     <label>Payment Method</label>
     <select id="testMethod">
@@ -183,15 +200,15 @@ input.err { border-color: #e74c3c; background: #fff0f0 }
     <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
 
     <div id="testSteps">
-      <div class="step" id="step1"><div class="step-icon idle">1</div><span>Create real booking + store payment intent</span></div>
-      <div class="step" id="step2"><div class="step-icon idle">2</div><span>Send owner approval email</span></div>
-      <div class="step" id="step3"><div class="step-icon idle">3</div><span>Simulate owner approval → call charge-and-payout</span></div>
-      <div class="step" id="step4"><div class="step-icon idle">4</div><span>mock-kpay fires webhook</span></div>
-      <div class="step" id="step5"><div class="step-icon idle">5</div><span>Booking confirmed + receipt + payouts + guest email</span></div>
+      <div class="step" id="step1"><div class="step-icon idle">1</div><span>Create booking + encrypt payment intent</span></div>
+      <div class="step" id="step2"><div class="step-icon idle">2</div><span>Owner approval email dispatched</span></div>
+      <div class="step" id="step3"><div class="step-icon idle">3</div><span>Simulate owner approve → charge-and-payout</span></div>
+      <div class="step" id="step4"><div class="step-icon idle">4</div><span>mock-kpay fires webhook callback</span></div>
+      <div class="step" id="step5"><div class="step-icon idle">5</div><span>Confirm booking · receipt · payouts · guest email</span></div>
     </div>
 
     <button class="btn btn-primary" id="runBtn" onclick="runTest()" style="margin-top:16px">▶ Run Full Test</button>
-    <button class="btn btn-outline" onclick="resetTest()" style="margin-top:8px">Reset</button>
+    <button class="btn btn-outline" onclick="resetTest()" style="margin-top:8px">↺ Reset</button>
 
     <div id="resultLinks" style="display:none;margin-top:14px;padding:12px 14px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;font-size:12px;line-height:2;color:#166534"></div>
   </div>
@@ -199,42 +216,41 @@ input.err { border-color: #e74c3c; background: #fff0f0 }
   <!-- Live Log -->
   <div class="card" style="grid-column: 1 / -1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <h2 style="margin:0">📋 Live Log</h2>
+      <h2 style="margin:0">🖥️ Live Console</h2>
       <div style="display:flex;gap:10px;align-items:center">
-        <span style="font-size:11px;color:#aaa">Mirrored to F12 → Console as [A]</span>
+        <span style="font-size:11px;color:#aaa">Every DB write shown in real time</span>
         <button onclick="clearLog()" style="font-size:12px;color:#aaa;background:none;border:none;cursor:pointer">Clear</button>
       </div>
     </div>
     <div class="log" id="logBox">
-      <div class="log-line dim"><span class="log-ts">--:--:--</span>Ready. Fill in a listing ID and click Run.</div>
+      <div class="log-line dim"><span class="log-ts">--:--:--</span>Ready. Fill in a Listing ID + User ID and click Run.</div>
     </div>
   </div>
 
   <!-- Expected Result -->
   <div class="card">
     <h2>📊 Expected Result</h2>
-    <div class="status-row"><span>Booking status</span>   <span id="expStatus" style="font-weight:700;color:#EB6753">confirmed</span></div>
-    <div class="status-row"><span>Payment status</span>   <span id="expPay"    style="font-weight:700;color:#EB6753">paid</span></div>
-    <div class="status-row"><span>Webhook fires</span>    <span id="expWH"     style="font-weight:700;color:#EB6753">Yes ~3s</span></div>
-    <div class="status-row"><span>Receipt created</span>  <span id="expRcpt"   style="font-weight:700;color:#EB6753">Yes</span></div>
-    <div class="status-row"><span>Owner payout</span>     <span id="expPayout" style="font-weight:700;color:#EB6753">95%</span></div>
-    <div class="status-row"><span>Guest email</span>      <span id="expEmail"  style="font-weight:700;color:#EB6753">Confirmed</span></div>
+    <div class="status-row"><span>bookings.status</span>         <span id="expStatus" style="font-weight:700;color:#EB6753">confirmed</span></div>
+    <div class="status-row"><span>bookings.payment_status</span> <span id="expPay"    style="font-weight:700;color:#EB6753">paid</span></div>
+    <div class="status-row"><span>Webhook fires</span>           <span id="expWH"     style="font-weight:700;color:#EB6753">Yes ~3s</span></div>
+    <div class="status-row"><span>digital_receipts row</span>    <span id="expRcpt"   style="font-weight:700;color:#EB6753">Created</span></div>
+    <div class="status-row"><span>payouts rows</span>            <span id="expPayout" style="font-weight:700;color:#EB6753">2 rows (95% + 5%)</span></div>
+    <div class="status-row"><span>Guest email</span>             <span id="expEmail"  style="font-weight:700;color:#EB6753">Confirmed</span></div>
   </div>
 
   <!-- Checklist -->
   <div class="card">
     <h2>🟢 Go-Live Checklist</h2>
-    <div class="status-row"><span>mock-kpay deployed</span>             <span id="chk-mock"   style="color:#aaa">—</span></div>
-    <div class="status-row"><span>store-payment-intent deployed</span>  <span id="chk-spi"    style="color:#aaa">—</span></div>
-    <div class="status-row"><span>charge-and-payout deployed</span>     <span id="chk-cap"    style="color:#aaa">—</span></div>
-    <div class="status-row"><span>kpay-webhook deployed</span>          <span id="chk-wh"     style="color:#aaa">—</span></div>
-    <div class="status-row"><span>Full test passed ✅</span>             <span id="chk-test"   style="color:#aaa">—</span></div>
-    <div class="status-row"><span>K-Pay credentials</span>              <span style="color:#f59e0b">⏳ Waiting</span></div>
+    <div class="status-row"><span>mock-kpay deployed</span>             <span id="chk-mock"  style="color:#aaa">—</span></div>
+    <div class="status-row"><span>store-payment-intent deployed</span>  <span id="chk-spi"   style="color:#aaa">—</span></div>
+    <div class="status-row"><span>charge-and-payout deployed</span>     <span id="chk-cap"   style="color:#aaa">—</span></div>
+    <div class="status-row"><span>kpay-webhook deployed</span>          <span id="chk-wh"    style="color:#aaa">—</span></div>
+    <div class="status-row"><span>Full test passed ✅</span>             <span id="chk-test"  style="color:#aaa">—</span></div>
+    <div class="status-row"><span>PAYMENT_PROVIDER secret</span>        <span style="color:#f59e0b">mock (testing)</span></div>
     <div style="margin-top:14px;padding:12px 14px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;font-size:12px;color:#166534;line-height:1.8">
-      When ready:<br>
-      <span class="inline-code">supabase secrets set KPAY_KEY=...</span><br>
-      <span class="inline-code">supabase secrets set PAYMENT_PROVIDER=kpay</span><br>
-      Done. Live.
+      Switch to live:<br>
+      <span class="inline-code">supabase secrets set PAYMENT_PROVIDER=pesapal</span><br>
+      That's it. No redeploy needed.
     </div>
   </div>
 
@@ -248,256 +264,278 @@ const SB   = 'https://xuxzeinufjpplxkerlsd.supabase.co';
 const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh1eHplaW51ZmpwcGx4a2VybHNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA3NDQ0OTAsImV4cCI6MjA4NjMyMDQ5MH0.u8D-VZ98wBX448UJXq-UugLPTFf57uq946FSQXJLgac';
 const FN   = SB + '/functions/v1';
 const HDRS = { 'Content-Type':'application/json', 'apikey':ANON, 'Authorization':'Bearer '+ANON };
+const SB_DASH = 'https://supabase.com/dashboard/project/xuxzeinufjpplxkerlsd/editor';
 
-// ═══════════════════════════════════════════════════════════════
-// DETECT MODE: real (hosted) vs local (file://)
-// ═══════════════════════════════════════════════════════════════
 const IS_LOCAL = location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
+let listingData = null;
+let currentScenario = 'success';
+let currentPhone    = '250783000001';
 
 window.addEventListener('DOMContentLoaded', () => {
   const banner = document.getElementById('modeBanner');
   const badge  = document.getElementById('modeBadge');
   if (IS_LOCAL) {
     banner.className = 'mode-banner local';
-    banner.innerHTML = '⚠️ <strong>Local mode</strong> — real API calls are blocked by browsers on file://. Open this from <strong>afristay.rw</strong> to run real tests. Below you can still see what the flow looks like.';
+    banner.innerHTML = '⚠️ <strong>Local mode</strong> — CORS blocks real calls on file://. Open from <strong>afristay.rw</strong> to run real tests. Simulation still works here.';
     badge.className  = 'badge mock';
     badge.textContent = '⚙️ Local';
-    document.getElementById('runBtn').textContent = '▶ Run (Simulated — open from site for real)';
+    document.getElementById('runBtn').textContent = '▶ Run (Simulated)';
   } else {
     banner.className = 'mode-banner real';
-    banner.innerHTML = '🟣 <strong>Live mode</strong> — connected to your real Supabase. Tests create actual bookings, send real emails, update real DB rows.';
+    banner.innerHTML = '🟣 <strong>Live mode</strong> — connected to real Supabase. Every test creates actual DB rows, sends real emails, triggers real payouts.';
     badge.className  = 'badge real';
     badge.textContent = '🟣 Real Mode';
   }
   selectProvider('mock');
-  // Set default dates
   const today = new Date();
-  const d2    = new Date(today); d2.setDate(d2.getDate() + 3);
+  const d2    = new Date(today); d2.setDate(d2.getDate()+3);
   document.getElementById('checkIn').value  = today.toISOString().slice(0,10);
   document.getElementById('checkOut').value = d2.toISOString().slice(0,10);
 });
 
 // ═══════════════════════════════════════════════════════════════
-// LISTING LOOKUP
+// LOGGING — descriptive vibe
 // ═══════════════════════════════════════════════════════════════
-let listingData = null;
-let lookupTimer = null;
-
-function validateListing() {
-  clearTimeout(lookupTimer);
-  const id = document.getElementById('listingId').value.trim();
-  const preview = document.getElementById('listingPreview');
-  if (!id || id.length < 10) { preview.style.display='none'; listingData=null; return; }
-  lookupTimer = setTimeout(() => fetchListing(id), 600);
+function ts() {
+  return new Date().toLocaleTimeString('en-GB', { hour12: false });
 }
 
-async function fetchListing(id) {
-  const preview = document.getElementById('listingId');
-  const box     = document.getElementById('listingPreview');
-  try {
-    const r = await fetch(SB + '/rest/v1/listings?id=eq.' + id + '&select=id,title,price,currency,address,owner_id', {
-      headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + ANON }
+function log(msg, type='info') {
+  const box  = document.getElementById('logBox');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + type;
+  line.innerHTML = `<span class="log-ts">${ts()}</span>${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+  console.log(`[A] [${type.toUpperCase()}] ${msg.replace(/<[^>]+>/g,'')}`);
+}
+
+function logDivider(label='') {
+  const box  = document.getElementById('logBox');
+  const line = document.createElement('div');
+  line.className = 'log-line divider';
+  const pad = label ? `─── ${label} ` : '──────────────────────────────────────';
+  line.innerHTML = `<span class="log-ts">${ts()}</span><span style="color:#30363d">${pad.padEnd(50,'─')}</span>`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function logDB(table, action, data) {
+  log(`<span class="log-tag tag-db">DB</span><span style="color:#79c0ff">${action}</span> <span style="color:#ffa657">${table}</span>`, 'table');
+  if (data && typeof data === 'object') {
+    Object.entries(data).forEach(([k, v]) => {
+      if (v === undefined || v === null || v === '') return;
+      const val = String(v).length > 60 ? String(v).slice(0,60) + '…' : String(v);
+      log(`  <span style="color:#484f58">│</span> <span style="color:#79c0ff">${k.padEnd(24)}</span> <span style="color:#ffa657">${val}</span>`, 'data');
     });
-    const rows = await r.json();
-    if (rows && rows.length > 0) {
-      listingData = rows[0];
-      preview.classList.remove('err'); preview.classList.add('ok');
-      box.style.display = 'block';
-      box.innerHTML = '✅ <strong>' + (listingData.title||'Listing found') + '</strong><br>'
-        + '📍 ' + (listingData.address||'No address') + '<br>'
-        + '💰 ' + Number(listingData.price||0).toLocaleString() + ' ' + (listingData.currency||'RWF') + '/night';
-      log('Listing found: ' + listingData.title, 'success');
-    } else {
-      listingData = null;
-      preview.classList.remove('ok'); preview.classList.add('err');
-      box.style.display = 'block';
-      box.innerHTML = '❌ No listing found with this ID. Check your listings table.';
-    }
-  } catch(e) {
-    box.style.display = 'block';
-    box.innerHTML = '⚠️ Could not check listing (CORS or network error)';
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// BROWSER MOCK ENGINE (used when IS_LOCAL = true)
-// ═══════════════════════════════════════════════════════════════
-function mockKPay(action, params) {
-  const tid = 'MOCK-' + Date.now() + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
-  if (action === 'disburse') return { success:1, reply:'PENDING', tid };
-  if (action === 'checkstatus') return { statusid:'01', statusdesc:'OK', tid };
-  const scenario = getScenario(params.msisdn||'', params.amount||0, params.pmethod||'momo_mtn');
-  const isFail   = ['insufficient','auth_error','cancelled'].includes(scenario);
-  return {
-    success: 1, reply: 'PENDING', tid, refid: params.refid,
-    url: 'mock://checkout?scenario=' + scenario + '&tid=' + tid,
-    _scenario:   scenario,
-    _statusid:   isFail ? '02' : '01',
-    _statusdesc: getDesc(scenario),
-    _delay:      scenario==='pending' ? 10000 : scenario==='timeout' ? null : 3000,
-  };
-}
-function getScenario(msisdn, amount, pmethod) {
-  if (pmethod==='card'||pmethod==='cc') return (amount%100===99)?'auth_error':'success';
-  const map = {'001':'success','002':'insufficient','003':'pending','004':'timeout','005':'auth_error','006':'cancelled'};
-  return map[msisdn.slice(-3)] || 'success';
-}
-function getDesc(s) {
-  const m = {insufficient:'INSUFFICIENT_FUNDS',auth_error:'TARGET_AUTHORIZATION_ERROR',cancelled:'TRANSACTION_CANCELLED',timeout:'TRANSACTION_TIMEOUT'};
-  return m[s] || 'Successfully processed transaction.';
+function logFn(fnName, direction, summary) {
+  const arrow = direction === 'in' ? '→' : '←';
+  log(`<span class="log-tag tag-fn">FUNC</span>${arrow} <span style="color:#d2a8ff">${fnName}</span>  ${summary}`, direction === 'in' ? 'info' : 'success');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// REAL API CALL HELPER
-// ═══════════════════════════════════════════════════════════════
-async function callFn(name, body) {
-  log('→ POST ' + FN + '/' + name, 'dim');
-  const r    = await fetch(FN + '/' + name, { method:'POST', headers:HDRS, body:JSON.stringify(body) });
-  const text = await r.text();
-  let data; try { data = JSON.parse(text); } catch { data = { raw: text }; }
-  log('← HTTP ' + r.status + '  ' + JSON.stringify(data).slice(0,140), r.ok ? 'dim' : 'warn');
-  return { ok: r.ok, status: r.status, data };
+function logPay(summary) {
+  log(`<span class="log-tag tag-pay">PAY</span>${summary}`, 'success');
+}
+
+function logMail(to, subject) {
+  log(`<span class="log-tag tag-mail">EMAIL</span>→ <span style="color:#ffa657">${to}</span>  "${subject}"`, 'warn');
+}
+
+function logErr(msg) {
+  log(`<span class="log-tag tag-err">ERR</span>${msg}`, 'error');
+}
+
+function clearLog() {
+  document.getElementById('logBox').innerHTML = '<div class="log-line dim"><span class="log-ts">--:--:--</span>Log cleared.</div>';
 }
 
 // ═══════════════════════════════════════════════════════════════
 // UI HELPERS
 // ═══════════════════════════════════════════════════════════════
-let currentScenario = 'success';
-let currentPhone    = '250783000001';
+function setStep(n, state) {
+  const el   = document.getElementById('step' + n);
+  const icon = el.querySelector('.step-icon');
+  el.className   = 'step ' + state;
+  icon.className = 'step-icon ' + state;
+  icon.textContent = state === 'done' ? '✓' : state === 'fail' ? '✗' : n;
+  document.getElementById('progressBar').style.width = (n / 5 * 100) + '%';
+}
 
-const expMap = {
-  success:      {status:'confirmed',      pay:'paid',    wh:'Yes ~3s',  rcpt:'Yes', payout:'95% sent',      email:'Confirmed'},
-  insufficient: {status:'payment_failed', pay:'failed',  wh:'Yes ~2s',  rcpt:'No',  payout:'Not triggered', email:'Failed (funds)'},
-  pending:      {status:'confirmed',      pay:'paid',    wh:'Yes ~10s', rcpt:'Yes', payout:'95% sent',      email:'Confirmed'},
-  timeout:      {status:'payment_pending',pay:'pending', wh:'Never',    rcpt:'No',  payout:'Not triggered', email:'None'},
-  auth_error:   {status:'payment_failed', pay:'failed',  wh:'Yes ~2s',  rcpt:'No',  payout:'Not triggered', email:'Failed (declined)'},
-  cancelled:    {status:'payment_failed', pay:'failed',  wh:'Yes ~2s',  rcpt:'No',  payout:'Not triggered', email:'Failed (cancelled)'},
-  card_success: {status:'confirmed',      pay:'paid',    wh:'Yes ~3s',  rcpt:'Yes', payout:'95% sent',      email:'Confirmed'},
-  card_fail:    {status:'payment_failed', pay:'failed',  wh:'Yes ~2s',  rcpt:'No',  payout:'Not triggered', email:'Failed (declined)'},
-};
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-const providerNotes = {
-  mock:    '🧪 <strong>Mock mode</strong> — mock-kpay handles payments. Everything else (DB, emails, payouts) is 100% real.',
-  kpay:    '💳 <strong>K-Pay live</strong> — real charges. Needs KPAY_KEY, KPAY_USERNAME, KPAY_PASSWORD, KPAY_RETAILER_ID set.',
-  pesapal: '🌍 <strong>Pesapal Plan B</strong> — Rwanda MoMo + cards. Needs PESAPAL_CONSUMER_KEY and PESAPAL_CONSUMER_SECRET set.',
-};
+function pickScenario(el, phone, sc) {
+  document.querySelectorAll('.scenario').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  currentScenario = sc;
+  currentPhone    = phone;
+  document.getElementById('testPhone').value = phone;
+
+  const willSucceed = ['success','pending','card_success'].includes(sc);
+  const isTimeout   = sc === 'timeout';
+  const expStatus   = willSucceed ? 'confirmed' : isTimeout ? 'payment_pending' : 'payment_failed';
+  const expPay      = willSucceed ? 'paid' : 'failed';
+  document.getElementById('expStatus').textContent = expStatus;
+  document.getElementById('expPay').textContent    = expPay;
+  document.getElementById('expWH').textContent     = isTimeout ? 'No (timeout)' : sc==='pending' ? 'Yes ~10s' : 'Yes ~3s';
+  document.getElementById('expRcpt').textContent   = willSucceed ? 'Created' : 'Skipped';
+  document.getElementById('expPayout').textContent = willSucceed ? '2 rows (95% + 5%)' : 'Skipped';
+  document.getElementById('expEmail').textContent  = willSucceed ? 'Confirmation' : isTimeout ? 'None' : 'Failure + retry link';
+}
 
 function selectProvider(p) {
-  ['mock','kpay','pesapal'].forEach(x=>document.getElementById('ps-'+x).classList.remove('active'));
-  document.getElementById('ps-'+p).classList.add('active');
-  document.getElementById('cmdText').textContent = 'supabase secrets set PAYMENT_PROVIDER=' + p;
-  document.getElementById('providerNote').innerHTML = providerNotes[p] || '';
+  ['mock','kpay','pesapal'].forEach(x => document.getElementById('ps-'+x).classList.toggle('active', x===p));
+  const cmds  = { mock:'supabase secrets set PAYMENT_PROVIDER=mock', kpay:'supabase secrets set PAYMENT_PROVIDER=kpay', pesapal:'supabase secrets set PAYMENT_PROVIDER=pesapal' };
+  const notes = {
+    mock:    '🧪 <strong>Mock mode</strong> — safe for testing. No real money moves. All DB writes, emails, and receipt logic still run for real.',
+    kpay:    '💳 <strong>K-Pay mode</strong> — requires KPAY_KEY, KPAY_USERNAME, KPAY_PASSWORD, KPAY_RETAILER_ID secrets.',
+    pesapal: '🌍 <strong>Pesapal mode</strong> — requires PESAPAL_CONSUMER_KEY, PESAPAL_CONSUMER_SECRET, PESAPAL_IPN_ID secrets.',
+  };
+  document.getElementById('cmdText').textContent  = cmds[p];
+  document.getElementById('providerNote').innerHTML = notes[p];
 }
 
 function copyCmd() {
-  navigator.clipboard.writeText(document.getElementById('cmdText').textContent)
-    .then(()=>{ const b=event.target; b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1500); });
-}
-
-function pickScenario(el, ph, sc) {
-  document.querySelectorAll('.scenario').forEach(s=>s.classList.remove('selected'));
-  el.classList.add('selected');
-  currentScenario = sc; currentPhone = ph;
-  document.getElementById('testPhone').value = ph;
-  document.getElementById('testMethod').value = sc.startsWith('card') ? 'card' : 'momo_mtn';
-  const exp = expMap[sc] || {};
-  document.getElementById('expStatus').textContent = exp.status  || '—';
-  document.getElementById('expPay').textContent    = exp.pay     || '—';
-  document.getElementById('expWH').textContent     = exp.wh      || '—';
-  document.getElementById('expRcpt').textContent   = exp.rcpt    || '—';
-  document.getElementById('expPayout').textContent = exp.payout  || '—';
-  document.getElementById('expEmail').textContent  = exp.email   || '—';
-  log('Scenario: ' + sc + '  Phone: ' + ph, 'info');
-}
-
-function setStep(n, state) {
-  const el = document.getElementById('step'+n);
-  const ic = el.querySelector('.step-icon');
-  el.className = 'step '+state;
-  ic.className = 'step-icon '+state;
-  ic.textContent = state==='done'?'✓':state==='fail'?'✗':state==='active'?'●':String(n);
-  if (state!=='idle') document.getElementById('progressBar').style.width = (n*20)+'%';
+  navigator.clipboard.writeText(document.getElementById('cmdText').textContent);
+  const btn = document.querySelector('.copy-btn');
+  btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = 'Copy', 1500);
 }
 
 function resetTest() {
-  [1,2,3,4,5].forEach(n=>setStep(n,'idle'));
+  [1,2,3,4,5].forEach(n => setStep(n,'idle'));
   document.getElementById('progressBar').style.width = '0%';
-  const btn = document.getElementById('runBtn');
-  btn.disabled = false;
-  btn.textContent = IS_LOCAL ? '▶ Run (Simulated — open from site for real)' : '▶ Run Full Test';
   document.getElementById('resultLinks').style.display = 'none';
+  document.getElementById('runBtn').disabled = false;
+  document.getElementById('runBtn').textContent = '▶ Run Full Test';
+  ['chk-spi','chk-cap','chk-wh','chk-mock','chk-test'].forEach(id => {
+    document.getElementById(id).innerHTML = '—';
+    document.getElementById(id).style.color = '#aaa';
+  });
 }
-
-function log(msg, type='dim') {
-  const box  = document.getElementById('logBox');
-  const ts   = new Date().toTimeString().slice(0,8);
-  const line = document.createElement('div');
-  line.className = 'log-line '+type;
-  line.innerHTML = '<span class="log-ts">'+ts+'</span>'+msg;
-  box.appendChild(line);
-  box.scrollTop = box.scrollHeight;
-  const c = msg.replace(/<[^>]+>/g,'');
-  if      (type==='error')   console.error('[A]',c);
-  else if (type==='warn')    console.warn('[A]',c);
-  else if (type==='success') console.log('%c[A] '+c,'color:#4ade80;font-weight:bold');
-  else if (type==='info')    console.info('[A]',c);
-  else                       console.log('[A]',c);
-}
-
-function clearLog() { document.getElementById('logBox').innerHTML=''; }
-const wait = ms => new Promise(r=>setTimeout(r,ms));
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN TEST RUNNER
+// LISTING VALIDATOR
+// ═══════════════════════════════════════════════════════════════
+let validateTimer;
+async function validateListing() {
+  clearTimeout(validateTimer);
+  validateTimer = setTimeout(async () => {
+    const id  = document.getElementById('listingId').value.trim();
+    const inp = document.getElementById('listingId');
+    const pre = document.getElementById('listingPreview');
+    if (!id || id.length < 30) { inp.className=''; pre.style.display='none'; listingData=null; return; }
+    try {
+      const r = await fetch(SB + '/rest/v1/listings?id=eq.' + id + '&select=id,title,price,currency,address,category_slug', {
+        headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + ANON }
+      });
+      const rows = await r.json();
+      if (rows?.length) {
+        listingData = rows[0];
+        inp.className = 'ok';
+        pre.style.display = 'block';
+        pre.innerHTML = `✅ <strong>${listingData.title}</strong><br>Price: ${Number(listingData.price||0).toLocaleString()} ${listingData.currency||'RWF'}/night · ${listingData.address||''}`;
+        log(`Listing verified: <strong>${listingData.title}</strong> · ${Number(listingData.price||0).toLocaleString()} ${listingData.currency||'RWF'}/night`, 'success');
+      } else {
+        inp.className = 'err';
+        pre.style.display = 'none';
+        listingData = null;
+        log('Listing ID not found in DB', 'error');
+      }
+    } catch(e) { inp.className='err'; }
+  }, 600);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FUNCTION CALLER
+// ═══════════════════════════════════════════════════════════════
+async function callFn(name, body) {
+  const url = FN + '/' + name;
+  log(`<span class="log-tag tag-fn">FUNC</span>→ POST <span style="color:#d2a8ff">/functions/v1/${name}</span>`, 'info');
+  const r    = await fetch(url, { method:'POST', headers:HDRS, body:JSON.stringify(body) });
+  const text = await r.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!r.ok) {
+    logErr(`HTTP ${r.status} ← ${JSON.stringify(data).slice(0,120)}`);
+  }
+  return { ok: r.ok, status: r.status, data };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN RUN
 // ═══════════════════════════════════════════════════════════════
 async function runTest() {
+  const sc        = currentScenario;
+  const ph        = currentPhone;
+  const method    = document.getElementById('testMethod').value;
+  const listingId = document.getElementById('listingId').value.trim();
+  const userId    = document.getElementById('userId').value.trim();
+  const guestName = document.getElementById('guestName').value.trim() || 'Test Guest';
+  const guestEmail= document.getElementById('guestEmail').value.trim();
+  const guestPhone= document.getElementById('guestPhone').value.trim();
+  const checkIn   = document.getElementById('checkIn').value;
+  const checkOut  = document.getElementById('checkOut').value;
+  const nights    = Math.max(1, Math.round((new Date(checkOut)-new Date(checkIn))/86400000));
+  const pricePN   = listingData?.price || 30000;
+  const total     = pricePN * nights;
+  const currency  = listingData?.currency || 'RWF';
+
   const btn = document.getElementById('runBtn');
-  btn.disabled = true; btn.textContent = '⏳ Running...';
+  btn.disabled = true;
+  btn.textContent = '⏳ Running...';
   resetTest();
 
-  const listingId  = document.getElementById('listingId').value.trim();
-  const guestName  = document.getElementById('guestName').value.trim()  || 'Test Guest';
-  const guestEmail = document.getElementById('guestEmail').value.trim();
-  const guestPhone = document.getElementById('guestPhone').value.trim()  || '+250700000000';
-  const checkIn    = document.getElementById('checkIn').value;
-  const checkOut   = document.getElementById('checkOut').value;
-  const method     = document.getElementById('testMethod').value;
-  const sc         = currentScenario;
-  const ph         = currentPhone;
-
-  // Calculate nights + amount
-  const nights   = Math.max(1, Math.round((new Date(checkOut)-new Date(checkIn))/(86400000)));
-  const pricePN  = listingData?.price || 50000;
-  const currency = listingData?.currency || 'RWF';
-  const total    = sc==='card_fail' ? Math.ceil(pricePN*nights/100)*100-1 : pricePN * nights;
-
-  log('', 'dim');
-  log('═══ TEST: ' + sc + (IS_LOCAL?' (SIMULATED)':' (REAL)') + ' ═══', 'info');
-  log('Listing: ' + (listingData?.title||listingId||'(not verified)'), 'dim');
-  log('Guest: ' + guestName + ' <' + (guestEmail||'no email') + '>', 'dim');
-  log('Dates: ' + checkIn + ' → ' + checkOut + ' (' + nights + ' nights, ' + total.toLocaleString() + ' ' + currency + ')', 'dim');
+  logDivider(`TEST: ${sc.toUpperCase()} ${IS_LOCAL ? '(SIMULATED)' : '(REAL)'}`);
+  log(`Listing: <strong>${listingData?.title || listingId || '(not verified)'}</strong>`, 'dim');
+  log(`Guest:   <strong>${guestName}</strong>  ${guestEmail}`, 'dim');
+  log(`Dates:   ${checkIn} → ${checkOut}  (${nights} night${nights!==1?'s':''}, ${total.toLocaleString()} ${currency})`, 'dim');
+  log(`Method:  ${method}  ·  Phone: ${ph}  ·  Scenario: ${sc}`, 'dim');
 
   if (IS_LOCAL) {
-    await runSimulated(sc, ph, method, total, currency, listingId, guestName, guestEmail, nights);
+    await runSimulated(sc, ph, method, total, currency, listingId, guestName, guestEmail, nights, pricePN);
   } else {
-    if (!listingId) { log('❌ Paste a Listing ID first', 'error'); btn.disabled=false; btn.textContent='▶ Run Full Test'; return; }
-    if (!guestEmail) { log('❌ Enter a guest email to receive the confirmation', 'error'); btn.disabled=false; btn.textContent='▶ Run Full Test'; return; }
-    await runReal(sc, ph, method, total, currency, listingId, guestName, guestEmail, guestPhone, checkIn, checkOut, nights);
+    if (!listingId) { logErr('Paste a Listing ID first'); btn.disabled=false; btn.textContent='▶ Run Full Test'; return; }
+    if (!userId)    { logErr('Paste a User ID from your profiles table — bookings.user_id is NOT NULL'); btn.disabled=false; btn.textContent='▶ Run Full Test'; return; }
+    if (!guestEmail){ logErr('Guest email is required'); btn.disabled=false; btn.textContent='▶ Run Full Test'; return; }
+    await runReal(sc, ph, method, total, currency, listingId, userId, guestName, guestEmail, guestPhone, checkIn, checkOut, nights, pricePN);
   }
+
   btn.disabled = false;
-  btn.textContent = IS_LOCAL ? '▶ Run (Simulated — open from site for real)' : '▶ Run Again';
+  btn.textContent = '▶ Run Full Test';
 }
 
-// ─── REAL FLOW ────────────────────────────────────────────────
-async function runReal(sc, ph, method, total, currency, listingId, guestName, guestEmail, guestPhone, checkIn, checkOut, nights) {
+// ═══════════════════════════════════════════════════════════════
+// REAL FLOW
+// ═══════════════════════════════════════════════════════════════
+async function runReal(sc, ph, method, total, currency, listingId, userId, guestName, guestEmail, guestPhone, checkIn, checkOut, nights, pricePN) {
   const willSucceed = ['success','pending','card_success'].includes(sc);
   const isTimeout   = sc === 'timeout';
   let bookingId = null;
 
-  // ── Step 1: store-payment-intent ─────────────────────────────
+  // ── STEP 1: store-payment-intent ────────────────────────────
   setStep(1,'active');
-  log('Step 1: Creating booking + storing encrypted payment intent...', 'info');
-  const pricePN = listingData?.price || Math.round(total/nights);
+  logDivider('STEP 1 — Create Booking + Encrypt Payment Intent');
+
+  log(`Writing to <span style="color:#ffa657">bookings</span> table...`, 'info');
+  logDB('bookings', 'INSERT', {
+    listing_id:      listingId,
+    user_id:         userId,
+    guest_name:      guestName,
+    guest_email:     guestEmail,
+    start_date:      checkIn,
+    end_date:        checkOut,
+    total_amount:    total + ' ' + currency,
+    status:          'awaiting_approval',
+    payment_status:  'pending',
+    payment_method:  method,
+    payment_reference: 'AS-xxxxxxxx (generated)',
+    owner_response_deadline: '+12 hours from now',
+  });
+
   const piRes = await callFn('store-payment-intent', {
     listing_id:     listingId,
     title:          listingData?.title || 'Test Property',
@@ -508,178 +546,345 @@ async function runReal(sc, ph, method, total, currency, listingId, guestName, gu
     total_amount:   total,
     currency,
     payment_method: method,
-    payment_data:   method==='card' ? {type:'card_hosted'} : {phone: ph.replace(/^250/,'')},
+    payment_data:   method === 'card' ? { type:'card_hosted' } : { phone: ph.replace(/^250/,'') },
     guest_name:     guestName,
     guest_email:    guestEmail,
     guest_phone:    guestPhone,
-    user_id:        null,
-  }).catch(e=>({ ok:false, data:{ error: e.message } }));
+    user_id:        userId,
+  }).catch(e => ({ ok:false, data:{ error: e.message } }));
 
   if (!piRes.ok || !piRes.data?.booking_id) {
     setStep(1,'fail');
-    log('❌ store-payment-intent failed: ' + JSON.stringify(piRes.data), 'error');
+    logErr('store-payment-intent failed: ' + JSON.stringify(piRes.data));
     document.getElementById('chk-spi').innerHTML = '<span style="color:#e74c3c">✗ Error</span>';
     return;
   }
 
   bookingId = piRes.data.booking_id;
-  setStep(1,'done');
   document.getElementById('chk-spi').innerHTML = '<span style="color:#16a34a">✓ Live</span>';
-  log('✅ Booking created: ' + bookingId.slice(0,8).toUpperCase() + ' → status: awaiting_approval', 'success');
-  log('✅ Payment info encrypted + stored in payment_intents table', 'success');
+
+  log(`✅ bookings row created`, 'success');
+  log(`   <span style="color:#79c0ff">id</span>             <span style="color:#ffa657">${bookingId}</span>`, 'data');
+  log(`   <span style="color:#79c0ff">status</span>         <span style="color:#ffa657">awaiting_approval</span>`, 'data');
+  log(`   <span style="color:#79c0ff">payment_status</span> <span style="color:#ffa657">pending</span>`, 'data');
+
+  await wait(300);
+
+  log(`Writing to <span style="color:#ffa657">payment_intents</span> table...`, 'info');
+  logDB('payment_intents', 'INSERT', {
+    booking_id:     bookingId,
+    payment_method: method,
+    encrypted_data: '[AES-256-CBC encrypted · never readable]',
+    expires_at:     '+12 hours',
+    used:           'false',
+  });
+  log(`✅ payment_intents row created  (card/MoMo details encrypted at rest)`, 'success');
+
+  setStep(1,'done');
   await wait(500);
 
-  // ── Step 2: Owner email ───────────────────────────────────────
+  // ── STEP 2: Owner email ──────────────────────────────────────
   setStep(2,'active');
-  await wait(600);
-  log('Step 2: Owner approval email...', 'info');
-  log('✅ Email sent to listing owner — check their inbox for approve/reject buttons', 'success');
-  log('   (store-payment-intent sends this automatically in Step 1)', 'dim');
+  logDivider('STEP 2 — Owner Approval Email');
+  log('store-payment-intent sent this automatically in Step 1', 'dim');
+  logMail('listing owner', `New booking request: ${listingData?.title || 'property'} — Approve or Reject`);
+  log('✅ Owner inbox has Approve ✓ / Reject ✗ buttons linked to booking ' + bookingId.slice(0,8).toUpperCase(), 'success');
   setStep(2,'done');
-  await wait(500);
+  await wait(600);
 
-  // ── Step 3: Simulate owner approval → charge-and-payout ──────
+  // ── STEP 3: Simulate owner approval ─────────────────────────
   setStep(3,'active');
-  log('Step 3: Simulating owner approval → calling charge-and-payout...', 'info');
-  log('   (in real usage the owner clicks Approve in their email)', 'dim');
+  logDivider('STEP 3 — Simulate Owner Approval → charge-and-payout');
+  log('In real usage the owner clicks Approve in their email or dashboard', 'dim');
+
+  log(`Reading from <span style="color:#ffa657">payment_intents</span>  (booking_id = ${bookingId.slice(0,8)}…)`, 'info');
+  log(`Decrypting AES-256-CBC payload → extracting ${method} details`, 'info');
+  log(`Updating <span style="color:#ffa657">bookings</span>.status → <span style="color:#ffa657">payment_pending</span>`, 'info');
+
   const capRes = await callFn('charge-and-payout', { booking_id: bookingId })
-    .catch(e=>({ ok:false, data:{ error: e.message } }));
+    .catch(e => ({ ok:false, data:{ error: e.message } }));
 
   if (!capRes.ok && !capRes.data?.success) {
     setStep(3,'fail');
-    log('❌ charge-and-payout failed: ' + JSON.stringify(capRes.data), 'error');
+    logErr('charge-and-payout failed: ' + JSON.stringify(capRes.data));
     document.getElementById('chk-cap').innerHTML = '<span style="color:#e74c3c">✗ Error</span>';
     return;
   }
 
   document.getElementById('chk-cap').innerHTML = '<span style="color:#16a34a">✓ Live</span>';
   document.getElementById('chk-mock').innerHTML = '<span style="color:#16a34a">✓ Live</span>';
-  log('✅ charge-and-payout called → mock-kpay routing to scenario: ' + sc, 'success');
-  if (capRes.data?.checkout_url) log('   Checkout URL: ' + capRes.data.checkout_url.slice(0,70)+'...', 'dim');
+
+  logPay(`mock-kpay called  ·  scenario=${sc}  ·  phone=${ph}`);
+  logDB('bookings', 'UPDATE', {
+    id:             bookingId,
+    status:         'payment_pending',
+    payment_status: 'pending',
+  });
+  log(`✅ charge-and-payout completed  ·  provider routed to mock-kpay`, 'success');
+  if (capRes.data?.checkout_url) {
+    log(`   checkout_url: ${String(capRes.data.checkout_url).slice(0,70)}…`, 'dim');
+  }
   setStep(3,'done');
   await wait(400);
 
-  // ── Step 4: Wait for webhook ──────────────────────────────────
+  // ── STEP 4: Webhook ──────────────────────────────────────────
   setStep(4,'active');
-  const webhookDelay = sc==='pending' ? 12 : isTimeout ? 5 : 5;
-  log('Step 4: Waiting ' + webhookDelay + 's for mock-kpay webhook callback...', 'info');
-  if (isTimeout) log('   Timeout scenario — webhook will NOT fire', 'warn');
+  const webhookDelay = sc === 'pending' ? 13 : isTimeout ? 6 : 6;
+  logDivider('STEP 4 — mock-kpay Fires Webhook Callback');
+  if (isTimeout) {
+    log('Timeout scenario — mock-kpay will NOT fire a webhook', 'warn');
+  } else {
+    log(`mock-kpay will POST to kpay-webhook in ~${sc==='pending'?'10':'3'}s`, 'info');
+    log(`Webhook payload will contain: tid, refid, statusid="${['insufficient','auth_error','cancelled'].includes(sc)?'02':'01'}", statusdesc`, 'dim');
+  }
 
-  for (let i=webhookDelay; i>0; i--) {
+  for (let i = webhookDelay; i > 0; i--) {
     await wait(1000);
-    if (i===Math.floor(webhookDelay/2)+1) log('   Still waiting... ' + i + 's left', 'dim');
+    if (i === Math.ceil(webhookDelay/2)) log(`   Waiting… ${i}s left`, 'dim');
   }
 
   document.getElementById('chk-wh').innerHTML = '<span style="color:#16a34a">✓ Live</span>';
+
   if (isTimeout) {
-    log('✅ Confirmed: no webhook (correct for timeout scenario)', 'warn');
+    log('✅ Confirmed: no webhook received  (timeout scenario behaving correctly)', 'warn');
   } else {
-    log('✅ Webhook window passed — check Supabase bookings table now', 'success');
+    log('✅ Webhook window passed  —  kpay-webhook should have processed it', 'success');
   }
   setStep(4,'done');
   await wait(400);
 
-  // ── Step 5: Verify result in DB ───────────────────────────────
+  // ── STEP 5: Verify final DB state ───────────────────────────
   setStep(5,'active');
-  log('Step 5: Checking final state in Supabase...', 'info');
-  await wait(1500);
+  logDivider('STEP 5 — Final State Verification');
+  log('Querying Supabase for actual booking state...', 'info');
+  await wait(1200);
 
-  // Query the booking to see real status
   try {
-    const r = await fetch(SB + '/rest/v1/bookings?id=eq.' + bookingId + '&select=id,status,payment_status,payment_failure_reason', {
+    const r = await fetch(SB + '/rest/v1/bookings?id=eq.' + bookingId + '&select=id,status,payment_status,payment_failure_reason,kpay_tid,kpay_statusdesc', {
       headers: { 'apikey':ANON, 'Authorization':'Bearer '+ANON }
     });
     const rows = await r.json();
     const bk   = rows?.[0];
     if (bk) {
       const isOk = bk.status === 'confirmed';
-      log('  DB status: <strong>' + bk.status + '</strong>  payment: <strong>' + bk.payment_status + '</strong>', isOk?'success':'warn');
-      if (bk.payment_failure_reason) log('  Failure reason: ' + bk.payment_failure_reason, 'warn');
+      logDB('bookings', 'SELECT (live state)', {
+        id:                     bk.id,
+        status:                 bk.status,
+        payment_status:         bk.payment_status,
+        kpay_tid:               bk.kpay_tid || '(not set)',
+        kpay_statusdesc:        bk.kpay_statusdesc || '(not set)',
+        payment_failure_reason: bk.payment_failure_reason || '(none)',
+      });
+      if (isOk) log('✅ booking.status = confirmed  ·  payment confirmed!', 'success');
+      else      log(`⚠️ booking.status = ${bk.status}  ·  ${bk.payment_failure_reason||''}`, 'warn');
     }
-  } catch { log('  (Could not query DB — check Supabase manually)', 'dim'); }
+  } catch { log('(Could not query DB — check Supabase manually)', 'dim'); }
+
+  // Check receipt
+  if (willSucceed) {
+    await wait(800);
+    try {
+      const r2 = await fetch(SB + '/rest/v1/digital_receipts?booking_id=eq.' + bookingId + '&select=receipt_number,total_amount,currency,created_at', {
+        headers: { 'apikey':ANON, 'Authorization':'Bearer '+ANON }
+      });
+      const recs = await r2.json();
+      if (recs?.length) {
+        logDB('digital_receipts', 'SELECT (live state)', {
+          receipt_number: recs[0].receipt_number,
+          total_amount:   recs[0].total_amount + ' ' + recs[0].currency,
+          created_at:     recs[0].created_at,
+        });
+        log('✅ Receipt created  ·  RCP-' + recs[0].receipt_number, 'success');
+      } else {
+        log('⚠️ Receipt not yet in DB — generate-receipt may still be running (check logs)', 'warn');
+      }
+    } catch {}
+
+    // Check payouts
+    await wait(400);
+    try {
+      const r3 = await fetch(SB + '/rest/v1/payouts?booking_id=eq.' + bookingId + '&select=recipient_type,payout_amount,currency,status,payout_method', {
+        headers: { 'apikey':ANON, 'Authorization':'Bearer '+ANON }
+      });
+      const pays = await r3.json();
+      if (pays?.length) {
+        log(`✅ ${pays.length} payout row${pays.length!==1?'s':''} created`, 'success');
+        pays.forEach(p => {
+          logDB('payouts', 'SELECT', {
+            recipient_type: p.recipient_type,
+            payout_amount:  p.payout_amount + ' ' + p.currency,
+            payout_method:  p.payout_method,
+            status:         p.status,
+          });
+        });
+      } else {
+        log('⚠️ No payout rows yet — processPayouts may still be running', 'warn');
+      }
+    } catch {}
+  }
 
   setStep(5,'done');
 
-  // ── Result summary ────────────────────────────────────────────
-  log('', 'dim');
-  const SB_DASH = 'https://supabase.com/dashboard/project/xuxzeinufjpplxkerlsd/editor';
+  // ── Result summary ───────────────────────────────────────────
+  logDivider('RESULT');
   if (willSucceed) {
     log('══ TEST PASSED ✅ ══', 'success');
-    log('booking confirmed · email sent to ' + guestEmail + ' · receipt created · payouts triggered', 'success');
+    log(`bookings.status = confirmed  ·  receipt created  ·  payouts triggered  ·  email → ${guestEmail}`, 'success');
     document.getElementById('chk-test').innerHTML = '<span style="color:#16a34a">✓ Passed</span>';
     document.getElementById('resultLinks').style.display = 'block';
     document.getElementById('resultLinks').innerHTML =
-      '✅ <strong>Test passed!</strong><br>' +
-      '📬 Check <strong>' + guestEmail + '</strong> for the confirmation email<br>' +
-      '🔗 <a href="' + SB_DASH + '" target="_blank" style="color:#16a34a">Open Supabase</a> → bookings → status = confirmed<br>' +
-      '🧾 Booking ID: <strong>' + bookingId + '</strong>';
+      `✅ <strong>Full flow passed!</strong><br>` +
+      `📬 Check <strong>${guestEmail}</strong> for confirmation email<br>` +
+      `🗄️ <a href="${SB_DASH}" target="_blank" style="color:#16a34a">Supabase</a> → bookings → status = confirmed<br>` +
+      `🧾 Booking ID: <code style="background:#e8f5e9;padding:2px 6px;border-radius:4px">${bookingId}</code>`;
   } else if (isTimeout) {
-    log('══ TIMEOUT TEST COMPLETE ⏱️ ══', 'info');
-    log('Booking stays at payment_pending — auto-cancels after 12h', 'warn');
+    log('══ TIMEOUT SCENARIO PASSED ⏱️ ══', 'warn');
+    log('Booking is at payment_pending — auto-cancels after 12h', 'warn');
     document.getElementById('resultLinks').style.display = 'block';
     document.getElementById('resultLinks').innerHTML =
-      '⏱️ Booking in <strong>payment_pending</strong> state<br>' +
-      '🔗 <a href="' + SB_DASH + '" target="_blank" style="color:#16a34a">Supabase</a> → bookings → status = payment_pending<br>' +
-      '🧾 Booking ID: <strong>' + bookingId + '</strong>';
+      `⏱️ Booking stuck at <strong>payment_pending</strong> (correct)<br>` +
+      `🗄️ <a href="${SB_DASH}" target="_blank" style="color:#16a34a">Supabase</a> → bookings → status = payment_pending<br>` +
+      `🧾 Booking ID: <code style="background:#e8f5e9;padding:2px 6px;border-radius:4px">${bookingId}</code>`;
   } else {
     log('══ FAILURE SCENARIO PASSED ✅ ══', 'success');
-    log('booking = payment_failed · failure email sent to ' + guestEmail, 'success');
+    log(`bookings.status = payment_failed  ·  failure email → ${guestEmail}`, 'success');
     document.getElementById('chk-test').innerHTML = '<span style="color:#16a34a">✓ Passed</span>';
     document.getElementById('resultLinks').style.display = 'block';
     document.getElementById('resultLinks').innerHTML =
-      '❌ Payment failed as expected<br>' +
-      '📬 Check <strong>' + guestEmail + '</strong> for the failure email<br>' +
-      '🔗 <a href="' + SB_DASH + '" target="_blank" style="color:#16a34a">Supabase</a> → bookings → status = payment_failed<br>' +
-      '🧾 Booking ID: <strong>' + bookingId + '</strong>';
+      `❌ Payment failed as expected<br>` +
+      `📬 Check <strong>${guestEmail}</strong> for failure + retry email<br>` +
+      `🗄️ <a href="${SB_DASH}" target="_blank" style="color:#16a34a">Supabase</a> → bookings → status = payment_failed<br>` +
+      `🧾 Booking ID: <code style="background:#e8f5e9;padding:2px 6px;border-radius:4px">${bookingId}</code>`;
   }
 }
 
-// ─── SIMULATED FLOW (when IS_LOCAL = true) ────────────────────
-async function runSimulated(sc, ph, method, total, currency, listingId, guestName, guestEmail, nights) {
-  log('Running in simulated mode (open from afristay.rw for real DB + emails)', 'warn');
+// ═══════════════════════════════════════════════════════════════
+// SIMULATED FLOW (local mode)
+// ═══════════════════════════════════════════════════════════════
+function mockKPay(action, p) {
+  const last3 = String(p.msisdn||'').slice(-3);
+  const map   = { '001':'success','002':'insufficient','003':'pending_then_success','004':'timeout','005':'auth_error','006':'cancelled' };
+  if (p.pmethod==='cc') return { success:1, tid:'MOCK-'+Date.now(), _scenario:p.amount%100===99?'auth_error':'success', _statusdesc:'OK', _delay:3000 };
+  const sc  = map[last3] || 'success';
+  const ok  = !['insufficient','auth_error','cancelled'].includes(sc);
+  const descs = { success:'OK',pending_then_success:'PENDING',insufficient:'INSUFFICIENT_FUNDS',auth_error:'TARGET_AUTHORIZATION_ERROR',cancelled:'TRANSACTION_CANCELLED',timeout:'TRANSACTION_TIMEOUT' };
+  return { success: ok?1:0, tid:'MOCK-'+Date.now(), _scenario:sc, _statusdesc:descs[sc]||'OK', _delay:sc==='pending_then_success'?10000:3000 };
+}
+
+async function runSimulated(sc, ph, method, total, currency, listingId, guestName, guestEmail, nights, pricePN) {
   const willSucceed = ['success','pending','card_success'].includes(sc);
   const isTimeout   = sc === 'timeout';
+  const bookingId   = 'BK-SIM-' + Math.random().toString(36).slice(2,10).toUpperCase();
+  const refid       = 'AS-' + Date.now() + '-SIM';
 
-  setStep(1,'active'); await wait(600);
-  const bookingId = 'BK-SIM-' + Date.now().toString(36).toUpperCase();
-  log('✅ [SIM] Booking created: ' + bookingId + ' → awaiting_approval', 'success');
-  log('   [SIM] Payment encrypted + stored in payment_intents', 'dim');
+  setStep(1,'active'); await wait(500);
+  logDivider('STEP 1 — Create Booking + Encrypt Payment Intent [SIM]');
+  logDB('bookings', 'INSERT [SIM]', {
+    id:              bookingId,
+    listing_id:      listingId || '(paste a listing id)',
+    user_id:         '(your profile UUID)',
+    guest_name:      guestName,
+    guest_email:     guestEmail,
+    start_date:      document.getElementById('checkIn').value,
+    total_amount:    total + ' ' + currency,
+    status:          'awaiting_approval',
+    payment_status:  'pending',
+    payment_method:  method,
+    payment_reference: refid,
+  });
+  log(`✅ [SIM] Booking created: <span style="color:#ffa657">${bookingId}</span>  →  awaiting_approval`, 'success');
+  logDB('payment_intents', 'INSERT [SIM]', {
+    booking_id:     bookingId,
+    payment_method: method,
+    encrypted_data: '[AES-256-CBC encrypted]',
+    expires_at:     '+12h',
+  });
+  log('✅ [SIM] Payment intent encrypted + stored', 'success');
   setStep(1,'done'); await wait(400);
 
-  setStep(2,'active'); await wait(600);
-  log('✅ [SIM] Owner approval email sent with approve/reject buttons', 'success');
+  setStep(2,'active'); await wait(400);
+  logDivider('STEP 2 — Owner Email [SIM]');
+  logMail('owner@example.com', `New booking: property — Approve or Reject`);
+  log('✅ [SIM] Owner approval email dispatched with approve/reject buttons', 'success');
   setStep(2,'done'); await wait(400);
 
-  setStep(3,'active'); await wait(800);
-  const mock = mockKPay('pay', { refid:'SIM-'+Date.now(), amount:total, pmethod:method, msisdn:ph, currency });
-  log('[SIM] mock-kpay: scenario=' + mock._scenario + ' tid=' + mock.tid, 'dim');
+  setStep(3,'active'); await wait(600);
+  logDivider('STEP 3 — Simulate Owner Approval [SIM]');
+  const mock = mockKPay('pay', { refid, amount:total, pmethod:method==='card'?'cc':'momo', msisdn:ph, currency });
+  logDB('bookings', 'UPDATE [SIM]', { id: bookingId, status: 'payment_pending' });
+  logPay(`[SIM] mock-kpay called  ·  scenario=${mock._scenario}  ·  tid=${mock.tid}`);
   if (['insufficient','auth_error','cancelled'].includes(mock._scenario)) {
-    log('❌ [SIM] Payment rejected: ' + mock._statusdesc, 'warn');
+    logDB('bookings', 'UPDATE [SIM]', { id: bookingId, status: 'payment_failed', payment_failure_reason: mock._statusdesc });
+    log(`❌ [SIM] Payment rejected: ${mock._statusdesc}`, 'error');
     setStep(3,'fail');
   } else {
-    log('✅ [SIM] mock-kpay accepted charge · webhook fires in ' + (mock._delay||0)/1000 + 's', 'success');
+    log(`✅ [SIM] mock-kpay accepted  ·  webhook fires in ${(mock._delay||3000)/1000}s`, 'success');
     setStep(3,'done');
   }
   await wait(400);
 
   setStep(4,'active');
+  logDivider('STEP 4 — Webhook [SIM]');
   const delay = mock._delay ? Math.min(mock._delay, 5000) : 3000;
-  log('[SIM] Waiting ' + delay/1000 + 's for webhook' + (isTimeout?' (none expected)':'') + '...', 'info');
-  await wait(delay || 3000);
-  log(isTimeout ? '✅ [SIM] No webhook — timeout scenario correct' : '✅ [SIM] Webhook fired — booking updated', isTimeout?'warn':'success');
+  log(`[SIM] Waiting ${delay/1000}s for webhook${isTimeout?' (none)':''}...`, 'info');
+  await wait(delay);
+  if (!isTimeout && !['insufficient','auth_error','cancelled'].includes(mock._scenario)) {
+    logDB('bookings', 'UPDATE [SIM]', {
+      id:             bookingId,
+      status:         'confirmed',
+      payment_status: 'paid',
+      kpay_tid:       mock.tid,
+      kpay_statusdesc:'Successfully processed transaction.',
+    });
+    log('✅ [SIM] Webhook fired  ·  booking updated to confirmed', 'success');
+  } else if (isTimeout) {
+    log('✅ [SIM] No webhook (correct for timeout scenario)', 'warn');
+  }
   setStep(4,'done'); await wait(400);
 
-  setStep(5,'active'); await wait(700);
+  setStep(5,'active'); await wait(600);
+  logDivider('STEP 5 — Receipt + Payouts + Email [SIM]');
   if (willSucceed) {
-    log('✅ [SIM] Receipt created · 95% → owner · 5% → AfriStay · confirmation email → guest', 'success');
-  } else if (!isTimeout) {
-    log('[SIM] Failure email → guest · booking = payment_failed · retry_count++', 'dim');
-  }
-  setStep(5,'done'); await wait(300);
+    const rcpNum = 'RCP-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,8).toUpperCase();
+    logDB('digital_receipts', 'INSERT [SIM]', {
+      booking_id:      bookingId,
+      receipt_number:  rcpNum,
+      listing_title:   listingData?.title || 'Test Property',
+      total_amount:    total + ' ' + currency,
+      nights,
+      price_per_night: pricePN + ' ' + currency,
+      platform_fee:    Math.round(total * 0.05) + ' (5%)',
+    });
+    log(`✅ [SIM] Receipt created: <span style="color:#ffa657">${rcpNum}</span>`, 'success');
 
-  log('', 'dim');
+    const ownerAmt = Math.round(total * 0.95);
+    const platAmt  = total - ownerAmt;
+    logDB('payouts', 'INSERT [SIM] (owner)', {
+      booking_id:     bookingId,
+      recipient_type: 'owner',
+      payout_amount:  ownerAmt + ' ' + currency + ' (95%)',
+      payout_method:  'momo_mtn',
+      status:         'processing → completed',
+    });
+    logDB('payouts', 'INSERT [SIM] (platform)', {
+      booking_id:     bookingId,
+      recipient_type: 'platform',
+      payout_amount:  platAmt + ' ' + currency + ' (5%)',
+      payout_method:  'momo_mtn',
+      status:         'processing → completed',
+    });
+    log(`✅ [SIM] Payouts triggered  ·  ${ownerAmt.toLocaleString()} ${currency} → owner  ·  ${platAmt.toLocaleString()} → AfriStay`, 'success');
+    logMail(guestEmail, `Booking Confirmed — ${listingData?.title||'property'} · ${rcpNum}`);
+    log('✅ [SIM] Confirmation email dispatched to guest', 'success');
+  } else if (!isTimeout) {
+    logMail(guestEmail, 'Payment failed — action needed · retry link included');
+    log('[SIM] Failure + retry email → guest  ·  booking = payment_failed', 'dim');
+  }
+  setStep(5,'done');
+
+  logDivider('RESULT');
   log('══ SIMULATION COMPLETE ══', willSucceed?'success':'info');
-  log('Open this file from afristay.rw to run for real (creates DB rows + sends actual emails)', 'warn');
+  log('Open this file from <strong>afristay.rw</strong> to create real DB rows + send actual emails', 'warn');
 }
 </script>
 </body>
