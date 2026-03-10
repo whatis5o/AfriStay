@@ -12,7 +12,7 @@ console.log("🚀 [ADMIN] Loading dashboard.js...");
 /* ===========================
    CONFIG
    =========================== */
-const DEMO_MODE = true; // Set to false for production
+const DEMO_MODE = false; // Set to true only when testing with mock provider
 
 /* ═══════════════════════════════════════════════
    EMAILJS CONFIG  — fill in after creating your account at emailjs.com

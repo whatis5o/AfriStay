@@ -504,7 +504,7 @@ window.downloadReceipt = async function(bookingId) {
         toast('Generating PDF...', 'info');
 
         // 3. Fetch Listing & Owner details for the PDF
-        const { data: l } = await _sb.from('listings').select('title, price, currency, address, province_id, district_id, owner_id').eq('id', b.listing_id).single();
+        const { data: l } = await _sb.from('listings').select('title, price, currency, address, province_id, district_id, owner_id, category_slug').eq('id', b.listing_id).single();
         const { data: owner } = await _sb.from('profiles').select('full_name, email, phone').eq('id', l?.owner_id).single();
 
         let loc = l?.address || 'Rwanda';
@@ -567,19 +567,23 @@ window.downloadReceipt = async function(bookingId) {
             doc.setDrawColor(240,240,240); doc.line(M, y-1, W-M, y-1); y += 2;
         };
 
-        secHead('PROPERTY');
+        const isVeh = l?.category_slug === 'vehicle';
+        const unit = isVeh ? 'day' : 'night';
+        const rateLabel = isVeh ? 'Rate per Day' : 'Rate per Night';
+
+        secHead(isVeh ? 'VEHICLE' : 'PROPERTY');
         doc.setTextColor(20,20,20); doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.text(l?.title || '—', M, y); y += 7;
         doc.setTextColor(100,100,100); doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.text('📍 ' + loc, M, y); y += 14;
 
         secHead('BOOKING DETAILS');
-        row('Check-in',  fmt(b.start_date));
-        row('Check-out', fmt(b.end_date));
-        row('Duration',  nights + ' night' + (nights !== 1 ? 's' : ''));
+        row(isVeh ? 'Pick-up Date' : 'Check-in',   fmt(b.start_date));
+        row(isVeh ? 'Return Date'  : 'Check-out',  fmt(b.end_date));
+        row('Duration',  nights + ' ' + unit + (nights !== 1 ? 's' : ''));
         row('Status',    '✓ Paid & Confirmed');
         y += 4;
 
         secHead('PAYMENT');
-        row('Rate per Night', pricePN + ' ' + currency);
+        row(rateLabel, pricePN + ' ' + currency);
         row('Payment Method', payMethod);
         y += 2;
 
@@ -612,7 +616,7 @@ window.downloadReceipt = async function(bookingId) {
         console.error('❌ [RECEIPT] Error:', err);
         toast('Could not generate receipt: ' + err.message, 'error');
     }
-};r
+};
 
 /* ══════════════════════════════════════════════
    IMAGE RESOLVER  (table → storage fallback)

@@ -294,25 +294,61 @@ async function initReviewForm() {
     const formSection = document.getElementById('reviewFormSection');
     if (!formSection) return;
 
+    // Context-aware language based on listing type
+    const isVeh = CURRENT_LISTING?.category_slug === 'vehicle';
+    const thing    = isVeh ? 'vehicle' : 'property';
+    const action   = isVeh ? 'rented this vehicle' : 'stayed at this property';
+    const noun     = isVeh ? 'rental' : 'stay';
+
     if (!CURRENT_USER) {
-        formSection.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fa-solid fa-star" style="font-size:26px;color:#f1c40f;margin-bottom:10px;display:block;"></i><p style="color:#555;font-size:14px;margin:0;"><a href="/Auth" style="color:#EB6753;font-weight:700;text-decoration:none;">Sign in</a> to leave a review — anyone who\'s visited or used this service can share their experience!</p></div>';
+        formSection.innerHTML =
+            '<div style="text-align:center;padding:20px;">' +
+            '<i class="fa-solid fa-star" style="font-size:26px;color:#f1c40f;margin-bottom:10px;display:block;"></i>' +
+            '<p style="color:#555;font-size:14px;margin:0;">' +
+            '<a href="/Auth" style="color:#EB6753;font-weight:700;text-decoration:none;">Sign in</a> ' +
+            'to leave a review — guests who have ' + action + ' can share their experience.' +
+            '</p></div>';
+        return;
+    }
+
+    // Check if this user has a completed booking for this listing
+    const { data: completedBooking } = await _supabase
+        .from('bookings')
+        .select('id')
+        .eq('listing_id', LISTING_ID)
+        .eq('user_id', CURRENT_USER.id)
+        .eq('status', 'completed')
+        .maybeSingle();
+
+    if (!completedBooking) {
+        formSection.innerHTML =
+            '<div style="background:#f9f9f9;border:1.5px solid #ececec;border-radius:12px;padding:18px 20px;text-align:center;">' +
+            '<i class="fa-solid fa-lock" style="font-size:22px;color:#ccc;margin-bottom:10px;display:block;"></i>' +
+            '<p style="font-weight:700;color:#555;margin:0 0 5px;font-size:14px;">Review not available yet</p>' +
+            '<p style="color:#aaa;font-size:13px;margin:0;">Only guests who have completed a ' + noun + ' of this ' + thing + ' can leave a review. ' +
+            (isVeh ? 'Once your rental is marked complete, come back here to share your experience.' : 'Once your stay is marked complete, come back here to share your experience.') +
+            '</p></div>';
         return;
     }
 
     const { data: existingReview } = await _supabase.from('reviews').select('id').eq('listing_id', LISTING_ID).eq('user_id', CURRENT_USER.id).maybeSingle();
     if (existingReview) {
-        formSection.innerHTML = '<p style="color:#2ecc71;font-size:14px;text-align:center;margin:0;"><i class="fa-solid fa-circle-check"></i> You\'ve already reviewed this listing. Thank you!</p>';
+        formSection.innerHTML = '<p style="color:#2ecc71;font-size:14px;text-align:center;margin:0;"><i class="fa-solid fa-circle-check"></i> You\'ve already reviewed this ' + thing + '. Thank you!</p>';
         return;
     }
 
+    const placeholder = isVeh
+        ? 'How was the drive? Condition, pickup experience, anything to know...'
+        : 'How was your stay? Cleanliness, location, host, anything to know...';
+
     formSection.innerHTML =
         '<h3 style="margin:0 0 6px;font-size:16px;color:#222;"><i class="fa-solid fa-star" style="color:#f1c40f;margin-right:6px;"></i>Leave a Review</h3>' +
-        '<p style="font-size:13px;color:#aaa;margin:0 0 14px;">Visited, stayed, or used this service? Share your experience!</p>' +
+        '<p style="font-size:13px;color:#aaa;margin:0 0 14px;">You\'ve ' + action + ' — share your experience!</p>' +
         '<div id="starPicker" style="display:flex;gap:8px;margin-bottom:16px;cursor:pointer;">' +
         [1,2,3,4,5].map(n => '<i class="fa-regular fa-star review-star" style="font-size:28px;color:#ddd;transition:color 0.12s;" onmouseover="hoverStars(' + n + ')" onmouseout="resetStars()" onclick="selectStar(' + n + ')"></i>').join('') +
         '</div>' +
         '<input type="hidden" id="reviewRating" value="0">' +
-        '<textarea id="reviewComment" placeholder="Tell others what you thought (optional)..." rows="3" style="width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;font-family:\'Inter\',sans-serif;font-size:14px;resize:vertical;margin-bottom:12px;outline:none;box-sizing:border-box;"></textarea>' +
+        '<textarea id="reviewComment" placeholder="' + placeholder + '" rows="3" style="width:100%;padding:14px;border:1px solid #ddd;border-radius:10px;font-family:\'Inter\',sans-serif;font-size:14px;resize:vertical;margin-bottom:12px;outline:none;box-sizing:border-box;"></textarea>' +
         '<button onclick="submitReview()" style="background:#EB6753;color:#fff;border:none;padding:12px 26px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">Submit Review</button>' +
         '<p id="reviewMsg" style="margin:10px 0 0;font-size:13px;font-weight:500;"></p>';
 }
@@ -349,12 +385,23 @@ window.submitReview = async () => {
 
 function initBookingForm() {
     const bookingForm = document.getElementById('bookingForm');
+    if (!bookingForm) return;
+
     if (!CURRENT_USER) {
         bookingForm.innerHTML = '<div style="text-align:center;padding:12px;"><p style="color:#666;margin-bottom:14px;font-size:14px;">Sign in to check availability and book.</p><a href="/Auth" class="book-btn" style="text-decoration:none;">Sign In to Book</a></div>';
         return;
     }
+
+    // Owner cannot book their own listing
+    if (CURRENT_LISTING?.owner_id && CURRENT_LISTING.owner_id === CURRENT_USER.id) {
+        bookingForm.innerHTML = '<div style="background:#f0f4ff;border:1.5px solid #c7d7f5;border-radius:12px;padding:16px 18px;text-align:center;"><i class="fa-solid fa-house-user" style="color:#4a6fa5;font-size:22px;margin-bottom:8px;display:block;"></i><p style="color:#4a6fa5;font-weight:700;margin:0 0 4px;font-size:14px;">This is your listing</p><p style="color:#6683aa;font-size:13px;margin:0;">You cannot book your own property.</p></div>';
+        return;
+    }
+
     if (CURRENT_LISTING?.availability_status !== 'available') {
-        bookingForm.innerHTML = '<p style="color:#c0392b;text-align:center;font-weight:600;background:#fde8e8;padding:14px;border-radius:10px;margin:0;"><i class="fa-solid fa-circle-xmark"></i> Not Available for Booking</p>';
+        const status = CURRENT_LISTING?.availability_status || 'unavailable';
+        const msg = status === 'booked' ? 'Currently Booked' : 'Not Available for Booking';
+        bookingForm.innerHTML = '<p style="color:#c0392b;text-align:center;font-weight:600;background:#fde8e8;padding:14px;border-radius:10px;margin:0;"><i class="fa-solid fa-circle-xmark"></i> ' + msg + '</p>';
         return;
     }
     const startDate = document.getElementById('bookingStartDate');
@@ -369,7 +416,9 @@ function initBookingForm() {
         const days = Math.round((new Date(e) - new Date(s)) / 86400000);
         if (days <= 0) { totalEl.textContent = ''; return; }
         const price = CURRENT_LISTING?.price || 0, currency = CURRENT_LISTING?.currency || 'RWF';
-        totalEl.innerHTML = days + ' night' + (days > 1 ? 's' : '') + ' × ' + Number(price).toLocaleString('en-RW') + ' ' + currency + ' = <span style="color:#EB6753;font-weight:700;">' + Number(days * price).toLocaleString('en-RW') + ' ' + currency + '</span>';
+        const isVeh = CURRENT_LISTING?.category_slug === 'vehicle';
+        const unit = isVeh ? 'day' : 'night';
+        totalEl.innerHTML = days + ' ' + unit + (days > 1 ? 's' : '') + ' × ' + Number(price).toLocaleString('en-RW') + ' ' + currency + ' = <span style="color:#EB6753;font-weight:700;">' + Number(days * price).toLocaleString('en-RW') + ' ' + currency + '</span>';
     }
     startDate?.addEventListener('change', () => { calcTotal(); if (endDate && startDate.value) endDate.min = startDate.value; });
     endDate?.addEventListener('change', calcTotal);
@@ -387,7 +436,7 @@ function goToCheckout() {
     const totalAmount = days * (CURRENT_LISTING?.price || 0);
     const currency = CURRENT_LISTING?.currency || 'RWF';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Redirecting...'; }
-    const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: CURRENT_LISTING?.price || 0, currency, total: totalAmount });
+    const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: CURRENT_LISTING?.price || 0, currency, total: totalAmount, category: CURRENT_LISTING?.category_slug || 'property' });
     window.location.href = '/Checkout/?' + params.toString();
 }
 

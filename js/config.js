@@ -20,8 +20,8 @@ const CONFIG = {
 // Compute functions URL automatically from SUPABASE_URL
 try {
     if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_URL.includes(".supabase.co")) {
-        const base = CONFIG.SUPABASE_URL.replace(".supabase.co", ".functions.supabase.co");
-        CONFIG.FUNCTIONS_BASE = base;
+        // Correct format: https://<ref>.supabase.co/functions/v1
+        CONFIG.FUNCTIONS_BASE = CONFIG.SUPABASE_URL + '/functions/v1';
         console.log("✅ [CONFIG] Functions URL computed:", CONFIG.FUNCTIONS_BASE);
     } else {
         CONFIG.FUNCTIONS_BASE = "";

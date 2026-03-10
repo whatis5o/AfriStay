@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard — AfriStay</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/Style/style.css">
+    <style>
+        :root{--primary:#EB6753;--ps:#fff0ee;--sw:240px;}
+        *{box-sizing:border-box;}
+        body{margin:0;background:#f5f6fa;font-family:'Inter',sans-serif;display:flex;min-height:100vh;}
+        #sidebar{width:var(--sw);background:#1a1a2e;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform .3s;overflow-y:auto;}
+        .sb-logo{padding:22px 20px 16px;border-bottom:1px solid rgba(255,255,255,.08);}
+        .sb-logo img{height:30px;}
+        .sb-user{padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:12px;}
+        .s-av{width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex-shrink:0;}
+        .s-nm{font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .s-role{font-size:10px;color:var(--primary);font-weight:700;background:rgba(235,103,83,.2);padding:2px 8px;border-radius:20px;display:inline-block;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
+        .sb-nav{padding:10px 0;}
+        .nav-sec{font-size:10px;font-weight:700;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.8px;padding:14px 20px 6px;}
+        .nav-btn{display:flex;align-items:center;gap:11px;padding:11px 20px;width:100%;border:none;background:none;font-size:13px;font-weight:500;color:rgba(255,255,255,.6);cursor:pointer;text-align:left;font-family:'Inter',sans-serif;transition:all .2s;position:relative;text-decoration:none;}
+        .nav-btn i{width:16px;text-align:center;font-size:13px;color:rgba(255,255,255,.3);transition:color .2s;}
+        .nav-btn:hover{background:rgba(255,255,255,.06);color:#fff;}
+        .nav-btn:hover i{color:var(--primary);}
+        .nav-btn.active{background:rgba(235,103,83,.15);color:#fff;font-weight:600;}
+        .nav-btn.active i{color:var(--primary);}
+        .nav-btn.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:55%;background:var(--primary);border-radius:0 3px 3px 0;}
+        .nav-btn.danger{color:rgba(231,76,60,.8);}
+        .nav-btn.danger i{color:rgba(231,76,60,.7);}
+        .nav-btn.danger:hover{background:rgba(231,76,60,.12);color:#e74c3c;}
+        .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:100vh;}
+        .topbar{background:#fff;padding:14px 28px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+        .topbar h1{font-size:20px;font-weight:800;color:#1a1a1a;margin:0;}
+        #mobileMenuBtn{display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#555;padding:4px;}
+        .content-area{padding:24px 28px;flex:1;}
+        .content-panel{display:none;}
+        .content-panel.active{display:block;}
+        .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+        .stat-card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);}
+        .stat-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:18px;}
+        .ic-or{background:#fff0ee;color:var(--primary);}
+        .ic-bl{background:#eff6ff;color:#3b82f6;}
+        .ic-gr{background:#f0fdf4;color:#22c55e;}
+        .ic-pu{background:#faf5ff;color:#a855f7;}
+        .stat-num{font-size:26px;font-weight:800;color:#1a1a1a;line-height:1;}
+        .stat-lbl{font-size:12px;color:#aaa;margin-top:4px;}
+        .data-section{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.06);overflow:hidden;margin-bottom:20px;}
+        .sec-head{padding:18px 24px;border-bottom:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+        .sec-head h2{font-size:16px;font-weight:700;color:#1a1a1a;margin:0;}
+        .sec-body{padding:20px 24px;}
+        table.dt{width:100%;border-collapse:collapse;font-size:13px;}
+        table.dt th{text-align:left;padding:10px 14px;font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #f5f5f5;white-space:nowrap;}
+        table.dt td{padding:12px 14px;border-bottom:1px solid #f8f8f8;vertical-align:middle;color:#333;}
+        table.dt tr:last-child td{border-bottom:none;}
+        table.dt tr:hover td{background:#fafafa;}
+        .sb{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+        .status-pending,.status-awaiting_approval{background:#fff8e8;color:#c47f2a;}
+        .status-confirmed,.status-approved{background:#e8f5e9;color:#27ae60;}
+        .status-completed{background:#e8f0ff;color:#5b6ef5;}
+        .status-rejected,.status-cancelled,.status-payment_failed{background:#fde8e8;color:#c0392b;}
+        .btn-s{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:#f5f5f5;color:#555;font-family:'Inter',sans-serif;transition:all .2s;display:inline-flex;align-items:center;gap:5px;}
+        .btn-s:hover{background:var(--primary);color:#fff;}
+        .btn-s.danger{background:#fde8e8;color:#e74c3c;}
+        .btn-s.danger:hover{background:#e74c3c;color:#fff;}
+        .btn-p{background:var(--primary);color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:'Inter',sans-serif;display:inline-flex;align-items:center;gap:8px;transition:all .2s;}
+        .btn-p:hover{opacity:.88;transform:translateY(-1px);}
+        #listingsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;}
+        .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;}
+        .filter-bar input,.filter-bar select{padding:9px 14px;border:1.5px solid #ebebeb;border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;transition:border-color .2s;color:#333;}
+        .filter-bar input:focus,.filter-bar select:focus{border-color:var(--primary);}
+        .filter-bar input{flex:1;min-width:180px;}
+        .filter-bar select{min-width:130px;}
+        .users-search{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;}
+        .users-search input{flex:1;min-width:200px;padding:9px 14px;border:1.5px solid #ebebeb;border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;transition:border-color .2s;}
+        .users-search input:focus{border-color:var(--primary);}
+        .status-select{padding:5px 10px;border:1.5px solid #ebebeb;border-radius:8px;font-size:12px;font-family:'Inter',sans-serif;outline:none;background:#fff;cursor:pointer;}
+        .fi{width:100%;padding:11px 14px;border:1.5px solid #e8e8e8;border-radius:11px;font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;background:#fff;color:#1a1a1a;}
+        .fi:focus{border-color:var(--primary);}
+        textarea.fi{min-height:80px;resize:vertical;}
+        .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+        .fg label{font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;}
+        .form-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+        .form-modal.active{display:flex;}
+        .mbox{background:#fff;border-radius:20px;padding:32px;max-width:580px;width:100%;margin:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+        .mx{position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:#aaa;line-height:1;}
+        .mx:hover{color:#333;}
+        .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+        .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+        .owner-search-wrap{position:relative;}
+        #ownerResults{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #ebebeb;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.1);z-index:1000;max-height:200px;overflow-y:auto;display:none;}
+        .search-result-item{padding:10px 14px;cursor:pointer;font-size:13px;color:#333;border-bottom:1px solid #f5f5f5;transition:background .15s;}
+        .search-result-item:hover{background:#fff0ee;color:var(--primary);}
+        .search-result-item:last-child{border-bottom:none;}
+        .chat-container{display:flex;gap:0;height:500px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);}
+        .chat-list{width:300px;border-right:1px solid #f0f0f0;overflow-y:auto;flex-shrink:0;}
+        .chat-user-item{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .15s;border-bottom:1px solid #f8f8f8;}
+        .chat-user-item:hover{background:#fafafa;}
+        .chat-user-item.active{background:var(--ps);}
+        .chat-user-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0;background:#f0f0f0;color:#888;}
+        .chat-user-info h4{font-size:14px;font-weight:600;color:#1a1a1a;margin:0 0 2px;}
+        .chat-user-info p{font-size:12px;color:#aaa;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;}
+        .chat-window{flex:1;overflow-y:auto;background:#fafafa;}
+        #chatWindowHeader{padding:18px 24px;background:#fff;border-bottom:1px solid #f0f0f0;font-size:15px;font-weight:700;color:#1a1a1a;}
+        #chatMessagesArea{padding:0;}
+        #sidebarOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;}
+        @media(max-width:1100px){.stats-grid{grid-template-columns:1fr 1fr;}}
+        @media(max-width:768px){
+            #sidebar{transform:translateX(-100%);}
+            #sidebar.active{transform:translateX(0);}
+            .main-area{margin-left:0;}
+            #mobileMenuBtn{display:block;}
+            #sidebarOverlay{display:block;opacity:0;pointer-events:none;transition:opacity .3s;}
+            #sidebarOverlay.active{opacity:1;pointer-events:all;}
+            .content-area{padding:16px;}
+            .chat-list{width:220px;}
+        }
+        @media(max-width:600px){
+            .stats-grid{grid-template-columns:1fr;}
+            .g2,.g3{grid-template-columns:1fr;}
+            .chat-container{flex-direction:column;height:auto;}
+            .chat-list{width:100%;height:200px;border-right:none;border-bottom:1px solid #f0f0f0;}
+        }
+    </style>
+</head>
+<body>
+
+<div id="sidebarOverlay"></div>
+
+<aside id="sidebar">
+    <div class="sb-logo"><a href="/"><img src="/Pictures/light-afri1.png" alt="AfriStay"></a></div>
+    <div class="sb-user">
+        <div class="s-av" id="adminAvatar">?</div>
+        <div><div class="s-nm" id="adminName">Loading...</div><span class="s-role">Admin</span></div>
+    </div>
+    <nav class="sb-nav">
+        <div class="nav-sec">Main</div>
+        <button class="nav-btn active" data-tab="dashboard"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+        <button class="nav-btn" data-tab="users"><i class="fa-solid fa-users"></i> Users</button>
+        <button class="nav-btn" data-tab="listings"><i class="fa-solid fa-house"></i> Listings</button>
+        <button class="nav-btn" data-tab="bookings"><i class="fa-solid fa-calendar-check"></i> Bookings</button>
+        <button class="nav-btn" data-tab="listing-requests"><i class="fa-solid fa-list-check"></i> Listing Requests</button>
+        <div class="nav-sec">Content</div>
+        <button class="nav-btn" data-tab="events"><i class="fa-solid fa-calendar-star"></i> Events</button>
+        <button class="nav-btn" data-tab="promotions"><i class="fa-solid fa-tag"></i> Promotions</button>
+        <button class="nav-btn" data-tab="messages"><i class="fa-solid fa-envelope"></i> Messages</button>
+        <div class="nav-sec">Account</div>
+        <button class="nav-btn" data-tab="settings"><i class="fa-solid fa-gear"></i> Settings</button>
+        <a href="/Dashboards/Profile/" class="nav-btn" style="text-decoration:none;"><i class="fa-solid fa-user"></i> My Profile</a>
+        <button class="nav-btn danger" id="logoutBtn" data-tab="logout"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button>
+    </nav>
+</aside>
+
+<div class="main-area">
+    <header class="topbar">
+        <div style="display:flex;align-items:center;gap:14px;">
+            <button id="mobileMenuBtn"><i class="fa-solid fa-bars"></i></button>
+            <h1 id="panelTitle">Dashboard</h1>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn-p" id="openCreateListingBtn" onclick="openModal('listingModal')">
+                <i class="fa-solid fa-plus"></i> New Listing
+            </button>
+        </div>
+    </header>
+
+    <div class="content-area">
+
+        <!-- DASHBOARD -->
+        <div class="content-panel active" id="dashboardPanel">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-icon ic-bl"><i class="fa-solid fa-users"></i></div><div class="stat-num" id="totalUsers">—</div><div class="stat-lbl">Total Users</div></div>
+                <div class="stat-card"><div class="stat-icon ic-or"><i class="fa-solid fa-house"></i></div><div class="stat-num" id="totalListings">—</div><div class="stat-lbl">Total Listings</div></div>
+                <div class="stat-card"><div class="stat-icon ic-gr"><i class="fa-solid fa-calendar-check"></i></div><div class="stat-num" id="totalBookings">—</div><div class="stat-lbl">Total Bookings</div></div>
+                <div class="stat-card"><div class="stat-icon ic-pu"><i class="fa-solid fa-coins"></i></div><div class="stat-num" id="totalRevenue" style="font-size:18px;">—</div><div class="stat-lbl">Platform Revenue</div></div>
+            </div>
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-list-check" style="color:var(--primary);margin-right:8px;"></i>Pending Listing Requests</h2>
+                    <span id="dashPendingBadge" style="background:#f39c12;color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;display:none;"></span>
+                </div>
+                <div class="sec-body"><div id="dashPendingListings"></div></div>
+            </div>
+        </div>
+
+        <!-- USERS -->
+        <div class="content-panel" id="usersPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2>All Users</h2>
+                    <button class="btn-s" id="fetchUsersBtn"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                </div>
+                <div class="sec-body">
+                    <div class="users-search">
+                        <input type="text" id="userSearchInput" placeholder="Search by name or email...">
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="dt" id="usersTable">
+                            <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Action</th><th>Delete</th></tr></thead>
+                            <tbody id="usersTableBody"><tr><td colspan="8" style="text-align:center;padding:30px;color:#aaa;">Click Refresh to load users</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LISTINGS -->
+        <div class="content-panel" id="listingsPanel">
+            <div class="filter-bar">
+                <input type="text" id="listingSearchInput" placeholder="Search listings...">
+                <select id="filterProvince" disabled><option value="">Province</option></select>
+                <select id="filterDistrict" disabled><option value="">District</option></select>
+                <select id="filterSector" disabled><option value="">Sector</option></select>
+                <button class="btn-s" id="searchIcon"><i class="fa-solid fa-magnifying-glass"></i></button>
+                <button class="btn-s" id="resetFiltersBtn">Reset</button>
+            </div>
+            <div id="listingsGrid"></div>
+        </div>
+
+        <!-- BOOKINGS -->
+        <div class="content-panel" id="bookingsPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2>All Bookings</h2>
+                    <button class="btn-s" onclick="loadBookingsTable()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="dt">
+                        <thead><tr><th>#</th><th>ID</th><th>Listing</th><th>Guest</th><th>Dates</th><th>Amount</th><th>Status / Actions</th></tr></thead>
+                        <tbody id="allBookingsBody"><tr><td colspan="7" style="text-align:center;padding:30px;color:#aaa;">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- LISTING REQUESTS -->
+        <div class="content-panel" id="listing-requestsPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-list-check" style="color:var(--primary);margin-right:8px;"></i>Listing Requests</h2>
+                    <button class="btn-s" onclick="loadListingRequests()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                </div>
+                <div class="sec-body">
+                    <p style="font-size:13px;color:#aaa;margin:0 0 16px;">Review and approve owner-submitted listings before they go live</p>
+                    <div id="listingRequestsContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EVENTS -->
+        <div class="content-panel" id="eventsPanel">
+            <!-- Populated dynamically by loadEventsCards() -->
+        </div>
+
+        <!-- PROMOTIONS -->
+        <div class="content-panel" id="promotionsPanel">
+            <!-- Populated dynamically by loadPromotionsCards() -->
+        </div>
+
+        <!-- MESSAGES -->
+        <div class="content-panel" id="messagesPanel">
+            <div class="data-section" style="overflow:hidden;">
+                <div id="chatWindowHeader">Messages</div>
+                <div class="chat-container">
+                    <div class="chat-list" id="chatUserList">
+                        <div style="padding:20px;text-align:center;color:#bbb;">
+                            <i class="fa-solid fa-spinner fa-spin" style="font-size:20px;"></i>
+                        </div>
+                    </div>
+                    <div class="chat-window">
+                        <div id="chatMessagesArea">
+                            <div style="padding:60px;text-align:center;color:#ccc;">
+                                <i class="fa-solid fa-envelope-open" style="font-size:48px;display:block;margin-bottom:14px;"></i>
+                                <p>Select a message to read</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="content-panel" id="settingsPanel">
+            <div style="max-width:580px;">
+
+                <div class="data-section">
+                    <div class="sec-head"><h2><i class="fa-solid fa-user" style="color:var(--primary);margin-right:8px;"></i>Profile Information</h2></div>
+                    <div class="sec-body">
+                        <div class="g2">
+                            <div class="fg"><label>Full Name</label><input type="text" class="fi" id="adminFullName" placeholder="Your full name"></div>
+                            <div class="fg"><label>Phone</label><input type="tel" class="fi" id="adminPhone" placeholder="+250 700 000 000"></div>
+                        </div>
+                        <div class="fg"><label>Email</label><input type="email" class="fi" id="newEmail" placeholder="you@example.com"></div>
+                        <button class="btn-p" id="saveAdminProfileBtn" onclick="saveAdminProfile()"><i class="fa-solid fa-floppy-disk"></i> Save Profile</button>
+                    </div>
+                </div>
+
+                <div class="data-section">
+                    <div class="sec-head"><h2><i class="fa-solid fa-lock" style="color:var(--primary);margin-right:8px;"></i>Change Password</h2></div>
+                    <div class="sec-body" style="max-width:400px;">
+                        <div class="fg"><label>New Password</label><input type="password" class="fi" id="newPassword" placeholder="Min 8 characters"></div>
+                        <button class="btn-p" id="savePwBtn" onclick="handleSaveSettings()"><i class="fa-solid fa-lock"></i> Update Password</button>
+                    </div>
+                </div>
+
+                <div class="data-section">
+                    <div class="sec-head"><h2 style="color:#e74c3c;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>Danger Zone</h2></div>
+                    <div class="sec-body">
+                        <div style="border:1.5px solid #fde8e8;border-radius:12px;padding:20px;">
+                            <h3 style="font-size:14px;font-weight:700;color:#c0392b;margin:0 0 6px;">Platform Reset</h3>
+                            <p style="font-size:13px;color:#888;margin:0 0 14px;">These actions affect the entire platform. Use with extreme caution.</p>
+                            <button class="btn-s danger" onclick="alert('Contact system administrator for platform-level actions.')"><i class="fa-solid fa-shield-halved"></i> Contact Sys Admin</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- CREATE LISTING MODAL (Admin with owner search) -->
+<div class="form-modal" id="listingModal">
+    <div class="mbox" style="max-width:620px;">
+        <button class="mx" onclick="closeModal('listingModal')">&times;</button>
+        <h3 style="font-size:22px;font-weight:800;color:#1a1a1a;margin:0 0 6px;">Create New Listing</h3>
+        <p style="font-size:13px;color:#aaa;margin:0 0 24px;">Admin-created listings are automatically approved</p>
+        <form id="listingForm">
+            <div class="fg">
+                <label>Assign Owner *</label>
+                <div class="owner-search-wrap">
+                    <input type="text" class="fi" id="ownerSearch" placeholder="Search owner by name..." oninput="searchOwners(event)" autocomplete="off">
+                    <div id="ownerResults"></div>
+                </div>
+                <input type="hidden" id="selectedOwnerId">
+                <small id="selectedOwnerName" style="color:var(--primary);font-size:12px;font-weight:600;margin-top:4px;display:block;"></small>
+            </div>
+            <div class="fg"><label>Title *</label><input type="text" class="fi" id="listTitle" placeholder="e.g. Modern Apartment in Kigali Heights" required></div>
+            <div class="g2">
+                <div class="fg"><label>Category *</label>
+                    <select class="fi" id="listCategory" onchange="updateFormLabels()" required>
+                        <option value="">Select category</option>
+                        <option value="hotel">Hotel</option><option value="apartment">Apartment</option>
+                        <option value="room">Room</option><option value="lodge">Lodge</option>
+                        <option value="villa">Villa</option><option value="event_space">Event Space</option>
+                        <option value="vehicle">Vehicle</option>
+                    </select>
+                </div>
+                <div class="fg"><label id="priceLabel">Price per Night (RWF) *</label><input type="number" class="fi" id="listPrice" placeholder="e.g. 50000" min="0" required></div>
+            </div>
+            <div class="fg location-box" style="position:relative;">
+                <label>Location</label>
+                <div class="g3" style="margin-bottom:10px;">
+                    <select class="fi" id="selProvince" onchange="loadDistricts()"><option value="">Province</option></select>
+                    <select class="fi" id="selDistrict" onchange="loadSectors()" disabled><option value="">District</option></select>
+                    <select class="fi" id="selSector" disabled><option value="">Sector</option></select>
+                </div>
+                <input type="text" class="fi" id="listAddress" placeholder="Street address or landmark (optional)">
+            </div>
+            <div class="fg"><label>Description *</label><textarea class="fi" id="listDesc" required></textarea></div>
+            <div class="g2">
+                <div class="fg"><label>Images (max 10)</label><input type="file" class="fi" id="listImageFiles" accept="image/*" multiple style="padding:8px;border-style:dashed;"></div>
+                <div class="fg"><label>Videos (max 3)</label><input type="file" class="fi" id="listVideoFiles" accept="video/*" multiple style="padding:8px;border-style:dashed;"></div>
+            </div>
+            <button type="submit" class="btn-p" style="width:100%;justify-content:center;padding:14px;font-size:15px;border-radius:12px;margin-top:8px;">
+                <i class="fa-solid fa-plus"></i> Create Listing (Auto-Approved)
+            </button>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
+<script src="/js/dashboard.js"></script>
+<script>
+const PTITLES={
+    dashboardPanel:'Dashboard',usersPanel:'Users',listingsPanel:'Listings',
+    bookingsPanel:'Bookings','listing-requestsPanel':'Listing Requests',
+    eventsPanel:'Events',promotionsPanel:'Promotions',messagesPanel:'Messages',settingsPanel:'Settings'
+};
+
+document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
+    btn.addEventListener('click',function(){
+        const tab=this.getAttribute('data-tab');
+        if(!tab||tab==='logout')return;
+        const el=document.getElementById('panelTitle');
+        if(el)el.textContent=PTITLES[tab+'Panel']||PTITLES[tab]||tab;
+        if(tab==='settings')setTimeout(prefillAdminProfile,200);
+    });
+});
+
+function prefillAdminProfile(){
+    if(!window.CURRENT_PROFILE)return;
+    const p=window.CURRENT_PROFILE;
+    const sv=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
+    sv('adminFullName',p.full_name);sv('adminPhone',p.phone);sv('newEmail',p.email);
+}
+
+async function saveAdminProfile(){
+    const btn=document.getElementById('saveAdminProfileBtn');
+    btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Saving...';
+    const _s=window.supabaseClient;
+    const nm=document.getElementById('adminFullName').value.trim();
+    const ph=document.getElementById('adminPhone').value.trim();
+    const em=document.getElementById('newEmail').value.trim();
+    try{
+        const{error}=await _s.from('profiles').update({full_name:nm,phone:ph}).eq('id',window.CURRENT_USER.id);
+        if(error)throw error;
+        if(em&&em!==window.CURRENT_USER.email){
+            const{error:ee}=await _s.auth.updateUser({email:em});
+            if(ee)throw ee;
+            window.toast('Profile saved! Confirm new email in inbox.','success');
+        }else{window.toast('Profile updated!','success');}
+        if(window.CURRENT_PROFILE){window.CURRENT_PROFILE.full_name=nm;window.CURRENT_PROFILE.phone=ph;}
+        const n=document.getElementById('adminName'),a=document.getElementById('adminAvatar');
+        if(n)n.textContent=nm||n.textContent;
+        if(a&&nm)a.textContent=nm.split(' ').map(w=>w[0]?.toUpperCase()||'').slice(0,2).join('');
+    }catch(err){window.toast('Failed: '+err.message,'error');}
+    btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-floppy-disk"></i> Save Profile';
+}
+
+// Auto-approve admin-created listings
+const origCreate=window.handleCreateListing;
+window.handleCreateListing=async function(){
+    await origCreate?.();
+    // Mark newly created listing as approved (admin bypass)
+    // dashboard.js sets status:'pending' — we update it after
+    const _s=window.supabaseClient;
+    if(!_s||!window.CURRENT_PROFILE)return;
+    const{data}=await _s.from('listings').select('id').eq('owner_id',window.CURRENT_PROFILE.id).eq('status','pending').order('created_at',{ascending:false}).limit(1);
+    if(data&&data[0]){await _s.from('listings').update({status:'approved'}).eq('id',data[0].id);}
+};
+
+document.getElementById('mobileMenuBtn')?.addEventListener('click',()=>{
+    document.getElementById('sidebar').classList.toggle('active');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+});
+document.getElementById('sidebarOverlay')?.addEventListener('click',()=>{
+    document.getElementById('sidebar').classList.remove('active');
+    document.getElementById('sidebarOverlay').classList.remove('active');
+});
+</script>
+</body>
+</html>

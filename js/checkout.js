@@ -50,7 +50,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         nights:     parseInt(p.get('nights')) || 1,
         price:      parseInt(p.get('price')) || 0,
         currency:   p.get('currency') || 'RWF',
-        total:      parseInt(p.get('total')) || 0
+        total:      parseInt(p.get('total')) || 0,
+        category:   p.get('category') || 'property'  // 'vehicle' or 'property'
     };
 
     console.log('📋 [CHECKOUT] Booking params:', BOOKING_PARAMS);
@@ -81,7 +82,10 @@ function renderSummary() {
     setEl('listingId', 'ID: ' + BOOKING_PARAMS.listing_id);
     setEl('checkInDate', fmt(BOOKING_PARAMS.start_date));
     setEl('checkOutDate', fmt(BOOKING_PARAMS.end_date));
-    setEl('nightsLabel', `${BOOKING_PARAMS.nights} night${BOOKING_PARAMS.nights !== 1 ? 's' : ''} × ${Number(BOOKING_PARAMS.price).toLocaleString('en-RW')} ${BOOKING_PARAMS.currency}`);
+
+    const isVeh = BOOKING_PARAMS.category === 'vehicle';
+    const unit = isVeh ? 'day' : 'night';
+    setEl('nightsLabel', `${BOOKING_PARAMS.nights} ${unit}${BOOKING_PARAMS.nights !== 1 ? 's' : ''} × ${Number(BOOKING_PARAMS.price).toLocaleString('en-RW')} ${BOOKING_PARAMS.currency}`);
     setEl('nightsAmount', `${Number(BOOKING_PARAMS.total).toLocaleString('en-RW')} ${BOOKING_PARAMS.currency}`);
     setEl('totalAmount', `${Number(BOOKING_PARAMS.total).toLocaleString('en-RW')} ${BOOKING_PARAMS.currency}`);
 
@@ -164,6 +168,8 @@ function showSuccessScreen(booking) {
     if (!body) return;
 
     const fmt = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    const isVeh = BOOKING_PARAMS.category === 'vehicle';
+    const unit = isVeh ? 'day' : 'night';
 
     body.innerHTML = `
         <div style="max-width:560px;margin:0 auto;text-align:center;padding:40px 20px;">

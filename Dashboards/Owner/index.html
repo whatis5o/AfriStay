@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner Dashboard — AfriStay</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/Style/style.css">
+    <style>
+        :root{--primary:#EB6753;--ps:#fff0ee;--sw:240px;}
+        *{box-sizing:border-box;}
+        body{margin:0;background:#f5f6fa;font-family:'Inter',sans-serif;display:flex;min-height:100vh;}
+        #sidebar{width:var(--sw);background:#fff;box-shadow:2px 0 20px rgba(0,0,0,.06);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform .3s;}
+        .sb-logo{padding:22px 20px 16px;border-bottom:1px solid #f0f0f0;}
+        .sb-logo img{height:30px;}
+        .sb-user{padding:18px 20px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:12px;}
+        .s-av{width:42px;height:42px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex-shrink:0;}
+        .s-nm{font-size:14px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .s-role{font-size:11px;color:var(--primary);font-weight:600;background:var(--ps);padding:2px 8px;border-radius:20px;display:inline-block;margin-top:2px;}
+        .sb-nav{flex:1;padding:10px 0;overflow-y:auto;}
+        .nav-btn{display:flex;align-items:center;gap:11px;padding:12px 20px;width:100%;border:none;background:none;font-size:14px;font-weight:500;color:#666;cursor:pointer;text-align:left;font-family:'Inter',sans-serif;transition:all .2s;position:relative;text-decoration:none;}
+        .nav-btn i{width:18px;text-align:center;font-size:14px;color:#ccc;transition:color .2s;}
+        .nav-btn:hover{background:#fafafa;color:#1a1a1a;}
+        .nav-btn:hover i{color:var(--primary);}
+        .nav-btn.active{background:var(--ps);color:var(--primary);font-weight:600;}
+        .nav-btn.active i{color:var(--primary);}
+        .nav-btn.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:55%;background:var(--primary);border-radius:0 3px 3px 0;}
+        .nav-btn.danger{color:#e74c3c;}
+        .nav-btn.danger i{color:#e74c3c;}
+        .nav-btn.danger:hover{background:#fde8e8;}
+        .nav-sep{height:1px;background:#f0f0f0;margin:8px 12px;}
+        .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:100vh;}
+        .topbar{background:#fff;padding:16px 28px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+        .topbar h1{font-size:20px;font-weight:800;color:#1a1a1a;margin:0;}
+        #mobileMenuBtn{display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#555;padding:4px;}
+        .content-area{padding:24px 28px;flex:1;}
+        .content-panel{display:none;}
+        .content-panel.active{display:block;}
+        .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+        .stat-card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);}
+        .stat-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:18px;}
+        .ic-or{background:#fff0ee;color:var(--primary);}
+        .ic-bl{background:#eff6ff;color:#3b82f6;}
+        .ic-gr{background:#f0fdf4;color:#22c55e;}
+        .ic-pu{background:#faf5ff;color:#a855f7;}
+        .stat-num{font-size:26px;font-weight:800;color:#1a1a1a;line-height:1;}
+        .stat-lbl{font-size:12px;color:#aaa;margin-top:4px;}
+        .data-section{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.06);overflow:hidden;margin-bottom:20px;}
+        .sec-head{padding:18px 24px;border-bottom:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+        .sec-head h2{font-size:16px;font-weight:700;color:#1a1a1a;margin:0;}
+        .sec-body{padding:20px 24px;}
+        table.dt{width:100%;border-collapse:collapse;font-size:13px;}
+        table.dt th{text-align:left;padding:10px 14px;font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #f5f5f5;white-space:nowrap;}
+        table.dt td{padding:13px 14px;border-bottom:1px solid #f8f8f8;vertical-align:middle;color:#333;}
+        table.dt tr:last-child td{border-bottom:none;}
+        table.dt tr:hover td{background:#fafafa;}
+        .sb{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+        .sb-pend,.sb-await{background:#fff8e8;color:#c47f2a;}
+        .sb-conf,.sb-appr{background:#e8f5e9;color:#27ae60;}
+        .sb-comp{background:#e8f0ff;color:#5b6ef5;}
+        .sb-rej,.sb-can,.sb-fail{background:#fde8e8;color:#c0392b;}
+        .btn-s{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:#f5f5f5;color:#555;font-family:'Inter',sans-serif;transition:all .2s;display:inline-flex;align-items:center;gap:5px;}
+        .btn-s:hover{background:var(--primary);color:#fff;}
+        .btn-s.danger{background:#fde8e8;color:#e74c3c;}
+        .btn-s.danger:hover{background:#e74c3c;color:#fff;}
+        .btn-p{background:var(--primary);color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:'Inter',sans-serif;display:inline-flex;align-items:center;gap:8px;transition:all .2s;}
+        .btn-p:hover{opacity:.88;transform:translateY(-1px);}
+        #listingsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;}
+        .filter-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:20px;}
+        .filter-bar input,.filter-bar select{padding:9px 14px;border:1.5px solid #ebebeb;border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;outline:none;background:#fff;transition:border-color .2s;color:#333;}
+        .filter-bar input:focus,.filter-bar select:focus{border-color:var(--primary);}
+        .filter-bar input{flex:1;min-width:180px;}
+        .filter-bar select{min-width:130px;}
+        .fi{width:100%;padding:11px 14px;border:1.5px solid #e8e8e8;border-radius:11px;font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color .2s;background:#fff;color:#1a1a1a;}
+        .fi:focus{border-color:var(--primary);}
+        textarea.fi{min-height:80px;resize:vertical;}
+        .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+        .fg label{font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;}
+        .form-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+        .form-modal.active{display:flex;}
+        .mbox{background:#fff;border-radius:20px;padding:32px;max-width:580px;width:100%;margin:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+        .mx{position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:#aaa;line-height:1;}
+        .mx:hover{color:#333;}
+        .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+        .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+        .ipw{position:relative;}
+        .ipw .fi{padding-right:44px;}
+        .pwtog{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#aaa;font-size:14px;padding:0;}
+        .pwtog:hover{color:var(--primary);}
+        .pwstr{height:4px;border-radius:4px;background:#eee;margin-top:6px;overflow:hidden;}
+        .pwstrb{height:100%;border-radius:4px;transition:width .3s,background .3s;width:0%;}
+        .pwhint{font-size:11px;color:#aaa;margin-top:4px;}
+        .dzone{border:1.5px solid #fde8e8;border-radius:12px;padding:20px;}
+        .dzone h3{font-size:14px;font-weight:700;color:#c0392b;margin:0 0 6px;}
+        .dzone p{font-size:13px;color:#888;margin:0 0 14px;}
+        #sidebarOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;}
+        @media(max-width:900px){.stats-grid{grid-template-columns:1fr 1fr;}}
+        @media(max-width:768px){
+            #sidebar{transform:translateX(-100%);}
+            #sidebar.active{transform:translateX(0);}
+            .main-area{margin-left:0;}
+            #mobileMenuBtn{display:block;}
+            #sidebarOverlay{display:block;opacity:0;pointer-events:none;transition:opacity .3s;}
+            #sidebarOverlay.active{opacity:1;pointer-events:all;}
+            .content-area{padding:16px;}
+        }
+        @media(max-width:500px){.stats-grid{grid-template-columns:1fr;}.g2,.g3{grid-template-columns:1fr;}}
+    </style>
+</head>
+<body>
+
+<div id="sidebarOverlay"></div>
+
+<aside id="sidebar">
+    <div class="sb-logo"><a href="/"><img src="/Pictures/light-afri1.png" alt="AfriStay"></a></div>
+    <div class="sb-user">
+        <div class="s-av" id="adminAvatar">?</div>
+        <div><div class="s-nm" id="adminName">Loading...</div><span class="s-role">Owner</span></div>
+    </div>
+    <nav class="sb-nav">
+        <button class="nav-btn active" data-tab="dashboard"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
+        <button class="nav-btn" data-tab="listings"><i class="fa-solid fa-house"></i> My Listings</button>
+        <button class="nav-btn" data-tab="bookings"><i class="fa-solid fa-calendar-check"></i> Bookings</button>
+        <div class="nav-sep"></div>
+        <button class="nav-btn" data-tab="settings"><i class="fa-solid fa-gear"></i> Settings</button>
+        <div class="nav-sep"></div>
+        <a href="/Dashboards/Profile/" class="nav-btn" style="text-decoration:none;"><i class="fa-solid fa-user"></i> My Profile</a>
+        <button class="nav-btn danger" id="logoutBtn" data-tab="logout"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button>
+    </nav>
+</aside>
+
+<div class="main-area">
+    <header class="topbar">
+        <div style="display:flex;align-items:center;gap:14px;">
+            <button id="mobileMenuBtn"><i class="fa-solid fa-bars"></i></button>
+            <h1 id="panelTitle">Dashboard</h1>
+        </div>
+        <button class="btn-p" id="openCreateListingBtn" onclick="openModal('listingModal')">
+            <i class="fa-solid fa-plus"></i> New Listing
+        </button>
+    </header>
+
+    <div class="content-area">
+
+        <!-- DASHBOARD -->
+        <div class="content-panel active" id="dashboardPanel">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-icon ic-or"><i class="fa-solid fa-house"></i></div><div class="stat-num" id="totalListings">—</div><div class="stat-lbl">My Listings</div></div>
+                <div class="stat-card"><div class="stat-icon ic-bl"><i class="fa-solid fa-users"></i></div><div class="stat-num" id="totalUsers">—</div><div class="stat-lbl">Total Clients</div></div>
+                <div class="stat-card"><div class="stat-icon ic-gr"><i class="fa-solid fa-calendar-check"></i></div><div class="stat-num" id="totalBookings">—</div><div class="stat-lbl">Total Bookings</div></div>
+                <div class="stat-card"><div class="stat-icon ic-pu"><i class="fa-solid fa-coins"></i></div><div class="stat-num" id="totalRevenue" style="font-size:18px;">—</div><div class="stat-lbl">My Revenue</div></div>
+            </div>
+
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-bell" style="color:var(--primary);margin-right:8px;"></i>Bookings Awaiting Approval</h2>
+                    <button class="btn-s" onclick="loadNewBookings()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                </div>
+                <div class="sec-body"><div id="newBookingsContainer"><p style="color:#bbb;text-align:center;padding:20px;">Loading...</p></div></div>
+            </div>
+
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-list-check" style="color:var(--primary);margin-right:8px;"></i>My Pending Listings</h2>
+                    <span id="dashPendingBadge" style="background:#f39c12;color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;display:none;"></span>
+                </div>
+                <div class="sec-body"><div id="dashPendingListings"></div></div>
+            </div>
+        </div>
+
+        <!-- LISTINGS -->
+        <div class="content-panel" id="listingsPanel">
+            <div class="filter-bar">
+                <input type="text" id="listingSearchInput" placeholder="Search listings...">
+                <select id="filterProvince" disabled><option value="">Province</option></select>
+                <select id="filterDistrict" disabled><option value="">District</option></select>
+                <select id="filterSector" disabled><option value="">Sector</option></select>
+                <button class="btn-s" id="searchIcon"><i class="fa-solid fa-magnifying-glass"></i></button>
+                <button class="btn-s" id="resetFiltersBtn">Reset</button>
+            </div>
+            <div id="listingsGrid"></div>
+        </div>
+
+        <!-- BOOKINGS -->
+        <div class="content-panel" id="bookingsPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2>All Bookings</h2>
+                    <button class="btn-s" onclick="loadBookingsTable()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                </div>
+                <div style="overflow-x:auto;">
+                    <table class="dt">
+                        <thead><tr><th>#</th><th>ID</th><th>Listing</th><th>Guest</th><th>Dates</th><th>Amount</th><th>Status / Actions</th></tr></thead>
+                        <tbody id="allBookingsBody"><tr><td colspan="7" style="text-align:center;padding:30px;color:#aaa;">Loading...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="content-panel" id="settingsPanel">
+            <div style="max-width:660px;">
+
+                <!-- Profile -->
+                <div class="data-section">
+                    <div class="sec-head"><h2><i class="fa-solid fa-user" style="color:var(--primary);margin-right:8px;"></i>Profile Information</h2></div>
+                    <div class="sec-body">
+                        <div class="g2">
+                            <div class="fg"><label>Full Name</label><input type="text" class="fi" id="ownerFullName" placeholder="Your full name"></div>
+                            <div class="fg"><label>Phone Number</label><input type="tel" class="fi" id="ownerPhone" placeholder="+250 700 000 000"></div>
+                        </div>
+                        <div class="fg"><label>Email Address</label><input type="email" class="fi" id="ownerEmail" placeholder="you@example.com"></div>
+                        <div class="fg"><label>Bio</label><textarea class="fi" id="ownerBio" placeholder="Tell guests a bit about yourself..."></textarea></div>
+                        <button class="btn-p" id="saveOwnerProfileBtn" onclick="saveOwnerProfile()"><i class="fa-solid fa-floppy-disk"></i> Save Profile</button>
+                    </div>
+                </div>
+
+                <!-- Wallet — loaded dynamically -->
+                <div id="ownerWalletSection"></div>
+
+                <!-- Payout History -->
+                <div class="data-section" id="payoutHistoryCard">
+                    <div class="sec-head">
+                        <h2><i class="fa-solid fa-clock-rotate-left" style="color:var(--primary);margin-right:8px;"></i>Payout History</h2>
+                        <button class="btn-s" onclick="loadPayoutHistory()"><i class="fa-solid fa-rotate-right"></i></button>
+                    </div>
+                    <div class="sec-body" id="payoutHistorySection"><p style="color:#aaa;font-size:13px;text-align:center;padding:16px;">No payouts yet.</p></div>
+                </div>
+
+                <!-- Password -->
+                <div class="data-section">
+                    <div class="sec-head"><h2><i class="fa-solid fa-lock" style="color:var(--primary);margin-right:8px;"></i>Change Password</h2></div>
+                    <div class="sec-body" style="max-width:400px;">
+                        <div class="fg">
+                            <label>New Password</label>
+                            <div class="ipw"><input type="password" class="fi" id="ownerPwNew" placeholder="Enter new password" oninput="ownerCheckPw(this.value)"><button class="pwtog" onclick="ownerTogglePw('ownerPwNew',this)" type="button"><i class="fa-solid fa-eye"></i></button></div>
+                            <div class="pwstr"><div class="pwstrb" id="ownerPwBar"></div></div>
+                            <div class="pwhint" id="ownerPwHint">At least 8 characters</div>
+                        </div>
+                        <div class="fg">
+                            <label>Confirm Password</label>
+                            <div class="ipw"><input type="password" class="fi" id="ownerPwConfirm" placeholder="Repeat new password"><button class="pwtog" onclick="ownerTogglePw('ownerPwConfirm',this)" type="button"><i class="fa-solid fa-eye"></i></button></div>
+                        </div>
+                        <button class="btn-p" id="ownerChangePwBtn" onclick="ownerChangePassword()"><i class="fa-solid fa-lock"></i> Update Password</button>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="data-section">
+                    <div class="sec-head"><h2 style="color:#e74c3c;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>Danger Zone</h2></div>
+                    <div class="sec-body">
+                        <div class="dzone">
+                            <h3>Delete Account</h3>
+                            <p>Permanently removes your account, all listings and data. Cannot be undone.</p>
+                            <button class="btn-s danger" onclick="ownerDeleteAccount()"><i class="fa-solid fa-trash"></i> Delete My Account</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div><!-- /settingsPanel -->
+
+    </div><!-- /content-area -->
+</div><!-- /main-area -->
+
+<!-- CREATE LISTING MODAL -->
+<div class="form-modal" id="listingModal">
+    <div class="mbox">
+        <button class="mx" onclick="closeModal('listingModal')">&times;</button>
+        <h3 style="font-size:22px;font-weight:800;color:#1a1a1a;margin:0 0 6px;">New Listing</h3>
+        <p style="font-size:13px;color:#aaa;margin:0 0 24px;">Submitted listings go live after admin approval</p>
+        <form id="listingForm">
+            <div class="fg"><label>Title *</label><input type="text" class="fi" id="listTitle" placeholder="e.g. Cozy Studio in Kigali" required></div>
+            <div class="g2">
+                <div class="fg"><label>Category *</label>
+                    <select class="fi" id="listCategory" onchange="updateFormLabels()" required>
+                        <option value="">Select category</option>
+                        <option value="hotel">Hotel</option><option value="apartment">Apartment</option>
+                        <option value="room">Room</option><option value="lodge">Lodge</option>
+                        <option value="villa">Villa</option><option value="event_space">Event Space</option>
+                        <option value="vehicle">Vehicle</option>
+                    </select>
+                </div>
+                <div class="fg"><label id="priceLabel">Price per Night (RWF) *</label><input type="number" class="fi" id="listPrice" placeholder="e.g. 50000" min="0" required></div>
+            </div>
+            <div class="fg" style="position:relative;" class="location-box">
+                <label>Location</label>
+                <div class="g3" style="margin-bottom:10px;">
+                    <select class="fi" id="selProvince" onchange="loadDistricts()"><option value="">Province</option></select>
+                    <select class="fi" id="selDistrict" onchange="loadSectors()" disabled><option value="">District</option></select>
+                    <select class="fi" id="selSector" disabled><option value="">Sector</option></select>
+                </div>
+                <input type="text" class="fi" id="listAddress" placeholder="Street address or landmark">
+            </div>
+            <div class="fg"><label>Description *</label><textarea class="fi" id="listDesc" style="min-height:80px;resize:vertical;" required></textarea></div>
+            <div class="g2">
+                <div class="fg"><label>Images (max 10)</label><input type="file" class="fi" id="listImageFiles" accept="image/*" multiple style="padding:8px;border-style:dashed;"></div>
+                <div class="fg"><label>Videos (max 3)</label><input type="file" class="fi" id="listVideoFiles" accept="video/*" multiple style="padding:8px;border-style:dashed;"></div>
+            </div>
+            <button type="submit" class="btn-p" style="width:100%;justify-content:center;padding:14px;font-size:15px;border-radius:12px;margin-top:8px;">
+                <i class="fa-solid fa-plus"></i> Submit for Approval
+            </button>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
+<script src="/js/dashboard.js"></script>
+<script>
+const PTITLES={dashboardPanel:'Dashboard',listingsPanel:'My Listings',bookingsPanel:'Bookings',settingsPanel:'Settings'};
+document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
+    btn.addEventListener('click',function(){
+        const tab=this.getAttribute('data-tab');
+        if(!tab||tab==='logout')return;
+        const el=document.getElementById('panelTitle');
+        if(el)el.textContent=PTITLES[tab+'Panel']||tab;
+        if(tab==='settings'){
+            setTimeout(()=>{
+                if(typeof loadOwnerWallet==='function')loadOwnerWallet();
+                if(typeof loadPayoutHistory==='function')loadPayoutHistory();
+                prefillOwnerProfile();
+            },150);
+        }
+    });
+});
+
+function prefillOwnerProfile(){
+    if(!window.CURRENT_PROFILE)return;
+    const p=window.CURRENT_PROFILE;
+    const sv=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
+    sv('ownerFullName',p.full_name);sv('ownerPhone',p.phone);
+    sv('ownerEmail',p.email);sv('ownerBio',p.bio);
+}
+
+async function saveOwnerProfile(){
+    const btn=document.getElementById('saveOwnerProfileBtn');
+    btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Saving...';
+    const _s=window.supabaseClient;
+    if(!_s||!window.CURRENT_USER){window.toast('Not authenticated.','error');btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-floppy-disk"></i> Save Profile';return;}
+    const nm=document.getElementById('ownerFullName').value.trim();
+    const ph=document.getElementById('ownerPhone').value.trim();
+    const bi=document.getElementById('ownerBio').value.trim();
+    const em=document.getElementById('ownerEmail').value.trim();
+    try{
+        const{error}=await _s.from('profiles').update({full_name:nm,phone:ph,bio:bi}).eq('id',window.CURRENT_USER.id);
+        if(error)throw error;
+        if(em&&em!==window.CURRENT_USER.email){
+            const{error:ee}=await _s.auth.updateUser({email:em});
+            if(ee)throw ee;
+            window.toast('Profile saved! Check inbox to confirm new email.','success');
+        }else{window.toast('Profile updated!','success');}
+        if(window.CURRENT_PROFILE){window.CURRENT_PROFILE.full_name=nm;window.CURRENT_PROFILE.phone=ph;window.CURRENT_PROFILE.bio=bi;}
+        const n=document.getElementById('adminName');const a=document.getElementById('adminAvatar');
+        if(n)n.textContent=nm||n.textContent;
+        if(a&&nm)a.textContent=nm.split(' ').map(w=>w[0]?.toUpperCase()||'').slice(0,2).join('');
+    }catch(err){window.toast('Failed: '+err.message,'error');}
+    btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-floppy-disk"></i> Save Profile';
+}
+
+function ownerTogglePw(id,btn){
+    const i=document.getElementById(id),ic=btn.querySelector('i');
+    i.type===('password')?(i.type='text',ic.className='fa-solid fa-eye-slash'):(i.type='password',ic.className='fa-solid fa-eye');
+}
+function ownerCheckPw(pw){
+    let s=0;
+    if(pw.length>=8)s++;if(pw.length>=12)s++;if(/[A-Z]/.test(pw))s++;if(/[0-9]/.test(pw))s++;if(/[^A-Za-z0-9]/.test(pw))s++;
+    const ls=[{p:'0%',c:'#eee',l:''},{p:'20%',c:'#e74c3c',l:'Too weak'},{p:'40%',c:'#e67e22',l:'Weak'},{p:'65%',c:'#f1c40f',l:'Fair'},{p:'85%',c:'#2ecc71',l:'Strong'},{p:'100%',c:'#27ae60',l:'Very strong'}];
+    const lv=ls[Math.min(s,5)];
+    const bar=document.getElementById('ownerPwBar'),hint=document.getElementById('ownerPwHint');
+    if(bar){bar.style.width=lv.p;bar.style.background=lv.c;}
+    if(hint){hint.textContent=lv.l||'At least 8 characters';hint.style.color=lv.c==='#eee'?'#aaa':lv.c;}
+}
+async function ownerChangePassword(){
+    const n=document.getElementById('ownerPwNew').value,c=document.getElementById('ownerPwConfirm').value;
+    const btn=document.getElementById('ownerChangePwBtn');
+    if(!n||n.length<8){window.toast('Password must be at least 8 characters.','warning');return;}
+    if(n!==c){window.toast("Passwords don't match.",'warning');return;}
+    btn.disabled=true;btn.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i> Updating...';
+    const{error}=await window.supabaseClient.auth.updateUser({password:n});
+    if(error){window.toast('Failed: '+error.message,'error');}
+    else{
+        window.toast('Password updated!','success');
+        document.getElementById('ownerPwNew').value='';document.getElementById('ownerPwConfirm').value='';
+        document.getElementById('ownerPwBar').style.width='0%';
+    }
+    btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-lock"></i> Update Password';
+}
+async function ownerDeleteAccount(){
+    if(prompt('Type DELETE to permanently delete your account:')!=='DELETE'){window.toast('Cancelled.','info');return;}
+    window.toast('Deleting...','info');
+    try{
+        await window.supabaseClient.from('profiles').delete().eq('id',window.CURRENT_USER.id);
+        await window.supabaseClient.auth.signOut();
+        window.toast('Account deleted.','success');
+        setTimeout(()=>window.location.href='/',1800);
+    }catch(err){window.toast('Failed: '+err.message,'error');}
+}
+
+document.getElementById('mobileMenuBtn')?.addEventListener('click',()=>{
+    document.getElementById('sidebar').classList.toggle('active');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+});
+document.getElementById('sidebarOverlay')?.addEventListener('click',()=>{
+    document.getElementById('sidebar').classList.remove('active');
+    document.getElementById('sidebarOverlay').classList.remove('active');
+});
+</script>
+</body>
+</html>
