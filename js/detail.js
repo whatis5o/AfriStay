@@ -104,6 +104,19 @@ async function loadListingDetails() {
     }
 
     renderRatingBadge(listing.avg_rating, listing.reviews_count);
+    // Wire up heart/favorites for this listing
+    if (typeof window.initFavorites === 'function') {
+        try { const { data:{ user } } = await _supabase.auth.getUser(); await window.initFavorites(user||null); }
+        catch(_) {}
+    }
+
+    // Wire up favorites/heart for this listing
+    if (typeof window.initFavorites === 'function') {
+        try {
+            const { data: { user } } = await _supabase.auth.getUser();
+            await window.initFavorites(user || null);
+        } catch(_) {}
+    }
 
     const images = (listing.listing_images || []).map(img => ({ type: 'image', src: img.image_url }));
     const videos = (listing.listing_videos || []).map(vid => ({ type: 'video', src: vid.video_url }));
@@ -324,12 +337,15 @@ async function initReviewForm() {
 
     if (!completedBooking) {
         formSection.innerHTML =
-            '<div style="background:#f9f9f9;border:1.5px solid #ececec;border-radius:12px;padding:18px 20px;text-align:center;">' +
-            '<i class="fa-solid fa-lock" style="font-size:22px;color:#ccc;margin-bottom:10px;display:block;"></i>' +
-            '<p style="font-weight:700;color:#555;margin:0 0 5px;font-size:14px;">Review not available yet</p>' +
-            '<p style="color:#aaa;font-size:13px;margin:0;">Only guests who have completed a ' + noun + ' of this ' + thing + ' can leave a review. ' +
-            (isVeh ? 'Once your rental period ends, come back here to share your experience.' : 'Once your stay ends, come back here to share your experience.') +
-            '</p></div>';
+            '<div style="background:#f9f9f9;border:1.5px solid #e8e8e8;border-radius:16px;padding:24px 20px;text-align:center;">' +
+            '<div style="width:52px;height:52px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">' +
+            '<i class="fa-solid fa-lock" style="font-size:20px;color:#ccc;"></i></div>' +
+            '<p style="font-weight:800;color:#333;margin:0 0 8px;font-size:15px;">Review not available yet</p>' +
+            '<p style="color:#aaa;font-size:13px;margin:0 0 14px;line-height:1.6;">Only guests who completed a ' + noun + ' here can review. ' +
+            (isVeh ? 'Once your rental ends, come back to share your experience.' : 'Once your stay is complete, come back to share your experience.') +
+            '</p>' +
+            '<a href="/Listings" style="display:inline-flex;align-items:center;gap:7px;padding:9px 20px;background:#EB6753;color:#fff;border-radius:100px;font-size:13px;font-weight:700;text-decoration:none;"><i class="fa-solid fa-magnifying-glass"></i> Browse Listings</a>' +
+            '</div>';
         return;
     }
 
@@ -371,7 +387,11 @@ window.submitReview = async () => {
     if (error) {
         console.error('❌ [DETAIL] Review error:', error.message);
         const isTrigger = error.message.toLowerCase().includes('approved') || error.message.toLowerCase().includes('booking');
-        if (msgEl) { msgEl.style.color = '#e74c3c'; msgEl.textContent = isTrigger ? '⚠️ Your DB has a trigger requiring a completed booking. Go to Supabase → Database → Functions → validate_review and remove the booking check.' : 'Failed: ' + error.message; }
+        if (msgEl) {
+            msgEl.innerHTML = isTrigger
+                ? '<div style="background:#fff5f5;border:1.5px solid #fcc;border-radius:10px;padding:12px 14px;color:#c0392b;font-size:13px;line-height:1.6;text-align:left;margin-top:8px;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:7px;"></i><strong>Database trigger blocked review.</strong><br>Go to Supabase → Database → Functions → <code>validate_review</code> and remove the booking check.</div>'
+                : '<div style="background:#fff5f5;border:1.5px solid #fcc;border-radius:10px;padding:12px 14px;color:#c0392b;font-size:13px;line-height:1.6;text-align:left;margin-top:8px;"><i class="fa-solid fa-circle-xmark" style="margin-right:7px;"></i>' + error.message + '</div>';
+        }
         return;
     }
 

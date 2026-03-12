@@ -1652,61 +1652,129 @@ async function toggleListingAvailability(listingId, current) {
    K-Pay charges customer → webhook confirms → receipt generated
    ═══════════════════════════════════════════════════════════════ */
 async function approveBooking(bookingId) {
-    console.log("✅ [APPROVE] Owner approving booking:", bookingId);
+    console.log('✅ [APPROVE] Approving booking:', bookingId);
 
-    const booking = await _supabase.from('bookings').select('*').eq('id', bookingId).single()
-        .then(r => r.data);
-    if (!booking) { toast('Booking not found', 'error'); return; }
+    // Load booking with retry (email link may arrive before auth fully loads)
+    let booking = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        const { data, error } = await _supabase.from('bookings').select('*').eq('id', bookingId).single();
+        if (data) { booking = data; break; }
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
+        else { showApproveError('Booking not found. It may have been cancelled or the link expired.'); return; }
+    }
 
     const isArrival = booking.payment_method === 'pay_on_arrival';
+    const fmt = d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     const msg = isArrival
-        ? 'Approve this pay-on-arrival reservation? Guest will be notified.'
-        : "Approve this booking? This will immediately charge the guest's card/MoMo.";
+        ? `Approve pay-on-arrival for "${booking.guest_name || 'Guest'}"?\n\nCheck-in: ${fmt(booking.start_date)}\nCheck-out: ${fmt(booking.end_date)}\nTotal: ${Number(booking.total_amount||0).toLocaleString('en-RW')} RWF\n\nGuest will pay in cash on arrival.`
+        : `Approve booking from "${booking.guest_name || 'Guest'}"?\n\nCheck-in: ${fmt(booking.start_date)}\nCheck-out: ${fmt(booking.end_date)}\nTotal: ${Number(booking.total_amount||0).toLocaleString('en-RW')} RWF\n\nThis will trigger Pesapal to charge the guest's card/MoMo.`;
     if (!confirm(msg)) return;
 
-    toast('Processing approval...', 'info');
+    toast('Processing approval…', 'info');
 
     try {
         if (isArrival) {
-            /* ── Pay on arrival: just confirm, no charge ── */
             const { error } = await _supabase.from('bookings')
                 .update({ status: 'confirmed', payment_status: 'pending' })
                 .eq('id', bookingId);
             if (error) throw error;
-            console.log('✅ [APPROVE] Pay-on-arrival confirmed:', bookingId);
-            toast('✅ Reservation confirmed! Guest has been notified.', 'success');
+            toast('✅ Reservation confirmed! Guest notified by email.', 'success');
 
         } else {
-            /* ── Online payment: call charge-and-payout Edge Function ── */
-            console.log('💳 [APPROVE] Triggering charge-and-payout for booking:', bookingId);
-            toast('Charging guest payment...', 'info');
+            toast('💳 Submitting payment to Pesapal…', 'info');
+            console.log('[APPROVE] Calling charge-and-payout for', bookingId);
 
-            const res = await fetch(CONFIG.FUNCTIONS_BASE + '/charge-and-payout', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ booking_id: bookingId }),
-            });
-            const data = await res.json();
-            console.log('📬 [APPROVE] charge-and-payout response:', data);
+            // Get auth token for edge function call
+            const { data: { session } } = await _supabase.auth.getSession();
+            const token = session?.access_token || CONFIG.SUPABASE_KEY;
 
-            if (data.error) throw new Error(data.error);
+            // Smart timeout: 25 seconds (Pesapal can be slow, but not more than that)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 25000);
 
-            if (data.checkout_url) {
-                /* MoMo/card needs customer to complete on K-Pay (webhook will confirm) */
-                console.log('ℹ️ [APPROVE] K-Pay checkout initiated — webhook will confirm payment');
-                toast('✅ Payment initiated. Waiting for guest to complete payment.', 'success');
-            } else {
-                toast('✅ Booking approved and payment processing!', 'success');
+            let res, data;
+            try {
+                res = await fetch(CONFIG.FUNCTIONS_BASE + '/charge-and-payout', {
+                    method:  'POST',
+                    signal:  controller.signal,
+                    headers: {
+                        'Content-Type':  'application/json',
+                        'Authorization': 'Bearer ' + token,
+                        'apikey':         CONFIG.SUPABASE_KEY,
+                    },
+                    body: JSON.stringify({ booking_id: bookingId }),
+                });
+                clearTimeout(timeoutId);
+                data = await res.json();
+            } catch (fetchErr) {
+                clearTimeout(timeoutId);
+                if (fetchErr.name === 'AbortError') {
+                    // Timeout: payment may still be processing on Pesapal side
+                    // Mark booking as payment_pending and tell owner to wait
+                    await _supabase.from('bookings').update({ status: 'payment_pending' }).eq('id', bookingId);
+                    showApproveError(
+                        'Payment request timed out (25s). This usually means Pesapal is processing it — the guest will receive a USSD push or email shortly. ' +
+                        'Check back in 2 minutes — if the booking is still "Charging", contact support.',
+                        'warning'
+                    );
+                    await loadBookingsTable();
+                    return;
+                }
+                throw fetchErr;
             }
+
+            console.log('[APPROVE] charge-and-payout response:', data);
+
+            if (!res.ok || data.error) {
+                const errMsg = data?.error || 'Charge failed (HTTP ' + res.status + ')';
+                // Show pretty error - don't just toast
+                showApproveError(errMsg);
+                await loadBookingsTable();
+                return;
+            }
+
+            toast('✅ Booking approved! Payment submitted to Pesapal. Guest will be notified.', 'success');
         }
 
         await loadBookingsTable();
         await loadCounts();
+        try { await loadNewBookings(); } catch(_) {}
 
     } catch (err) {
-        console.error("❌ [APPROVE] Error:", err);
-        toast('Failed to approve: ' + err.message, 'error');
+        console.error('❌ [APPROVE] Error:', err);
+        showApproveError(err.message || 'Approval failed. Please try again.');
     }
+}
+
+/* Pretty error modal for approval failures */
+function showApproveError(message, type = 'error') {
+    const colors = { error: '#e74c3c', warning: '#f39c12', info: '#3498db' };
+    const icons  = { error: 'fa-triangle-exclamation', warning: 'fa-clock', info: 'fa-circle-info' };
+    const color  = colors[type] || colors.error;
+    const icon   = icons[type]  || icons.error;
+
+    let el = document.getElementById('_approveErrorModal');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = '_approveErrorModal';
+        el.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);padding:20px;';
+        document.body.appendChild(el);
+    }
+    el.innerHTML = `
+        <div style="background:#fff;border-radius:20px;padding:36px 32px;max-width:460px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.2);text-align:center;font-family:Inter,sans-serif;">
+            <div style="width:64px;height:64px;border-radius:50%;background:${color}18;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
+                <i class="fa-solid ${icon}" style="font-size:28px;color:${color};"></i>
+            </div>
+            <h3 style="margin:0 0 12px;font-size:18px;font-weight:800;color:#1a1a1a;">
+                ${type === 'warning' ? 'Payment Timed Out' : 'Approval Failed'}
+            </h3>
+            <p style="margin:0 0 20px;font-size:14px;color:#666;line-height:1.7;">${escapeHtml(message)}</p>
+            <button onclick="document.getElementById('_approveErrorModal').remove()"
+                style="padding:12px 28px;background:${color};color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">
+                OK, Got It
+            </button>
+        </div>`;
+    el.onclick = e => { if (e.target === el) el.remove(); };
 }
 
 async function rejectBooking(bookingId) {
@@ -2588,7 +2656,7 @@ async function loadListingRequests() {
         const { data, error } = await _supabase
             .from('listings')
             .select('id,title,price,currency,category_slug,province_id,district_id,owner_id,created_at,status')
-            .eq('status', 'pending')
+            .in('status', ['awaiting_approval', 'pending'])
             .order('created_at', { ascending: false });
         if (error) throw error;
 
@@ -2690,7 +2758,7 @@ async function loadNewBookings() {
             .from('bookings')
             .select('id,listing_id,user_id,start_date,end_date,total_amount,created_at')
             .in('listing_id', listingIds)
-            .eq('status', 'pending')
+            .in('status', ['awaiting_approval', 'pending'])
             .order('created_at', { ascending: false });
         if (error) throw error;
 
@@ -2782,7 +2850,7 @@ async function loadDashPendingListings() {
         let q = _supabase
             .from('listings')
             .select('id,title,price,currency,category_slug,province_id,district_id,owner_id,created_at')
-            .eq('status', 'pending')
+            .in('status', ['awaiting_approval', 'pending'])
             .order('created_at', { ascending: false })
             .limit(15);
 
@@ -2951,8 +3019,8 @@ async function handleUrlActions() {
     }
 }
 
-// Run after page init
-setTimeout(handleUrlActions, 2000);
+// Run after page init — wait 3.5s to allow auth + data to fully load from email link
+setTimeout(handleUrlActions, 3500);
 
 /* ═══════════════════════════════════════════════════════════════
    OWNER WALLET SETTINGS

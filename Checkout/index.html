@@ -22,8 +22,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 .nav-back{display:flex;align-items:center;gap:7px;color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;padding:8px 16px;border-radius:100px;border:1.5px solid var(--border);transition:all .2s}
 .nav-back:hover{color:var(--red);border-color:var(--red);background:var(--red-glow)}
 .page{max-width:980px;margin:0 auto;padding:96px 18px 60px;display:grid;grid-template-columns:1fr 420px;gap:22px;align-items:start}
-
-/* SUMMARY */
 .summary{background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--sh)}
 .s-img{width:100%;height:210px;object-fit:cover;display:block}
 .s-img-ph{width:100%;height:210px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0efed,#e8e7e4)}
@@ -32,21 +30,16 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 .s-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
 .s-row:last-child{border:none}
 .s-lbl{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px}
-.s-lbl i{color:var(--red);font-size:11px;width:12px;text-align:center}
+.s-lbl i{color:var(--red);font-size:11px}
 .s-val{font-size:13px;font-weight:700}
 .s-divider{border:none;border-top:2px dashed var(--border);margin:6px 0}
 .s-total-row{display:flex;justify-content:space-between;align-items:center;padding-top:14px}
 .s-total-val{font-size:30px;font-weight:800;color:var(--red);letter-spacing:-1px}
-.s-cur{font-size:13px;font-weight:600;color:var(--faint);margin-left:3px}
-
-/* PAY CARD */
 .pay-card{background:var(--card);border-radius:var(--radius);padding:24px;box-shadow:var(--sh);position:sticky;top:88px}
 .pesa-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
 .pesa-title{font-size:17px;font-weight:800}
 .pesa-badge{display:inline-flex;align-items:center;gap:5px;background:var(--blue-bg);border:1px solid var(--blue-bdr);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;color:var(--blue)}
 .pesa-sub{font-size:11px;color:var(--muted);margin-bottom:16px;margin-top:3px}
-
-/* METHOD TABS */
 .methods{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
 .m-tab{display:flex;flex-direction:column;align-items:center;gap:5px;padding:13px 4px 11px;border:2px solid var(--border);border-radius:13px;cursor:pointer;transition:all .15s;background:#fafafa;position:relative;text-align:center}
 .m-tab:hover{border-color:var(--red);background:var(--red-glow)}
@@ -57,59 +50,33 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 .m-tab-lbl{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;line-height:1.3}
 .m-tab:hover .m-tab-lbl,.m-tab.on .m-tab-lbl{color:var(--red)}
 .panel{display:none}.panel.on{display:block}
-
-/* FORM */
 .fg{margin-bottom:12px}
 .fg label{display:block;font-size:10px;font-weight:700;color:#bbb;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
-.fg input{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Sora',sans-serif;outline:none;background:#fff;color:var(--dark);transition:border-color .15s}
-.fg input:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow)}
+.fg input,.fg select{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Sora',sans-serif;outline:none;background:#fff;color:var(--dark);transition:border-color .15s}
+.fg input:focus,.fg select:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow)}
 .fg input::placeholder{color:#d8d8d8}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.icon-wrap{position:relative}
-.icon-wrap input{padding-right:38px}
-.icon-wrap .ico{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:14px;pointer-events:none}
-
-/* NETWORK */
 .nets{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .net{display:flex;align-items:center;justify-content:center;gap:7px;padding:11px 8px;border:2px solid var(--border);border-radius:10px;cursor:pointer;transition:all .15s;font-size:13px;font-weight:700;color:var(--mid);background:#fafafa}
 .net:hover,.net.on{border-color:var(--red);background:var(--red-glow);color:var(--dark)}
 .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .mtn-dot{background:#ffcc00;box-shadow:0 0 0 1px rgba(0,0,0,.1)}
 .air-dot{background:#e40000}
-
-/* PHONE */
 .ph-wrap{position:relative;display:flex;margin-bottom:12px}
 .ph-pre{position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;padding:0 12px;font-size:13px;font-weight:700;color:var(--dark);border-right:1.5px solid var(--border);pointer-events:none;z-index:1;gap:5px;white-space:nowrap}
 .ph-wrap input{width:100%;padding:11px 13px 11px 92px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Sora',sans-serif;outline:none;color:var(--dark);transition:border-color .15s;background:#fff}
 .ph-wrap input:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow)}
-
-/* CARD LOGOS */
-.card-logos{display:flex;align-items:center;gap:5px;margin-bottom:12px}
-.c-logo{height:22px;border-radius:4px;border:1px solid var(--border);background:#fff;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800}
-.c-logo.visa{background:#1a1f71;color:#fff;font-style:italic;font-size:12px}
-.c-logo.amex{background:#006fcf;color:#fff;font-size:9px;letter-spacing:.5px}
-.c-logo.verve{background:linear-gradient(135deg,#e63946,#c1121f);color:#fff}
-
-/* INFO BOXES */
 .box{border-radius:11px;padding:13px 15px;margin-bottom:12px;font-size:12px;line-height:1.7;display:flex;gap:9px}
 .box i{flex-shrink:0;margin-top:2px}
 .box-green{background:var(--green-bg);border:1.5px solid var(--green-bdr);color:#166534}
+.box-blue{background:var(--blue-bg);border:1.5px solid var(--blue-bdr);color:#1e40af}
 .box-yellow{background:#fffbf0;border:1.5px solid #fde68a;color:#92400e}
-
-/* ARRIVAL STEPS */
 .a-steps{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:10px}
 .a-steps li{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#166534;line-height:1.5}
 .sn{width:19px;height:19px;border-radius:50%;background:var(--green);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-
-/* SEPARATOR */
 .sep{border:none;border-top:1.5px solid var(--border);margin:15px 0 13px}
 .g-lbl{font-size:10px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
-
-/* ERROR */
 .err{display:none;align-items:flex-start;gap:9px;background:#fff1f0;border:1.5px solid #fcc;border-radius:10px;padding:11px 13px;font-size:13px;color:#c0392b;margin-bottom:13px;line-height:1.5}
 .err i{flex-shrink:0;margin-top:1px}
-
-/* BUTTON */
 .pay-btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:'Sora',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;margin-top:14px;background:var(--red);color:#fff}
 .pay-btn:hover:not(:disabled){background:var(--red-d);transform:translateY(-2px);box-shadow:0 8px 24px rgba(235,103,83,.32)}
 .pay-btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
@@ -117,25 +84,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 .pay-btn.g:hover:not(:disabled){background:#15803d;box-shadow:0 8px 24px rgba(22,163,74,.28)}
 .lock-row{display:flex;align-items:center;justify-content:center;gap:5px;margin-top:8px;font-size:11px;color:var(--faint)}
 .lock-row i{color:var(--green);font-size:10px}
-
-/* SECURE NOTE */
-.sec-note{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);margin-top:4px;margin-bottom:4px}
-.sec-note i{color:var(--green);font-size:10px}
-
-/* SKELETON */
-.skel{background:linear-gradient(90deg,#f0f0f0 25%,#e8e8e8 50%,#f0f0f0 75%);background-size:200%;animation:sk 1.4s infinite;border-radius:8px;color:transparent!important;user-select:none}
+.skel{background:linear-gradient(90deg,#f0f0f0 25%,#e8e8e8 50%,#f0f0f0 75%);background-size:200%;animation:sk 1.4s infinite;border-radius:8px}
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
-@media(max-width:780px){
-  .page{grid-template-columns:1fr;padding-top:78px}
-  .pay-card{position:static}
-  #nav{top:0;left:0;transform:none;width:100%;border-radius:0;padding:0 16px}
-}
-@media(max-width:380px){.row2{grid-template-columns:1fr}.nets{grid-template-columns:1fr}}
+/* How it works steps */
+.how-steps{display:flex;flex-direction:column;gap:0;margin-top:4px}
+.hs{display:flex;gap:12px;align-items:flex-start;position:relative}
+.hs:not(:last-child)::after{content:'';position:absolute;left:13px;top:28px;bottom:-12px;width:1.5px;background:var(--border)}
+.hs-num{width:26px;height:26px;border-radius:50%;background:var(--red);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.hs-body{padding-bottom:14px}
+.hs-title{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:2px}
+.hs-sub{font-size:12px;color:var(--muted);line-height:1.5}
+@media(max-width:780px){.page{grid-template-columns:1fr;padding-top:78px}.pay-card{position:static}#nav{top:0;left:0;transform:none;width:100%;border-radius:0;padding:0 16px}}
+@media(max-width:380px){.nets{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-
 <nav id="nav">
   <a href="/" class="nav-logo">
     <img src="/Pictures/light-afri1.png" alt="AfriStay"
@@ -147,12 +110,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 </nav>
 
 <div class="page" id="mainPage">
-
   <!-- SUMMARY -->
   <div class="summary">
-    <div id="sImgWrap" class="s-img-ph">
-      <i class="fa-solid fa-image" style="font-size:38px;color:#ccc"></i>
-    </div>
+    <div id="sImgWrap" class="s-img-ph"><i class="fa-solid fa-image" style="font-size:38px;color:#ccc"></i></div>
     <div class="s-body">
       <div id="sTitle" class="s-name skel" style="height:22px;width:70%;margin-bottom:16px">&nbsp;</div>
       <div class="s-row"><span class="s-lbl"><i class="fa-solid fa-calendar-check"></i>Check-in</span><span class="s-val" id="sIn">—</span></div>
@@ -162,24 +122,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
       <hr class="s-divider">
       <div class="s-total-row">
         <span style="font-size:14px;font-weight:700">Total</span>
-        <span class="s-total-val" id="sTotal">—<span class="s-cur" id="sCur"> RWF</span></span>
+        <span class="s-total-val" id="sTotal">—<span style="font-size:13px;font-weight:600;color:#ccc;margin-left:3px" id="sCur"> RWF</span></span>
       </div>
     </div>
   </div>
 
   <!-- PAYMENT -->
   <div class="pay-card">
-
     <div class="pesa-row">
-      <div class="pesa-title">How would you like to pay?</div>
-      <span class="pesa-badge">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#1a56db"/><path d="M7 12h10M12 7l5 5-5 5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Pesapal
-      </span>
+      <div class="pesa-title">Choose payment method</div>
+      <span class="pesa-badge"><i class="fa-solid fa-shield-halved" style="font-size:10px"></i> Pesapal</span>
     </div>
-    <div class="pesa-sub">Your details are encrypted. You're only charged after host approval.</div>
+    <div class="pesa-sub">No charge until the host approves your request</div>
 
-    <!-- Tabs -->
     <div class="methods">
       <div class="m-tab on" id="tab-card" onclick="switchTab('card')">
         <i class="fa-solid fa-credit-card"></i>
@@ -195,55 +150,19 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
       </div>
     </div>
 
-    <!-- Error -->
-    <div class="err" id="errBox">
-      <i class="fa-solid fa-triangle-exclamation"></i>
-      <span id="errMsg"></span>
-    </div>
+    <div class="err" id="errBox"><i class="fa-solid fa-triangle-exclamation"></i><span id="errMsg"></span></div>
 
     <!-- ═══ CARD ═══ -->
     <div class="panel on" id="panel-card">
-      <div class="card-logos">
-        <div class="c-logo visa">VISA</div>
-        <div class="c-logo" style="padding:2px 5px">
-          <svg width="32" height="20" viewBox="0 0 36 22"><circle cx="13" cy="11" r="10" fill="#EB001B"/><circle cx="23" cy="11" r="10" fill="#F79E1B"/><path d="M18 4.4a10 10 0 0 1 0 13.2A10 10 0 0 1 18 4.4z" fill="#FF5F00"/></svg>
-        </div>
-        <div class="c-logo amex">AMEX</div>
-        <div class="c-logo verve">VERVE</div>
+      <div class="box box-blue">
+        <i class="fa-solid fa-circle-info" style="color:var(--blue)"></i>
+        <div>You'll be sent a <strong>Pesapal payment link by email</strong> once the host approves. You complete payment securely on Pesapal's site — Visa, Mastercard and more accepted.</div>
       </div>
-      <div class="fg">
-        <label>Card Number</label>
-        <div class="icon-wrap">
-          <input type="tel" id="cardNum" placeholder="1234 5678 9012 3456"
-                 maxlength="19" inputmode="numeric" autocomplete="cc-number"
-                 oninput="fmtCard(this)">
-          <i class="fa-solid fa-credit-card ico" id="cardIcon"></i>
-        </div>
-      </div>
-      <div class="fg">
-        <label>Name on Card</label>
-        <input type="text" id="cardName" placeholder="As printed on card"
-               autocomplete="cc-name" oninput="this.value=this.value.toUpperCase()">
-      </div>
-      <div class="row2">
-        <div class="fg">
-          <label>Expiry</label>
-          <input type="tel" id="cardExp" placeholder="MM / YY" maxlength="7"
-                 inputmode="numeric" autocomplete="cc-exp" oninput="fmtExp(this)">
-        </div>
-        <div class="fg">
-          <label>CVV</label>
-          <div class="icon-wrap">
-            <input type="tel" id="cardCvv" placeholder="3 digits" maxlength="4"
-                   inputmode="numeric" autocomplete="cc-csc"
-                   oninput="this.value=this.value.replace(/\D/g,'')">
-            <i class="fa-solid fa-question-circle ico"></i>
-          </div>
-        </div>
-      </div>
-      <div class="sec-note">
-        <i class="fa-solid fa-lock"></i>
-        AES-256 encrypted · Pesapal charges your card after host approves
+      <div class="how-steps">
+        <div class="hs"><div class="hs-num">1</div><div class="hs-body"><div class="hs-title">Submit your request</div><div class="hs-sub">Host reviews within 12 hours</div></div></div>
+        <div class="hs"><div class="hs-num">2</div><div class="hs-body"><div class="hs-title">Host approves</div><div class="hs-sub">You get a Pesapal payment link by email</div></div></div>
+        <div class="hs"><div class="hs-num">3</div><div class="hs-body"><div class="hs-title">Complete payment</div><div class="hs-sub">Enter card on Pesapal's secure site</div></div></div>
+        <div class="hs"><div class="hs-num">4</div><div class="hs-body"><div class="hs-title">Booking confirmed</div><div class="hs-sub">Receipt sent. Enjoy your stay!</div></div></div>
       </div>
     </div>
 
@@ -252,26 +171,21 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
       <div class="fg">
         <label>Select Network</label>
         <div class="nets">
-          <div class="net on" id="net-mtn" onclick="pickNet('mtn')">
-            <span class="dot mtn-dot"></span>MTN MoMo
-          </div>
-          <div class="net" id="net-air" onclick="pickNet('airtel')">
-            <span class="dot air-dot"></span>Airtel Money
-          </div>
+          <div class="net on" id="net-mtn" onclick="pickNet('mtn')"><span class="dot mtn-dot"></span>MTN MoMo</div>
+          <div class="net" id="net-air" onclick="pickNet('airtel')"><span class="dot air-dot"></span>Airtel Money</div>
         </div>
       </div>
       <div class="fg">
         <label>MoMo Phone Number</label>
         <div class="ph-wrap">
           <span class="ph-pre"><span style="font-size:15px">🇷🇼</span>&nbsp;+250</span>
-          <input type="tel" id="momoPhone" placeholder="78X XXX XXX"
-                 maxlength="9" inputmode="numeric"
-                 oninput="this.value=this.value.replace(/\D/g,'')">
+          <input type="tel" id="momoPhone" placeholder="78X XXX XXX" maxlength="9"
+                 inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
         </div>
       </div>
       <div class="box box-yellow">
         <i class="fa-solid fa-circle-info" style="color:#f59e0b"></i>
-        <div>After host approval, Pesapal sends a <strong>USSD push to this number</strong>. Enter your MoMo PIN to confirm. Make sure you have enough balance.</div>
+        <div>Once the host approves, Pesapal will <strong>send a USSD push to this number</strong>. Enter your MoMo PIN to confirm. Make sure you have enough balance.</div>
       </div>
     </div>
 
@@ -279,30 +193,22 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
     <div class="panel" id="panel-arrival">
       <div class="box box-green" style="flex-direction:column;gap:0">
         <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--green);margin-bottom:10px">
-          <i class="fa-solid fa-handshake" style="margin-top:0"></i> Pay on Arrival
+          <i class="fa-solid fa-handshake"></i> Pay on Arrival
         </div>
         <ul class="a-steps">
-          <li><span class="sn">1</span>Booking is reserved now — no charge today</li>
+          <li><span class="sn">1</span>Booking reserved now — no charge today</li>
           <li><span class="sn">2</span>Host confirms within 12 hours</li>
-          <li><span class="sn">3</span>Pay the host directly in cash on arrival</li>
+          <li><span class="sn">3</span>Pay the host directly in cash on check-in</li>
           <li><span class="sn">4</span>Free cancellation up to 24h before check-in</li>
         </ul>
       </div>
-      <p style="font-size:12px;color:var(--muted);line-height:1.6">⚠️ Hosts may prioritise paid bookings. Online payment guarantees your spot.</p>
+      <p style="font-size:12px;color:var(--muted);line-height:1.6">⚠️ Online payment secures your spot — hosts may prioritise paid bookings.</p>
     </div>
 
-    <!-- GUEST DETAILS -->
     <hr class="sep">
     <div class="g-lbl">Your details</div>
-
-    <div class="fg">
-      <label>Full Name *</label>
-      <input type="text" id="gName" placeholder="e.g. Amahoro Jean" autocomplete="name">
-    </div>
-    <div class="fg">
-      <label>Email Address *</label>
-      <input type="email" id="gEmail" placeholder="you@example.com" autocomplete="email">
-    </div>
+    <div class="fg"><label>Full Name *</label><input type="text" id="gName" placeholder="e.g. Amahoro Jean" autocomplete="name"></div>
+    <div class="fg"><label>Email Address *</label><input type="email" id="gEmail" placeholder="you@example.com" autocomplete="email"></div>
     <div class="fg">
       <label>Your Phone *</label>
       <div class="ph-wrap">
@@ -316,11 +222,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
       <i id="payIcon" class="fa-solid fa-lock"></i>
       <span id="payLabel">Submit Booking Request</span>
     </button>
-    <div class="lock-row">
-      <i class="fa-solid fa-shield-halved"></i>
-      <span id="lockLabel">No charge until host approves · AES-256 Encrypted</span>
-    </div>
-
+    <div class="lock-row"><i class="fa-solid fa-shield-halved"></i><span id="lockLabel">No charge until host approves · Secured by Pesapal</span></div>
   </div>
 </div>
 
@@ -328,26 +230,34 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 <script src="/js/config.js"></script>
 <script>
 /* ─────────────────────────────────────────────────────────────────
-   AfriStay Checkout — Full Encrypted Payment Flow
+   AfriStay Checkout v4 — Correct Pesapal Flow
+   
+   HOW PESAPAL ACTUALLY WORKS:
    ─────────────────────────────────────────────────────────────────
+   Pesapal does NOT accept card details via API.
+   It only works via a hosted payment page (redirect_url).
+   
    CARD FLOW:
-   1. Guest enters card details here
-   2. store-payment-intent: encrypts with AES-256 → stores in payment_intents
-   3. Owner gets email → clicks Approve in Dashboard
-   4. Dashboard calls charge-and-payout → decrypts → submits to Pesapal
-      with card details → Pesapal charges card directly
-   5. Pesapal fires IPN → kpay-webhook → booking confirmed → receipt email
-
+   1. Guest picks "Card" and enters their details (name/email/phone only)
+   2. store-payment-intent: creates booking as awaiting_approval
+   3. Owner approves in Dashboard
+   4. Dashboard → charge-and-payout:
+      - Creates Pesapal order → gets redirect_url
+      - Emails redirect_url to guest: "Click here to pay"
+   5. Guest clicks link → pays on Pesapal's hosted page
+   6. Pesapal fires IPN → pesapal-ipn.php → kpay-webhook → confirmed → receipt
+   
    MOMO FLOW:
-   1. Guest enters phone number
-   2. Same encryption flow
-   3. Owner approves → charge-and-payout → Pesapal sends USSD push to guest
-   4. Guest approves on phone → Pesapal IPN → confirmed → receipt
-
+   1. Guest picks MoMo network + phone number
+   2. Same approval flow
+   3. charge-and-payout submits order with payment_method=MTN/AIRTEL + phone
+   4. Pesapal sends USSD push directly to guest's phone
+   5. Guest enters PIN → confirmed via IPN
+   
    PAY ON ARRIVAL:
-   1. Booking inserted directly as awaiting_approval
-   2. Owner confirms → booking confirmed (no payment processing)
-   ───────────────────────────────────────────────────────────────── */
+   1. Booking inserted as awaiting_approval / pay_on_arrival
+   2. Owner confirms → booking confirmed, payment happens in person
+   ──────────────────────────────────────────────────────────────── */
 
 const P       = new URLSearchParams(window.location.search);
 const LISTING = P.get('listing_id') || '';
@@ -363,23 +273,19 @@ let METHOD  = 'card';
 let NETWORK = 'mtn';
 let BUSY    = false;
 
-const $    = id => document.getElementById(id);
-const tx   = (id, v) => { const e = $(id); if (e) e.textContent = v; };
-const fmt  = n => Number(n).toLocaleString('en-RW');
-const esc  = s => String(s||'').replace(/[&<>"']/g,
-  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $     = id => document.getElementById(id);
+const tx    = (id, v) => { const e=$(id); if(e) e.textContent=v; };
+const fmt   = n => Number(n).toLocaleString('en-RW');
+const esc   = s => String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtDate = d => {
   if (!d) return '—';
-  try { return new Date(d+'T00:00:00').toLocaleDateString('en-US',
-    { weekday:'short', month:'short', day:'numeric', year:'numeric' }); }
+  try { return new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}); }
   catch(_) { return d; }
 };
 
-/* ── Init ───────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🛒 [CHECKOUT] Init | listing:', LISTING, '| total:', TOTAL, CUR);
 
-  // Populate summary
   const tEl = $('sTitle');
   if (tEl) { tEl.textContent = TITLE; tEl.classList.remove('skel'); }
   tx('sIn',     fmtDate(S_DATE));
@@ -390,62 +296,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   tx('sCur',    ' ' + CUR);
   refreshBtn();
 
-  if (!LISTING) {
-    showErr('No listing found — please go back and select a property.');
-    return;
-  }
+  if (!LISTING) { showErr('No listing found — please go back and select a property.'); return; }
 
   const sb = window.supabaseClient;
-  if (!sb) {
-    console.error('❌ [CHECKOUT] supabaseClient missing — is config.js loaded?');
-    showErr('Page configuration error. Please refresh the page.');
-    return;
-  }
+  if (!sb) { showErr('Page configuration error. Please refresh.'); return; }
 
   // Load listing image
   try {
-    const { data: imgs } = await sb.from('listing_images')
-      .select('image_url').eq('listing_id', LISTING).limit(1);
+    const { data: imgs } = await sb.from('listing_images').select('image_url').eq('listing_id', LISTING).limit(1);
     if (imgs?.[0]?.image_url) {
       $('sImgWrap').innerHTML = '<img src="'+esc(imgs[0].image_url)+'" class="s-img" alt="'+esc(TITLE)+'">';
     }
-  } catch(e) { console.warn('[CHECKOUT] Image load:', e.message); }
+  } catch(e) { console.warn('[CHECKOUT] Image:', e.message); }
 
-  // Pre-fill from auth
+  // Pre-fill from profile
   try {
     const { data: { user } } = await sb.auth.getUser();
     if (user) {
-      console.log('👤 [CHECKOUT] User:', user.email);
       try {
-        const { data: p } = await sb.from('profiles')
-          .select('full_name,email,phone').eq('id', user.id).single();
+        const { data: p } = await sb.from('profiles').select('full_name,email,phone').eq('id', user.id).single();
         if (p?.full_name) $('gName').value  = p.full_name;
         if (p?.email)     $('gEmail').value = p.email;
         if (p?.phone)     $('gPhone').value = (p.phone||'').replace(/^\+?250/,'').replace(/\D/g,'');
-      } catch(_) {
-        if (user.email) $('gEmail').value = user.email;
-      }
-    } else {
-      console.log('ℹ️ [CHECKOUT] Not logged in');
+      } catch(_) { if (user.email) $('gEmail').value = user.email; }
     }
   } catch(e) { console.warn('[CHECKOUT] Auth:', e.message); }
 });
 
-/* ── Tabs ───────────────────────────────────────────────────────── */
 function switchTab(m) {
   METHOD = m;
   ['card','momo','arrival'].forEach(x => {
-    $('tab-'+x)?.classList.toggle('on', x === m);
-    $('panel-'+x)?.classList.toggle('on', x === m);
+    $('tab-'+x)?.classList.toggle('on', x===m);
+    $('panel-'+x)?.classList.toggle('on', x===m);
   });
-  refreshBtn();
-  hideErr();
+  refreshBtn(); hideErr();
 }
 
 function pickNet(n) {
   NETWORK = n;
-  $('net-mtn')?.classList.toggle('on', n === 'mtn');
-  $('net-air')?.classList.toggle('on', n === 'airtel');
+  $('net-mtn')?.classList.toggle('on', n==='mtn');
+  $('net-air')?.classList.toggle('on', n==='airtel');
 }
 
 function refreshBtn() {
@@ -455,11 +345,11 @@ function refreshBtn() {
   if (METHOD === 'card') {
     tx('payLabel', 'Request Booking — Pay ' + t + ' by Card');
     $('payIcon').className = 'fa-solid fa-credit-card';
-    tx('lockLabel', 'Card encrypted & charged after host approves · Pesapal');
+    tx('lockLabel', 'Pesapal payment link emailed after host approval');
   } else if (METHOD === 'momo') {
     tx('payLabel', 'Request Booking — Pay ' + t + ' via MoMo');
     $('payIcon').className = 'fa-solid fa-mobile-screen-button';
-    tx('lockLabel', 'USSD push to your phone after host approves · Pesapal');
+    tx('lockLabel', 'USSD push sent to your phone after host approves');
   } else {
     btn.classList.add('g');
     tx('payLabel', 'Reserve — Pay Cash on Arrival');
@@ -468,86 +358,47 @@ function refreshBtn() {
   }
 }
 
-/* ── Validate ───────────────────────────────────────────────────── */
 function validate() {
   const name  = $('gName')?.value.trim()  || '';
   const email = $('gEmail')?.value.trim() || '';
   const phone = $('gPhone')?.value.trim() || '';
 
-  if (!name)                  { showErr('Please enter your full name.'); return null; }
-  if (!email.includes('@'))   { showErr('Please enter a valid email.'); return null; }
-  if (phone.length < 8)       { showErr('Please enter your phone (without +250).'); return null; }
-  if (!LISTING)               { showErr('Session expired — go back and try again.'); return null; }
+  if (!name)               { showErr('Please enter your full name.'); return null; }
+  if (!email.includes('@')){ showErr('Please enter a valid email.'); return null; }
+  if (phone.length < 8)    { showErr('Please enter your phone number (without +250).'); return null; }
+  if (!LISTING)            { showErr('Session expired — please go back.'); return null; }
   if (METHOD !== 'arrival' && TOTAL <= 0) {
-    showErr('Invalid booking amount — please go back and re-select your dates.'); return null;
+    showErr('Invalid booking amount — go back and re-select your dates.'); return null;
   }
-
-  if (METHOD === 'card') {
-    const num = ($('cardNum')?.value  || '').replace(/\s/g,'');
-    const nm  = ($('cardName')?.value || '').trim();
-    const exp = ($('cardExp')?.value  || '').replace(/[\s/]/g,'');
-    const cvv = ($('cardCvv')?.value  || '').trim();
-    if (num.length < 13) { showErr('Please enter your full card number.'); return null; }
-    if (!nm)             { showErr('Please enter the name on your card.'); return null; }
-    if (exp.length < 4)  { showErr('Please enter a valid expiry date (MM/YY).'); return null; }
-    if (cvv.length < 3)  { showErr('Please enter your 3-digit CVV.'); return null; }
-  }
-
   if (METHOD === 'momo') {
     const mp = $('momoPhone')?.value.trim() || '';
-    if (mp.length < 8) { showErr('Please enter the MoMo number to receive the USSD push.'); return null; }
+    if (mp.length < 8) { showErr('Please enter the MoMo phone number that will receive the USSD push.'); return null; }
   }
-
   return { name, email, phone: '+250' + phone };
 }
 
-/* ── Main pay() ─────────────────────────────────────────────────── */
 async function pay() {
   if (BUSY) return;
   hideErr();
-
   const form = validate();
   if (!form) return;
-
   if (METHOD === 'arrival') { await doArrival(form); return; }
 
-  // Collect payment data
-  let paymentData = {};
-  if (METHOD === 'card') {
-    paymentData = {
-      card_number: ($('cardNum')?.value  || '').replace(/\s/g,''),
-      card_name:   ($('cardName')?.value || '').trim(),
-      expiry:      ($('cardExp')?.value  || '').replace(/[\s/]/g,''),
-      cvv:         ($('cardCvv')?.value  || '').trim(),
-    };
-    console.log('💳 [CHECKOUT] Card collected — encrypting...');
-  } else {
-    paymentData = {
-      phone:   $('momoPhone')?.value.trim() || '',
-      network: NETWORK,
-    };
-    console.log('📱 [CHECKOUT] MoMo', NETWORK, '— encrypting...');
-  }
+  // payment_data for MoMo includes phone + network
+  // For card: just store the intent, Pesapal link sent after approval
+  const paymentData = METHOD === 'momo'
+    ? { phone: $('momoPhone')?.value.trim() || '', network: NETWORK }
+    : { info: 'card_via_pesapal_redirect' }; // card details collected by Pesapal, not us
 
   setBusy(true, 'Submitting request…');
-
   try {
     const sb = window.supabaseClient;
     if (!sb) throw new Error('Page config error — please refresh.');
 
-    // Get current user
     const { data: { user }, error: authErr } = await sb.auth.getUser();
-    if (authErr || !user) {
-      showErr('Please log in to make a booking.');
-      setBusy(false); return;
-    }
-    console.log('✅ [CHECKOUT] Auth OK:', user.id);
+    if (authErr || !user) { showErr('Please log in to make a booking.'); setBusy(false); return; }
 
-    // Build request — include apikey + anon auth header (required by Supabase)
     const fnUrl = (CONFIG?.FUNCTIONS_BASE || '') + '/store-payment-intent';
-    if (!CONFIG?.FUNCTIONS_BASE) {
-      throw new Error('FUNCTIONS_BASE not set in config.js');
-    }
     console.log('📡 [CHECKOUT] POST', fnUrl);
 
     const { data: { session } } = await sb.auth.getSession();
@@ -578,42 +429,33 @@ async function pay() {
       }),
     });
 
-    console.log('📬 [CHECKOUT] Response:', res.status);
-
+    console.log('📬 [CHECKOUT] HTTP', res.status);
     let data;
-    try { data = await res.json(); }
-    catch(_) {
-      throw new Error('Server error (HTTP ' + res.status + '). Check Supabase function logs.');
+    try { data = await res.json(); } catch(_) {
+      throw new Error('Server error (HTTP ' + res.status + '). Check Supabase → Edge Functions → Logs.');
     }
-
     console.log('📬 [CHECKOUT] Body:', JSON.stringify(data));
 
     if (!res.ok || !data.success) {
+      if (data.code === 'SELF_BOOKING')
+        return showErr('You cannot book your own listing — you are the host of this property.');
       throw new Error(data.error || data.message || 'Booking failed (HTTP ' + res.status + ')');
     }
 
-    console.log('✅ [CHECKOUT] Booking created:', data.booking_id);
     showConfirmation(data.booking_id);
-
   } catch(err) {
-    console.error('❌ [CHECKOUT] Error:', err.message || err);
+    console.error('❌ [CHECKOUT]', err.message);
     showErr(err.message || 'Something went wrong. Please try again.');
     setBusy(false);
   }
 }
 
-/* ── Pay on Arrival ─────────────────────────────────────────────── */
 async function doArrival(form) {
   setBusy(true, 'Reserving…');
   try {
     const sb = window.supabaseClient;
-    if (!sb) throw new Error('Page config error — please refresh.');
-
     const { data: { user }, error: authErr } = await sb.auth.getUser();
-    if (authErr || !user) {
-      showErr('Please log in to make a booking.');
-      setBusy(false); return;
-    }
+    if (authErr || !user) { showErr('Please log in.'); setBusy(false); return; }
 
     const { data: bk, error } = await sb.from('bookings').insert({
       listing_id:              LISTING,
@@ -630,51 +472,43 @@ async function doArrival(form) {
       owner_response_deadline: new Date(Date.now() + 12 * 3600000).toISOString(),
     }).select('id').single();
 
-    if (error) {
-      console.error('[CHECKOUT] Arrival error:', error.message);
-      throw new Error(error.message);
-    }
-    console.log('✅ [CHECKOUT] Arrival reserved:', bk.id);
+    if (error) throw new Error(error.message);
     showConfirmation(bk.id, true);
-
   } catch(err) {
-    console.error('❌ [CHECKOUT] Arrival error:', err.message);
     showErr('Reservation failed: ' + err.message);
     setBusy(false);
   }
 }
 
-/* ── Confirmation screen ────────────────────────────────────────── */
 function showConfirmation(bookingId, isArrival = false) {
   $('mainPage').style.display = 'none';
-
-  let nextStep = '';
-  if (isArrival)         nextStep = 'Host will confirm within <strong>12 hours</strong>. Pay cash on arrival.';
-  else if (METHOD==='card') nextStep = 'Once the host approves, <strong>Pesapal will charge your card directly</strong>. You\'ll get a confirmation email.';
-  else                   nextStep = 'Once the host approves, <strong>Pesapal will send a USSD push to your MoMo phone</strong>. Approve it to confirm payment.';
+  let msg = '';
+  if (isArrival)
+    msg = 'Host will confirm within <strong>12 hours</strong>. Pay the host directly in cash on arrival.';
+  else if (METHOD === 'momo')
+    msg = 'Once the host approves, <strong>Pesapal will send a USSD push to your MoMo phone</strong>. Enter your PIN to confirm payment.';
+  else
+    msg = 'Once the host approves, <strong>you\'ll receive a Pesapal payment link by email</strong>. Click it to pay securely with your card.';
 
   document.body.insertAdjacentHTML('beforeend', `
     <div style="max-width:540px;margin:100px auto 60px;text-align:center;background:#fff;
-      border-radius:24px;box-shadow:0 4px 32px rgba(0,0,0,.08);padding:50px 32px;
-      font-family:'Sora',sans-serif">
+      border-radius:24px;box-shadow:0 4px 32px rgba(0,0,0,.08);padding:50px 32px;font-family:'Sora',sans-serif">
       <div style="width:76px;height:76px;border-radius:50%;background:#fff8f3;border:3px solid #EB6753;
-        display:flex;align-items:center;justify-content:center;margin:0 auto 20px;
-        animation:pulse 2s infinite">
+        display:flex;align-items:center;justify-content:center;margin:0 auto 20px;animation:pulse 2s infinite">
         <i class="fa-solid fa-hourglass-half" style="font-size:30px;color:#EB6753"></i>
       </div>
       <h2 style="font-family:'Playfair Display',serif;font-size:24px;color:#161616;margin-bottom:10px">
         ${isArrival ? 'Reservation Sent!' : 'Booking Request Sent!'}
       </h2>
-      <p style="font-size:14px;color:#888;margin-bottom:20px;line-height:1.8">${nextStep}</p>
+      <p style="font-size:14px;color:#888;margin-bottom:20px;line-height:1.8">${msg}</p>
       <div style="background:#fff8f3;border:1.5px solid #fdd5c4;border-radius:12px;padding:14px 18px;
         font-size:13px;color:#9a3412;margin-bottom:20px;line-height:1.8">
         <i class="fa-solid fa-bell" style="margin-right:6px"></i>
-        You'll receive an <strong>email notification</strong> when the host responds.<br>
+        You'll get an <strong>email notification</strong> when the host responds.<br>
         No response in 12 hours = auto-cancelled, no charge.
       </div>
-      <div style="background:#f7f7f7;border-radius:10px;padding:9px 14px;font-size:12px;
-        color:#aaa;margin-bottom:24px">
-        Booking ref: <strong style="color:#161616;font-size:13px">${String(bookingId||'').slice(0,8).toUpperCase()}</strong>
+      <div style="background:#f7f7f7;border-radius:10px;padding:9px 14px;font-size:12px;color:#aaa;margin-bottom:24px">
+        Ref: <strong style="color:#161616;font-size:13px">${String(bookingId||'').slice(0,8).toUpperCase()}</strong>
       </div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
         <a href="/Dashboard" style="display:inline-flex;align-items:center;gap:7px;padding:12px 22px;
@@ -687,45 +521,23 @@ function showConfirmation(bookingId, isArrival = false) {
         </a>
       </div>
     </div>
-    <style>@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}</style>
-  `);
+    <style>@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}</style>`);
   document.title = 'Request Sent — AfriStay';
 }
 
-/* ── Helpers ────────────────────────────────────────────────────── */
 function setBusy(on, label) {
   BUSY = on;
   const btn = $('payBtn'); if (!btn) return;
   btn.disabled = on;
-  if (on) {
-    tx('payLabel', label || 'Processing…');
-    $('payIcon').className = 'fa-solid fa-circle-notch fa-spin';
-  } else { refreshBtn(); }
+  if (on) { tx('payLabel', label||'Processing…'); $('payIcon').className='fa-solid fa-circle-notch fa-spin'; }
+  else refreshBtn();
 }
-
 function showErr(msg) {
   tx('errMsg', msg);
   $('errBox').style.display = 'flex';
   $('errBox').scrollIntoView({ behavior:'smooth', block:'nearest' });
 }
-
 function hideErr() { $('errBox').style.display = 'none'; }
-
-function fmtCard(el) {
-  let v = el.value.replace(/\D/g,'').slice(0,16);
-  el.value = v.replace(/(.{4})/g,'$1 ').trim();
-  const icon = $('cardIcon'); if (!icon) return;
-  if      (/^4/.test(v))       icon.className = 'fa-brands fa-cc-visa ico';
-  else if (/^5[1-5]/.test(v))  icon.className = 'fa-brands fa-cc-mastercard ico';
-  else if (/^3[47]/.test(v))   icon.className = 'fa-brands fa-cc-amex ico';
-  else                          icon.className = 'fa-solid fa-credit-card ico';
-}
-
-function fmtExp(el) {
-  let v = el.value.replace(/\D/g,'').slice(0,4);
-  if (v.length >= 3) v = v.slice(0,2) + ' / ' + v.slice(2);
-  el.value = v;
-}
 </script>
 </body>
 </html>

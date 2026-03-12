@@ -45,7 +45,7 @@
     /* ─────────────────────────────────────────
        TOGGLE — called by onclick on heart icon
     ───────────────────────────────────────── */
-    window.toggleHeart = async function (e, listingId) {
+    window.toggleHeart = window.toggleFavorite = async function (e, listingId) {
         e.stopPropagation();
         e.preventDefault();
 
@@ -97,21 +97,26 @@
        HELPERS
     ───────────────────────────────────────── */
     function _collectListingIds() {
-        return [...document.querySelectorAll('[data-listing-id]')]
-            .map(el => el.dataset.listingId)
-            .filter(Boolean);
+        const ids = new Set();
+        // Support both data-listing-id (util) and data-lid (home.js cards)
+        document.querySelectorAll('[data-listing-id],[data-lid]').forEach(el => {
+            const id = el.dataset.listingId || el.dataset.lid;
+            if (id) ids.add(id);
+        });
+        return [...ids];
     }
 
     function _iconFor(listingId) {
-        const el = document.querySelector('[data-listing-id="' + listingId + '"]');
+        // Support both attribute names
+        const el = document.querySelector('[data-listing-id="' + listingId + '"],[data-lid="' + listingId + '"]');
         return el ? el.querySelector('i') : null;
     }
 
     function _syncAllHearts() {
-        document.querySelectorAll('[data-listing-id]').forEach(el => {
-            const id = el.dataset.listingId;
+        document.querySelectorAll('[data-listing-id],[data-lid]').forEach(el => {
+            const id = el.dataset.listingId || el.dataset.lid;
             const icon = el.querySelector('i');
-            if (icon) _setHeart(icon, _favMap.hasOwnProperty(id));
+            if (icon && id) _setHeart(icon, _favMap.hasOwnProperty(id));
         });
     }
 
