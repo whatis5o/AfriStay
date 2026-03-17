@@ -18,12 +18,7 @@ const DEMO_MODE = false; // Set to true only when testing with mock provider
    EMAILJS CONFIG  — fill in after creating your account at emailjs.com
    See EMAIL_SETUP.md for step-by-step instructions
    ═══════════════════════════════════════════════ */
-const EMAILJS_CONFIG = {
-    SERVICE_ID:               'service_XXXXXXX',   // EmailJS Dashboard → Email Services → your service ID
-    TEMPLATE_BOOKING_REQUEST: 'template_XXXXXXX',  // Template that emails the OWNER on new booking
-    TEMPLATE_BOOKING_APPROVED:'template_XXXXXXX',  // Template that emails the BOOKER on approval
-    PUBLIC_KEY:               'XXXXXXXXXXXXXXXXXXXX' // EmailJS Dashboard → Account → Public Key
-};
+// EmailJS removed — emails handled by Brevo edge functions
 
 console.log("🎯 [ADMIN] Demo mode:", DEMO_MODE ? "ENABLED" : "DISABLED");
 
@@ -1372,7 +1367,7 @@ async function loadBookingsTable() {
             const isOwnerRow  = CURRENT_ROLE === 'owner' && listing?.owner_id === CURRENT_PROFILE?.id;
             const isAdminRow  = CURRENT_ROLE === 'admin';
             const needsAction = isOwnerRow || isAdminRow;
-            const canApprove  = needsAction && (r.status === 'awaiting_approval' || r.status === 'pending');
+            const canApprove  = needsAction && ['awaiting_approval', 'pending'].includes(r.status);
             const canReject   = needsAction && (r.status === 'awaiting_approval' || r.status === 'pending' || r.status === 'confirmed');
             const isPaid      = r.status === 'confirmed' || r.status === 'approved' || r.status === 'completed';
             const hasFailed   = r.status === 'payment_failed';
@@ -1647,183 +1642,96 @@ async function toggleListingAvailability(listingId, current) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   APPROVE BOOKING — New Architecture
-   Owner approves → calls charge-and-payout Edge Function →
-   K-Pay charges customer → webhook confirms → receipt generated
+   APPROVE / REJECT BOOKING — v3 clean flow (no payment)
+   Owner approves → calls approve-booking edge function →
+   Edge function emails guest a "Confirm Your Stay" link
+   (When DPO is live: edge function emails a payment link instead)
    ═══════════════════════════════════════════════════════════════ */
 async function approveBooking(bookingId) {
-    console.log('✅ [APPROVE] Approving booking:', bookingId);
+    console.log('✅ [APPROVE] Owner approving booking:', bookingId);
 
-    // Load booking with retry (email link may arrive before auth fully loads)
-    let booking = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-        const { data, error } = await _supabase.from('bookings').select('*').eq('id', bookingId).single();
-        if (data) { booking = data; break; }
-        if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
-        else { showApproveError('Booking not found. It may have been cancelled or the link expired.'); return; }
-    }
+    // Load booking to show confirm dialog
+    const { data: booking } = await _supabase
+        .from('bookings').select('*, listings(title)').eq('id', bookingId).single();
+    if (!booking) { toast('Booking not found', 'error'); return; }
 
-    const isArrival = booking.payment_method === 'pay_on_arrival';
-    const fmt = d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    const msg = isArrival
-        ? `Approve pay-on-arrival for "${booking.guest_name || 'Guest'}"?\n\nCheck-in: ${fmt(booking.start_date)}\nCheck-out: ${fmt(booking.end_date)}\nTotal: ${Number(booking.total_amount||0).toLocaleString('en-RW')} RWF\n\nGuest will pay in cash on arrival.`
-        : `Approve booking from "${booking.guest_name || 'Guest'}"?\n\nCheck-in: ${fmt(booking.start_date)}\nCheck-out: ${fmt(booking.end_date)}\nTotal: ${Number(booking.total_amount||0).toLocaleString('en-RW')} RWF\n\nThis will trigger Pesapal to charge the guest's card/MoMo.`;
-    if (!confirm(msg)) return;
+    const title = booking.listings?.title || 'this listing';
+    if (!confirm(`Approve booking for "${title}"?\n\nThe guest will receive an email to confirm their stay.`)) return;
 
-    toast('Processing approval…', 'info');
+    toast('Approving booking…', 'info');
 
     try {
-        if (isArrival) {
-            const { error } = await _supabase.from('bookings')
-                .update({ status: 'confirmed', payment_status: 'pending' })
-                .eq('id', bookingId);
-            if (error) throw error;
-            toast('✅ Reservation confirmed! Guest notified by email.', 'success');
+        // Get auth session for the function call
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) throw new Error('Not logged in');
 
+        const res = await fetch(CONFIG.FUNCTIONS_BASE + '/approve-booking', {
+            method:  'POST',
+            headers: {
+                'Content-Type':  'application/json',
+                'Authorization': 'Bearer ' + session.access_token,
+                'apikey':        CONFIG.SUPABASE_KEY,
+            },
+            body: JSON.stringify({ booking_id: bookingId }),
+        });
+
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Approval failed');
+
+        console.log('✅ [APPROVE] Done:', data);
+
+        if (data.dpo_active) {
+            toast('✅ Approved! Guest received a payment link.', 'success');
         } else {
-            toast('💳 Submitting payment to Pesapal…', 'info');
-            console.log('[APPROVE] Calling charge-and-payout for', bookingId);
-
-            // Get auth token for edge function call
-            const { data: { session } } = await _supabase.auth.getSession();
-            const token = session?.access_token || CONFIG.SUPABASE_KEY;
-
-            // Smart timeout: 25 seconds (Pesapal can be slow, but not more than that)
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 25000);
-
-            let res, data;
-            try {
-                res = await fetch(CONFIG.FUNCTIONS_BASE + '/charge-and-payout', {
-                    method:  'POST',
-                    signal:  controller.signal,
-                    headers: {
-                        'Content-Type':  'application/json',
-                        'Authorization': 'Bearer ' + token,
-                        'apikey':         CONFIG.SUPABASE_KEY,
-                    },
-                    body: JSON.stringify({ booking_id: bookingId }),
-                });
-                clearTimeout(timeoutId);
-                data = await res.json();
-            } catch (fetchErr) {
-                clearTimeout(timeoutId);
-                if (fetchErr.name === 'AbortError') {
-                    // Timeout: payment may still be processing on Pesapal side
-                    // Mark booking as payment_pending and tell owner to wait
-                    await _supabase.from('bookings').update({ status: 'payment_pending' }).eq('id', bookingId);
-                    showApproveError(
-                        'Payment request timed out (25s). This usually means Pesapal is processing it — the guest will receive a USSD push or email shortly. ' +
-                        'Check back in 2 minutes — if the booking is still "Charging", contact support.',
-                        'warning'
-                    );
-                    await loadBookingsTable();
-                    return;
-                }
-                throw fetchErr;
-            }
-
-            console.log('[APPROVE] charge-and-payout response:', data);
-
-            if (!res.ok || data.error) {
-                const errMsg = data?.error || 'Charge failed (HTTP ' + res.status + ')';
-                // Show pretty error - don't just toast
-                showApproveError(errMsg);
-                await loadBookingsTable();
-                return;
-            }
-
-            toast('✅ Booking approved! Payment submitted to Pesapal. Guest will be notified.', 'success');
+            toast('✅ Approved! Guest received a confirmation email.', 'success');
         }
 
         await loadBookingsTable();
         await loadCounts();
-        try { await loadNewBookings(); } catch(_) {}
 
     } catch (err) {
-        console.error('❌ [APPROVE] Error:', err);
-        showApproveError(err.message || 'Approval failed. Please try again.');
+        console.error('❌ [APPROVE]', err);
+        toast('Failed to approve: ' + err.message, 'error');
     }
-}
-
-/* Pretty error modal for approval failures */
-function showApproveError(message, type = 'error') {
-    const colors = { error: '#e74c3c', warning: '#f39c12', info: '#3498db' };
-    const icons  = { error: 'fa-triangle-exclamation', warning: 'fa-clock', info: 'fa-circle-info' };
-    const color  = colors[type] || colors.error;
-    const icon   = icons[type]  || icons.error;
-
-    let el = document.getElementById('_approveErrorModal');
-    if (!el) {
-        el = document.createElement('div');
-        el.id = '_approveErrorModal';
-        el.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);padding:20px;';
-        document.body.appendChild(el);
-    }
-    el.innerHTML = `
-        <div style="background:#fff;border-radius:20px;padding:36px 32px;max-width:460px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.2);text-align:center;font-family:Inter,sans-serif;">
-            <div style="width:64px;height:64px;border-radius:50%;background:${color}18;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;">
-                <i class="fa-solid ${icon}" style="font-size:28px;color:${color};"></i>
-            </div>
-            <h3 style="margin:0 0 12px;font-size:18px;font-weight:800;color:#1a1a1a;">
-                ${type === 'warning' ? 'Payment Timed Out' : 'Approval Failed'}
-            </h3>
-            <p style="margin:0 0 20px;font-size:14px;color:#666;line-height:1.7;">${escapeHtml(message)}</p>
-            <button onclick="document.getElementById('_approveErrorModal').remove()"
-                style="padding:12px 28px;background:${color};color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">
-                OK, Got It
-            </button>
-        </div>`;
-    el.onclick = e => { if (e.target === el) el.remove(); };
 }
 
 async function rejectBooking(bookingId) {
-    console.log("❌ [ACTION] Rejecting booking:", bookingId);
-    if (!confirm('Reject this booking? The listing will become available again.')) return;
+    console.log('❌ [REJECT] Rejecting booking:', bookingId);
 
-    toast('Rejecting booking...', 'info');
+    const { data: booking } = await _supabase
+        .from('bookings').select('*, listings(title)').eq('id', bookingId).single();
+    if (!booking) { toast('Booking not found', 'error'); return; }
+
+    const title  = booking.listings?.title || 'this listing';
+    const reason = prompt(`Reject booking for "${title}"?\n\nOptional: enter a reason for the guest (or leave blank):`) ;
+    if (reason === null) return; // cancelled
+
+    toast('Rejecting booking…', 'info');
+
     try {
-        // 1. Reject the booking (trigger will free the listing automatically)
-        const { error } = await _supabase
-            .from('bookings')
-            .update({ status: 'rejected' })
-            .eq('id', bookingId);
-        if (error) throw error;
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) throw new Error('Not logged in');
 
-        // 2. Email the guest if EmailJS available
-        try {
-            const { data: booking }  = await _supabase.from('bookings').select('*').eq('id', bookingId).single();
-            const { data: listing }  = await _supabase.from('listings').select('title, owner_id').eq('id', booking.listing_id).single();
-            const { data: booker }   = await _supabase.from('profiles').select('full_name, email').eq('id', booking.user_id).single();
+        const res = await fetch(CONFIG.FUNCTIONS_BASE + '/reject-booking', {
+            method:  'POST',
+            headers: {
+                'Content-Type':  'application/json',
+                'Authorization': 'Bearer ' + session.access_token,
+                'apikey':        CONFIG.SUPABASE_KEY,
+            },
+            body: JSON.stringify({ booking_id: bookingId, reason: reason || null }),
+        });
 
-            if (booker?.email && window.emailjs) {
-                const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
-                await emailjs.send(
-                    EMAILJS_CONFIG.SERVICE_ID,
-                    EMAILJS_CONFIG.TEMPLATE_BOOKING_REJECTED || EMAILJS_CONFIG.TEMPLATE_BOOKING_APPROVED,
-                    {
-                        to_email:       booker.email,
-                        booker_name:    booker.full_name || 'Guest',
-                        listing_title:  listing?.title || '—',
-                        check_in:       fmt(booking.start_date),
-                        check_out:      fmt(booking.end_date),
-                        message:        'Unfortunately, the host was unable to accommodate your booking request. The listing is now available for new dates.',
-                    },
-                    EMAILJS_CONFIG.PUBLIC_KEY
-                );
-                console.log('📧 [REJECT] Guest notified:', booker.email);
-            }
-        } catch (emailErr) {
-            console.warn('⚠️ [REJECT] Email failed (non-blocking):', emailErr.message);
-        }
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Rejection failed');
 
-        toast('Booking rejected. Listing is now available again.', 'success');
+        toast('Booking rejected. Guest has been notified.', 'success');
         await loadBookingsTable();
         await filterListings();
 
     } catch (err) {
-        console.error("❌ [ACTION] Error rejecting booking:", err);
-        toast('Failed to reject booking: ' + err.message, 'error');
+        console.error('❌ [REJECT]', err);
+        toast('Failed to reject: ' + err.message, 'error');
     }
 }
 
@@ -2656,7 +2564,7 @@ async function loadListingRequests() {
         const { data, error } = await _supabase
             .from('listings')
             .select('id,title,price,currency,category_slug,province_id,district_id,owner_id,created_at,status')
-            .in('status', ['awaiting_approval', 'pending'])
+            .in('status', ['awaiting_approval', 'approved', 'pending'])
             .order('created_at', { ascending: false });
         if (error) throw error;
 
@@ -2758,7 +2666,7 @@ async function loadNewBookings() {
             .from('bookings')
             .select('id,listing_id,user_id,start_date,end_date,total_amount,created_at')
             .in('listing_id', listingIds)
-            .in('status', ['awaiting_approval', 'pending'])
+            .in('status', ['awaiting_approval', 'approved', 'pending'])
             .order('created_at', { ascending: false });
         if (error) throw error;
 
@@ -2850,7 +2758,7 @@ async function loadDashPendingListings() {
         let q = _supabase
             .from('listings')
             .select('id,title,price,currency,category_slug,province_id,district_id,owner_id,created_at')
-            .in('status', ['awaiting_approval', 'pending'])
+            .in('status', ['awaiting_approval', 'approved', 'pending'])
             .order('created_at', { ascending: false })
             .limit(15);
 
@@ -3008,7 +2916,7 @@ async function handleUrlActions() {
     window.history.replaceState({}, '', cleanUrl);
 
     // Wait for auth + data to load
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1000)); // already waited 3.5s on page load
 
     if (action === 'approve') {
         console.log('[URL-ACTION] Auto-approving booking from email link:', bookingId);
@@ -3019,8 +2927,8 @@ async function handleUrlActions() {
     }
 }
 
-// Run after page init — wait 3.5s to allow auth + data to fully load from email link
-setTimeout(handleUrlActions, 3500);
+// Run after page init
+setTimeout(handleUrlActions, 3500); // give auth session time to restore
 
 /* ═══════════════════════════════════════════════════════════════
    OWNER WALLET SETTINGS
