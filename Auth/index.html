@@ -43,7 +43,6 @@
             <div class="title-group">
                 <h1 class="white">Join Us!</h1>
                 <h1 class="white"></h1>
-            
             </div>
             <p class="auth-desc">Access your bookings, favorites, and more.</p>
             <i class="fa-solid fa-key big-icon"></i>
@@ -51,25 +50,42 @@
 
         <div class="box-right">
             
-            <div class="auth-toggle">
+            <div class="auth-toggle" id="authToggleContainer">
                 <button id="btn-signin" class="active" onclick="toggleAuth('signin')">Sign In</button>
                 <button id="btn-signup" onclick="toggleAuth('signup')">Sign Up</button>
             </div>
 
             <form id="authForm">
-                <h1 class="orange form-title">Sign In</h1>
+                <h1 class="orange form-title" id="dynamicTitle">Sign In</h1>
                 
-                <div id="nameField" class="input-group hidden">
-                    <input type="text" id="fullName" placeholder="Full Name">
-                    <input type="tel" id="phoneNumber" placeholder="+250" style="margin-top: 15px;">
+                <div id="loginGroup">
+                    <div class="input-group">
+                        <input type="text" id="loginIdentifier" placeholder="Email or Phone (+250...)">
+                    </div>
                 </div>
 
-                <div class="input-group">
-                    <input type="email" id="email" placeholder="Email Address" required>
+                <div id="signupGroup" class="hidden">
+                    <div class="input-group">
+                        <input type="text" id="fullName" placeholder="Full Name">
+                    </div>
+                    <div class="input-group">
+                        <input type="email" id="signupEmail" placeholder="Email Address (Optional)">
+                    </div>
+                    <div class="input-group">
+                        <input type="tel" id="signupPhone" placeholder="Phone Number (Optional, +250...)">
+                        <p style="font-size: 11px; color: #888; margin-top: 5px; margin-left: 10px;">Fill at least one. If using Phone, we will text you a code.</p>
+                    </div>
                 </div>
 
-                <div class="input-group">
-                    <input type="password" id="password" placeholder="Password" required>
+                <div id="otpGroup" class="hidden">
+                    <p style="margin-bottom: 15px; color: #555; font-size: 14px;">We sent a 6-digit code to your phone. Enter it below to verify your account.</p>
+                    <div class="input-group">
+                        <input type="text" id="otpCode" placeholder="Enter 6-digit SMS Code" autocomplete="one-time-code">
+                    </div>
+                </div>
+
+                <div class="input-group" id="passwordGroup">
+                    <input type="password" id="password" placeholder="Password">
                 </div>
 
                 <button type="submit" id="submitBtn">Login</button>
@@ -85,5 +101,4 @@
     <script src="/js/script.js"></script>
     <script src="/js/auth.js"></script>
 </body>
-
 </html>
