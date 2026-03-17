@@ -1,153 +1,24 @@
-# AfriStay — Project Checklist
+Dont show unavailable or unapproved listings in listings or homepage even there detail page is diabled
 
-## ✅ Done this session
-- **Pending listing workflow** — owner uploads → `status='pending'`, invisible to public. Admin approves → `status='approved'` → live on /Listings and home
-- **Public page filters** — script.js and home.js now filter `status='approved'` AND `availability_status='available'`. Unapproved or unavailable listings never appear publicly
-- **Dashboard "New Listings" widget** — replaces old Recent Bookings on dashboard tab. Admin sees all pending with Approve/Reject. Owner sees their own pending with status badge
-- **Detail page for pending listings** — shows full listing info but replaces booking form with "Awaiting Approval" notice. Preview link (`?preview=1`) works from dashboard
-- **Owner contact on detail page** — fetches owner's full_name, email, phone and renders a "Contact Host" card above reviews
-- **Client-side caching** — `_cache` module in dashboard.js (TTL-based), `_locCache` in script.js (5 min), location lookups shared between pages. Image maps cached 2 min. Cache busted after create/approve/delete
-- **Dashboard logo fix** — `.logo-area img` CSS updated: proper `height:48px`, `max-width:180px`, bottom border separator, less vertical padding. Collapsed sidebar shows 36px logo
+When listing is uploading let the owner or admin know put a message like creating listing uploading image... or video.. etcand when done let them know
 
----
+apply the new dashboard to the separated dashboards and make the dashboards have the same UI as before
 
-## 🔲 Remaining — Priority Order
+when owner or admin login they go to home
 
-### 🔴 High Priority
+after booking, and then i click on view bookings or my bookings and am user i go to profile and on the tab of my bookings 
 
-#### Payment System
-- [ ] Choose payment provider: **MTN Mobile Money** (Rwanda) or **Stripe** (cards)
-  - MTN MoMo: needs MTN API credentials, webhook handler
-  - Stripe: `stripe.js` + backend Edge Function to create PaymentIntent
-- [ ] `/Checkout` page: payment method selection UI
-- [ ] Edge Function: `create-payment-intent` or MoMo initiation
-- [ ] Webhook handler: on payment success → update booking `status='confirmed'`, `payment_status='paid'`
-- [ ] Payment status shown on booking cards in dashboard
-- [ ] Refund handling (admin can issue refund from dashboard)
+after booking with pay on arrival i cant see the email as owner
 
-#### Email Confirmations + Detailed Receipt
-- [ ] EmailJS (already configured but keys are placeholder) → fill real keys in config
-- [ ] **Booking Request email** → owner gets notified when someone books
-- [ ] **Booking Approved email** → guest gets confirmation + receipt PDF
-- [ ] **Receipt content**: listing name, address, dates, nights, price/night, total, booking ID, owner contact, AfriStay branding
-- [ ] Receipt PDF: upgrade `downloadReceipt()` in dashboard.js — currently uses jsPDF but needs styling
-- [ ] Add "Download Receipt" button to guest's booking card
+as user i see my bookings in recent bookings but not bookings tab
 
-### 🟡 Medium Priority
+in admin, when a listing has been approved/rejected, remove it
 
-#### Listing Management
-- [ ] Owner can **edit** a listing (title, description, price, images, availability) — currently no edit form
-- [ ] Owner can **delete** their own listing
-- [ ] Image upload UX: drag-and-drop zone, preview before submit, re-order images
-- [ ] Video upload: currently supported in schema but UX is basic
+add the other tabs in admin dashboard and like make the rest of the pages and JS get use to the new architecture of /Dashboards/
+				/Profile
+				/Owner
+				/Admin 
+and /Events/Event and /Listing/
+			/Detail
 
-#### Booking Flow
-- [ ] **Date conflict checking** — prevent double-booking: before creating booking, check if listing has overlapping approved booking
-- [ ] Auto-cancel: 3-hour countdown for unconfirmed bookings (pg_cron already set up per prev session)
-- [ ] Countdown timer visible on guest's pending booking card
-
-#### Search & Filters
-- [ ] `/Listings` page: add **price range** filter (min/max inputs)
-- [ ] `/Listings` page: add **category** filter (real estate vs vehicle)
-- [ ] `/Listings` page: sort options (price ↑↓, newest, rating)
-- [ ] Search: full-text search across title + description (Supabase `fts` or `websearch_to_tsquery`)
-
-### 🟢 Lower Priority
-
-#### Reviews
-- [ ] Review gating: only guests with a **completed** booking can leave a review (currently open to all)
-  - DB trigger `validate_review` already exists — just needs enabling
-
-#### Events
-- [ ] Event RSVP / attendance tracking
-- [ ] Events: share button (copy link, social)
-- [ ] Event images: gallery with swipe on mobile
-
-#### Promotions
-- [ ] Promotion conflict check: prevent two active promos for same listing at same time
-- [ ] Dashboard promotion stats: "X bookings used this promo"
-
-#### UX / Polish
-- [ ] Skeleton loaders on `/Listings` and `/Events` pages (currently just spinner)
-- [ ] 404 page for invalid listing/event IDs
-- [ ] SEO: `<meta og:image>` populated from listing's first image
-- [ ] PWA manifest: add to home screen on mobile
-- [ ] Dark mode (optional)
-
-#### Admin
-- [ ] Admin can **reassign** listing owner
-- [ ] Admin bulk actions: approve all pending, bulk delete
-- [ ] Revenue chart (bar/line) on admin dashboard with monthly breakdown
-- [ ] Export bookings to CSV
-
----
-
-## 🗄️ SQL Still Needed
-
-```sql
--- Run migration.sql first (attached), then:
-
--- Date conflict check (call from JS before inserting booking)
-CREATE OR REPLACE FUNCTION check_booking_conflict(
-    p_listing_id UUID, p_start DATE, p_end DATE, p_exclude_id UUID DEFAULT NULL
-) RETURNS BOOLEAN AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM bookings
-        WHERE listing_id = p_listing_id
-          AND status IN ('pending','approved','confirmed')
-          AND (p_exclude_id IS NULL OR id != p_exclude_id)
-          AND start_date < p_end
-          AND end_date > p_start
-    );
-$$ LANGUAGE SQL STABLE;
-```
-
----
-
-## 📂 Deployment Order (this session)
-
-1. Run `migration.sql` in Supabase SQL Editor
-2. Deploy `dashboard.css` → `/Style/dashboard.css`
-3. Deploy `dashboard.js` → `/js/dashboard.js`
-4. Deploy `detail.js` → `/js/detail.js`
-5. Deploy `script.js` → `/js/script.js`
-6. Deploy `home.js` → `/js/home.js`
-7. Verify: Create a test listing as owner → should appear in dashboard "New Listings" pending widget → admin approves → appears on /Listings
-
-
-"Failed to approve booking: record "new" has no field "total_price"" "xuxzeinufjpplxkerlsd…88cb-c606b29bb65d:1  Failed to load resource: the server responded with a status of 400 ()
-
-dashboard.js:1672 ❌ [ACTION] Error approving booking:
-
-
-
-
-
-Object
-
-
-
-
-
-code: "42703"
-
-
-
-details: null
-
-
-
-hint: null
-
-
-
-message: "record \"new\" has no field \"total_price\""
-
-
-
-[[Prototype]]: Object
-
-
-I want to change the payment architecture to this, user requests for listings inputs payment and allat, and it is store safely not in frontend either card or phone number then email sent to owner to approve with link when owner reject email is sent to user telling them owner rejected their booking and it updates like everywhere in profile dashboard and shii if owner approves, the other payment info is used and sent to kpay to handle payment and then when successfull and email is sent to user tell them booking successfull and receipt attached below(a really good receipt with good design and like when users go on profile and they can see their booking their should be a button receipt when clicked downloads receipts, i want a table in database called digital receipts you know to keep track. and to be used to make and download them receipts. if payment failed send an email to user telling them payment failed because... insuffiecient amount or error on us or whatever reason, and ion know how you plan on doing it but like i want that you stores owners wallets either mobile or bank securely and like when payment is made 5% goes to us(maybe stored maybe not) and the rest to owner and like make it easy for me to change percentage. so deal and make functions to do it and allat and help me in the setting of kpay when i get credentials to accommodate this i think this is it if you have any qns of what should happen in a certain situation ask and if you have ideas you want to add to make everything like UX better please mention them
-
-Do i need to remove any functions/tables to avoid conflicts with these new ones
+Make events and promotions work well and perfectly and like promotions can be advertised on home page
