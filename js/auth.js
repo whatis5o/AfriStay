@@ -95,7 +95,7 @@
 
         showSuccess('Welcome back, ' + firstName + '! Redirecting...');
         setTimeout(() => {
-            window.location.href = (role === 'admin' || role === 'owner') ? '/Dashboard' : '/';
+            window.location.href = '/';
         }, 1000);
     }
 

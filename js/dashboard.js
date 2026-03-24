@@ -261,8 +261,6 @@ function bindUIInteractions() {
             togglePanels(`${tabName}Panel`);
             // Auto-load data when switching tabs
             if (tabName === 'listings')         { filterListings(); }
-            if (tabName === 'events')           { loadEventsCards(); }
-            if (tabName === 'promotions')       { loadPromotionsCards(); }
             if (tabName === 'messages')         { loadMessagesPreview(); }
             if (tabName === 'listing-requests') { loadListingRequests(); }
             if (tabName === 'bookings')         { loadBookingsTable(); }
@@ -810,7 +808,7 @@ function applyRoleToUI(role) {
     // ADMIN: sees everything
     if (role === 'admin') {
         console.log("  👑 ADMIN role - showing all features");
-        ['users', 'events', 'promotions', 'messages', 'listing-requests'].forEach(t => show(t));
+        ['users', 'messages', 'listing-requests'].forEach(t => show(t));
         if (createListingBtn) createListingBtn.style.display = '';
         if (quickMenu) quickMenu.querySelectorAll('button').forEach(b => b.style.display = '');
         // Inject listing-requests nav button if not in HTML
@@ -823,8 +821,6 @@ function applyRoleToUI(role) {
         show('bookings');
         hide('messages');
         hide('users');
-        hide('promotions');
-        hide('events');
 
         // Relabel stat cards for owner context
         // Try multiple selector strategies to find the label element
@@ -871,9 +867,7 @@ function applyRoleToUI(role) {
         show('messages');
         hide('listings');
         hide('users');
-        hide('events');
-        hide('promotions');
-        
+
         if (createListingBtn) createListingBtn.style.display = 'none';
         if (quickMenu) quickMenu.querySelectorAll('button').forEach(b => b.style.display = 'none');
     }
@@ -1320,7 +1314,7 @@ async function loadBookingsTable() {
     tbody.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
 
     try {
-        let q = _supabase.from('bookings').select('id, listing_id, start_date, end_date, total_amount, status, payment_status, payment_method, payment_failure_reason, user_id, guest_name, guest_email, created_at');
+        let q = _supabase.from('bookings').select('id, listing_id, start_date, end_date, total_amount, status, payment_status, payment_method, user_id, guest_name, guest_email, created_at');
 
         if (CURRENT_ROLE === 'owner') {
             console.log("  Filtering for owner's listing bookings");
@@ -1409,9 +1403,9 @@ async function loadBookingsTable() {
                             <button class="btn-small" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;" onclick="downloadReceipt('${r.id}')">
                                 <i class="fa-solid fa-receipt"></i> Receipt
                             </button>` : ''}
-                        ${hasFailed && (CURRENT_ROLE === 'user' || CURRENT_ROLE === 'admin') ? `
+                        ${hasFailed ? `
                             <span style="font-size:11px;color:#e74c3c;display:block;margin-top:2px;">
-                                ${escapeHtml(r.payment_failure_reason || 'Payment failed')}
+                                Payment could not be processed
                             </span>` : ''}
                     </div>
                 </td>
@@ -1825,8 +1819,12 @@ async function handleCreateListing() {
     if (images.length > 10) { alert('Max 10 images allowed'); return; }
     if (videos.length > 3) { alert('Max 3 videos allowed'); return; }
 
+    // ── Progress toast helper ──
+    function progressToast(msg) { toast(msg, 'info', 8000); }
+
     try {
-        // 1) create listing row and get its id
+        // 1) create listing row
+        progressToast('⏳ Creating listing…');
         const { data: created, error: createErr } = await _supabase
         .from('listings')
         .insert([{
@@ -1854,11 +1852,14 @@ async function handleCreateListing() {
         // 2) Upload images
         const uploadedImageRows = [];
         if (images.length) {
-        for (const file of images) {
+        for (let i = 0; i < images.length; i++) {
+            const file = images[i];
+            progressToast(`🖼️ Uploading image ${i + 1} of ${images.length}: ${file.name}…`);
             const path = `${ownerId}/${listingId}/${Date.now()}-${file.name}`;
             const { error: upErr } = await _supabase.storage.from('listing-images').upload(path, file, { upsert: false });
             if (upErr) {
             console.warn('Image upload failed for', file.name, upErr);
+            toast(`⚠️ Image "${file.name}" failed: ${upErr.message}`, 'warning');
             continue;
             }
             const { data: urlData } = await _supabase.storage.from('listing-images').getPublicUrl(path);
@@ -1875,11 +1876,14 @@ async function handleCreateListing() {
         // 3) Upload videos
         const uploadedVideoRows = [];
         if (videos.length) {
-        for (const file of videos) {
+        for (let i = 0; i < videos.length; i++) {
+            const file = videos[i];
+            progressToast(`🎬 Uploading video ${i + 1} of ${videos.length}: ${file.name}…`);
             const path = `${ownerId}/${listingId}/${Date.now()}-${file.name}`;
             const { error: upErr } = await _supabase.storage.from('listing-videos').upload(path, file, { upsert: false });
             if (upErr) {
             console.warn('Video upload failed for', file.name, upErr);
+            toast(`⚠️ Video "${file.name}" failed: ${upErr.message}`, 'warning');
             continue;
             }
             const { data: urlData } = await _supabase.storage.from('listing-videos').getPublicUrl(path);
@@ -1893,7 +1897,8 @@ async function handleCreateListing() {
         }
         }
 
-        toast('Listing created! Pending approval.', 'success');
+        const mediaCount = uploadedImageRows.length + uploadedVideoRows.length;
+        toast(`✅ Listing created${mediaCount ? ` with ${mediaCount} media file${mediaCount > 1 ? 's' : ''}` : ''}! Pending admin approval.`, 'success', 5000);
         console.log('✅ Listing and media created');
     } catch (err) {
         console.error('❌ [LISTING] Error creating listing:', err);
@@ -2564,7 +2569,7 @@ async function loadListingRequests() {
         const { data, error } = await _supabase
             .from('listings')
             .select('id,title,price,currency,category_slug,province_id,district_id,owner_id,created_at,status')
-            .in('status', ['awaiting_approval', 'approved', 'pending'])
+            .in('status', ['pending'])
             .order('created_at', { ascending: false });
         if (error) throw error;
 
@@ -2592,7 +2597,8 @@ async function loadListingRequests() {
             const owner = ownerMap[l.owner_id] || {};
             const loc = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
             const row = document.createElement('div');
-            row.style.cssText = 'background:#fff;border-radius:16px;padding:20px 24px;margin-bottom:14px;display:flex;align-items:center;gap:20px;box-shadow:0 4px 16px rgba(0,0,0,0.07);flex-wrap:wrap;';
+            row.setAttribute('data-req-id', l.id);
+            row.style.cssText = 'background:#fff;border-radius:16px;padding:20px 24px;margin-bottom:14px;display:flex;align-items:center;gap:20px;box-shadow:0 4px 16px rgba(0,0,0,0.07);flex-wrap:wrap;transition:opacity 0.3s;';
             row.innerHTML =
                 '<div style="flex:1;min-width:200px;">' +
                 '<h4 style="font-size:16px;font-weight:700;color:#1a1a1a;margin:0 0 4px;">' + escapeHtml(l.title) + '</h4>' +
@@ -2617,13 +2623,16 @@ async function loadListingRequests() {
 window.loadListingRequests = loadListingRequests;
 
 async function approveListingRequest(listingId, btn) {
-    if (btn) { btn.disabled = true; btn.textContent = 'Approving...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Approving...'; }
     try {
         const { error } = await _supabase.from('listings').update({ status: 'approved' }).eq('id', listingId);
         if (error) throw error;
         toast('Listing approved — it is now live!', 'success');
         bustListingCache();
-        await Promise.all([loadListingRequests(), loadDashPendingListings()]);
+        // Remove just this row from DOM instead of reloading entire list
+        const row = btn ? btn.closest('[data-req-id]') : document.querySelector('[data-req-id="' + listingId + '"]');
+        if (row) { row.style.opacity = '0'; row.style.transition = 'opacity 0.3s'; setTimeout(() => row.remove(), 320); }
+        loadDashPendingListings();
     } catch (err) {
         toast('Failed: ' + err.message, 'error');
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Approve'; }
@@ -2633,13 +2642,16 @@ window.approveListingRequest = approveListingRequest;
 
 async function rejectListingRequest(listingId, btn) {
     if (!confirm('Reject and delete this listing request?')) return;
-    if (btn) { btn.disabled = true; btn.textContent = 'Rejecting...'; }
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Rejecting...'; }
     try {
         const { error } = await _supabase.from('listings').delete().eq('id', listingId);
         if (error) throw error;
         toast('Listing request rejected.', 'warning');
         bustListingCache();
-        await Promise.all([loadListingRequests(), loadDashPendingListings()]);
+        // Remove just this row from DOM
+        const row = btn ? btn.closest('[data-req-id]') : document.querySelector('[data-req-id="' + listingId + '"]');
+        if (row) { row.style.opacity = '0'; row.style.transition = 'opacity 0.3s'; setTimeout(() => row.remove(), 320); }
+        loadDashPendingListings();
     } catch (err) {
         toast('Failed: ' + err.message, 'error');
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Reject'; }

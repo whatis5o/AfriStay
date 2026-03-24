@@ -298,10 +298,13 @@
 }
 
 /* Magically fill the heart to solid on hover, just like the nav link! */
-.card-heart:hover .fa-heart::before { 
-    content: "\f004"; 
-    font-weight: 900; 
+.card-heart:hover .fa-heart::before {
+    content: "\f004";
+    font-weight: 900;
 }
+/* Filled state when listing is favorited */
+.card-heart.faved i { color: #EB6753; }
+.card-heart.faved .fa-heart::before { content: "\f004"; font-weight: 900; }
 .avail-strip {
     position: absolute; bottom: 0; left: 0; right: 0;
     padding: 5px 14px; font-size: 11px; font-weight: 700; color: #fff; text-align: right; text-transform: capitalize;
@@ -364,4 +367,97 @@
 }
 
 .toast i { color: #EB6753; font-size: 16px; }
+
+/* ═══════════════════════════════════════
+   RESPONSIVE — TABLET (≤ 1024px)
+   ═══════════════════════════════════════ */
+@media (max-width: 1024px) {
+    /* Detail page: stack layout */
+    .detail-grid { grid-template-columns: 1fr !important; }
+    .info-card { position: static !important; top: auto !important; }
+
+    /* Listings grid */
+    .listings-grid, .cards-grid, [class*="grid"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE — MOBILE (≤ 768px)
+   ═══════════════════════════════════════ */
+@media (max-width: 768px) {
+    /* ── Body padding above fixed navbar ── */
+    body { padding-top: 60px; }
+
+    /* ── Cards: single column ── */
+    .listings-grid, .cards-grid, [class*="grid"],
+    .profile-grid { grid-template-columns: 1fr !important; }
+
+    /* ── Property card min-width on mobile (carousel) ── */
+    .property-card { min-width: 0; width: 100%; }
+
+    /* ── Page body padding ── */
+    .page-body { padding: 80px 16px 48px !important; }
+
+    /* ── Detail page ── */
+    .detail-grid { grid-template-columns: 1fr !important; gap: 20px !important; }
+    .listing-title { font-size: 22px !important; }
+    .gallery-main img, #mediaViewer { height: 280px !important; }
+    .info-card { position: static !important; padding: 20px !important; }
+
+    /* ── Checkout page ── */
+    .checkout-layout, .checkout-grid {
+        grid-template-columns: 1fr !important;
+        flex-direction: column !important;
+    }
+    .checkout-form-col, .checkout-summary-col { width: 100% !important; }
+
+    /* ── Profile page sidebar + content ── */
+    .profile-layout { flex-direction: column !important; }
+    .profile-sidebar { width: 100% !important; min-width: 0 !important; }
+    .profile-content { padding: 0 !important; }
+
+    /* ── Dashboard table: horizontal scroll ── */
+    .table-wrap, .data-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { min-width: 600px; }
+
+    /* ── Booking cards ── */
+    .booking-card { flex-direction: column !important; }
+    .booking-thumb { width: 100% !important; height: 160px !important; object-fit: cover; border-radius: 12px 12px 0 0 !important; }
+    .booking-thumb-placeholder { width: 100% !important; height: 120px !important; border-radius: 12px 12px 0 0 !important; }
+
+    /* ── Card footer: stack price + button ── */
+    .card-footer { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .details-btn { width: 100%; text-align: center; }
+
+    /* ── Meta chips wrap ── */
+    .meta-chips { gap: 6px; }
+    .meta-chip { font-size: 12px; padding: 4px 10px; }
+
+    /* ── Auth page ── */
+    .auth-card, .auth-box { width: 100% !important; max-width: 100% !important; margin: 0 16px; }
+
+    /* ── Stat cards in dashboard/profile ── */
+    .stat-cards, .stats-row { grid-template-columns: repeat(2, 1fr) !important; }
+
+    /* ── Toast bottom offset ── */
+    #toast-container { bottom: 16px; width: calc(100% - 32px); left: 16px; transform: none; }
+    ._favToastBox { right: 12px !important; bottom: 12px !important; }
+}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE — SMALL PHONES (≤ 480px)
+   ═══════════════════════════════════════ */
+@media (max-width: 480px) {
+    .stat-cards, .stats-row { grid-template-columns: 1fr !important; }
+    .gallery-main img, #mediaViewer { height: 220px !important; }
+    .listing-title { font-size: 19px !important; }
+    .section-title { font-size: 15px; }
+
+    /* Thumbs row: show on mobile but allow full scroll */
+    .thumbs-row { gap: 6px !important; }
+
+    /* Nav: slightly smaller logo text */
+    .logo-area h1 { font-size: 26px; }
+}
 .toast a { color: #e8a94a; text-decoration: underline; pointer-events: auto; margin-left: 5px; }

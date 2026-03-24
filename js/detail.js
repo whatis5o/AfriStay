@@ -67,6 +67,21 @@ async function loadListingDetails() {
     console.log(`📊 [DETAIL] status="${listing.status}" | availability="${listing.availability_status}"`);
     console.log(`🖼️ [DETAIL] images: ${listing.listing_images?.length || 0} | videos: ${listing.listing_videos?.length || 0}`);
 
+    // ── Guard: block unapproved or unavailable listings ──
+    const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
+    if (!isPreview) {
+        if (listing.status !== 'approved') {
+            console.warn('🚫 [DETAIL] Listing not approved — redirecting');
+            window.location.replace('/Listings/?msg=not_available');
+            return;
+        }
+        if (listing.availability_status === 'unavailable') {
+            console.warn('🚫 [DETAIL] Listing unavailable — redirecting');
+            window.location.replace('/Listings/?msg=not_available');
+            return;
+        }
+    }
+
     CURRENT_LISTING = listing;
 
     setEl('listingTitle', listing.title);
@@ -105,17 +120,8 @@ async function loadListingDetails() {
 
     renderRatingBadge(listing.avg_rating, listing.reviews_count);
     // Wire up heart/favorites for this listing
-    if (typeof window.initFavorites === 'function') {
-        try { const { data:{ user } } = await _supabase.auth.getUser(); await window.initFavorites(user||null); }
-        catch(_) {}
-    }
-
-    // Wire up favorites/heart for this listing
-    if (typeof window.initFavorites === 'function') {
-        try {
-            const { data: { user } } = await _supabase.auth.getUser();
-            await window.initFavorites(user || null);
-        } catch(_) {}
+    if (typeof window.refreshFavHearts === 'function') {
+        setTimeout(() => window.refreshFavHearts(), 200);
     }
 
     const images = (listing.listing_images || []).map(img => ({ type: 'image', src: img.image_url }));
@@ -130,7 +136,6 @@ async function loadListingDetails() {
     console.log('✅ [DETAIL] Page rendered');
 
     // ── Pending notice: hide booking form if not approved ──
-    const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
     if (listing.status !== 'approved') {
         const bf = document.getElementById('bookingForm');
         if (bf) bf.innerHTML =

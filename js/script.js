@@ -118,8 +118,6 @@ window.fetchAndRenderSharedListings = async function(options) {
     const container = document.getElementById(options.containerId);
     if (!container) return;
 
-    const today = new Date().toISOString().split('T')[0];
-
     let q = sb.from('listings')
         .select(`id, title, price, currency, availability_status, status,
                  category_slug, province_id, district_id, created_at,
@@ -151,19 +149,6 @@ window.fetchAndRenderSharedListings = async function(options) {
     const dtIds = [...new Set(listings.map(l => l.district_id).filter(Boolean))];
     const { pvMap, dtMap } = await _cacheLocNames(sb, pvIds, dtIds); // cached 5 min
 
-    // Fetch active promotions for these listings
-    const listingIds = listings.map(l => l.id);
-    const promoMap = {};
-    if (listingIds.length) {
-        const { data: promos } = await sb
-            .from('promotions')
-            .select('listing_id, discount')
-            .in('listing_id', listingIds)
-            .lte('start_date', today)
-            .gte('end_date', today);
-        (promos || []).forEach(p => { promoMap[p.listing_id] = p.discount; });
-    }
-
     container.innerHTML = '';
     listings.forEach(l => {
         const rawUrl = l.listing_images?.[0]?.image_url;
@@ -173,14 +158,8 @@ window.fetchAndRenderSharedListings = async function(options) {
             finalImageUrl = pub.publicUrl;
         }
         l.final_thumb_url = finalImageUrl;
-        // Attach promo data if active
-        if (promoMap[l.id]) {
-            l.promo_discount = promoMap[l.id];
-            l.promo_price = Math.round(l.price * (1 - promoMap[l.id] / 100));
-        } else {
-            l.promo_discount = null;
-            l.promo_price = null;
-        }
+        l.promo_discount = null;
+        l.promo_price = null;
         const locName = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
         container.innerHTML += generateListingCard(l, locName);
     });
@@ -266,10 +245,13 @@ async function loadFavCache(sb, userId) {
 // ── set a heart button to filled or outline ──
 function setHeartState(btn, saved) {
     if (!btn) return;
+    var icon = btn.querySelector('i');
     if (saved) {
         btn.classList.add('faved');
+        if (icon) icon.className = 'fa-solid fa-heart';
     } else {
         btn.classList.remove('faved');
+        if (icon) icon.className = 'fa-regular fa-heart';
     }
 }
 
@@ -307,18 +289,30 @@ async function initFavoriteHearts() {
 }
 
 // expose so home.js and other pages can trigger a refresh after their own renders
-window.refreshFavHearts = function() {
+window.refreshFavHearts = async function() {
     console.log('🔄 [FAV] Manual refreshFavHearts() called');
+    // Tag any untagged hearts with data-lid from their onclick
     document.querySelectorAll('.card-heart').forEach(function(btn) {
         var m = (btn.getAttribute('onclick') || '').match(/['"]([a-f0-9-]{36})['"]/i);
         if (m && !btn.dataset.lid) btn.dataset.lid = m[1];
     });
+    // If cache not loaded yet, load it now before refreshing hearts
+    if (_favCache === null) {
+        var sb = window.supabaseClient;
+        if (sb) {
+            try {
+                var authResult = await sb.auth.getUser();
+                var user = authResult.data && authResult.data.user;
+                if (user) await loadFavCache(sb, user.id);
+            } catch(e) { console.warn('[FAV] refreshFavHearts cache load failed:', e); }
+        }
+    }
     refreshAllHearts();
 };
 
-// run on page load
+// run on page load — no delay so cache is ready before cards render
 document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(initFavoriteHearts, 300);
+    initFavoriteHearts();
 });
 
 // ── THE MAIN TOGGLE — called by onclick on every card heart ──

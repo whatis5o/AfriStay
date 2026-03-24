@@ -48,6 +48,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateSidebar();
     prefillProfileForm();
     await loadOverview();
+
+    // Auto-switch tab if ?tab= param is in URL
+    const urlTab = new URLSearchParams(window.location.search).get('tab');
+    if (urlTab && TAB_LOADERS[urlTab]) {
+        switchTab(urlTab);
+    }
 });
 
 /* ══════════════════════════════════════════════

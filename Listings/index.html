@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Listings - AfriStay</title>
     <link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+    <meta property="og:title" content="Listings — AfriStay Rwanda">
+    <meta property="og:description" content="Browse verified homes, properties and vehicles available for rent across Rwanda. Filter by province, district and category.">
+    <meta property="og:image" content="https://afristay.rw/Pictures/light-afri1.png">
+    <meta property="og:url" content="https://afristay.rw/Listings/">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Oleo+Script+Swash+Caps:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/Style/style.css">
@@ -746,7 +752,7 @@
                     '<div class="card-image">' +
                         (thumb ? '<img src="' + esc(thumb) + '" alt="' + esc(l.title) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' + '<div class="card-no-img" style="display:none;width:100%;height:100%;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:44px;color:#ddd;"></i></div>' : '<div class="card-no-img" style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:44px;color:#ddd;"></i></div>') +
                         '<div class="cat-label">' + catLbl + '</div>' +
-                        '<div class="card-heart" onclick="event.preventDefault()"><i class="fa-regular fa-heart"></i></div>' +
+                        '<div class="card-heart" data-lid="' + l.id + '" onclick="event.preventDefault();event.stopPropagation();window.toggleFavorite(event,this,\'' + l.id + '\')"><i class="fa-regular fa-heart"></i></div>' +
                         '<div class="avail-strip ' + avail + '">' + (avail === 'available' ? '&#9679; Available' : '&#9679; ' + avail) + '</div>' +
                     '</div>' +
                     '<div class="card-content">' +

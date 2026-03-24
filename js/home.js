@@ -68,13 +68,12 @@ async function loadFeaturedListings() {
     const sb = window.supabaseClient;
     if (!sb) { renderFallback(); return; }
 
-    const today = new Date().toISOString().split('T')[0];
-
     const { data: listings, error } = await sb
         .from('listings')
         .select('id, title, price, currency, availability_status, category_slug, province_id, district_id, created_at')
         .eq('featured', true)
         .eq('status', 'approved')
+        .eq('availability_status', 'available')
         .order('created_at', { ascending: false })
         .limit(6);
 
@@ -90,18 +89,6 @@ async function loadFeaturedListings() {
     // Resolve images (table → storage fallback)
     const imgMap = await resolveImages(sb, ids);
 
-    // Fetch active promotions
-    const promoMap = {};
-    if (ids.length) {
-        const { data: promos } = await sb
-            .from('promotions')
-            .select('listing_id, discount')
-            .in('listing_id', ids)
-            .lte('start_date', today)
-            .gte('end_date', today);
-        (promos || []).forEach(p => { promoMap[p.listing_id] = p.discount; });
-    }
-
     // Batch district + province names
     const pvIds = [...new Set(listings.map(l => l.province_id).filter(Boolean))];
     const dtIds = [...new Set(listings.map(l => l.district_id).filter(Boolean))];
@@ -109,11 +96,11 @@ async function loadFeaturedListings() {
     if (pvIds.length) { const { data: ps } = await sb.from('provinces').select('id,name').in('id', pvIds); (ps||[]).forEach(p => pvMap[p.id] = p.name); }
     if (dtIds.length) { const { data: ds } = await sb.from('districts').select('id,name').in('id', dtIds); (ds||[]).forEach(d => dtMap[d.id] = d.name); }
 
-    renderCards(listings, imgMap, dtMap, pvMap, promoMap);
+    renderCards(listings, imgMap, dtMap, pvMap);
 }
 
 /* ── RENDER CARDS — identical structure to Listings page ── */
-function renderCards(listings, imgMap, dtMap, pvMap, promoMap) {
+function renderCards(listings, imgMap, dtMap, pvMap) {
     const track = document.getElementById('carouselTrack');
     if (!track) return;
     track.innerHTML = '';
@@ -155,13 +142,7 @@ function renderCards(listings, imgMap, dtMap, pvMap, promoMap) {
                     '<div class="feature"><i class="fa-solid fa-circle-check" style="color:#2ecc71"></i><span>' + avail + '</span></div>' +
                 '</div>' +
                 '<div class="card-footer">' +
-                    (promoMap && promoMap[l.id]
-                        ? '<div class="card-price">' +
-                          '<span class="promo-original">' + price + ' <span style="font-size:11px;">' + (l.currency||'RWF') + unit + '</span></span> ' +
-                          '<span class="promo-badge">' + promoMap[l.id] + '% OFF</span><br>' +
-                          Math.round(l.price * (1 - promoMap[l.id] / 100)).toLocaleString() + ' <span>' + (l.currency||'RWF') + unit + '</span></div>'
-                        : '<div class="card-price">' + price + ' <span>' + (l.currency || 'RWF') + unit + '</span></div>'
-                    ) +
+                    '<div class="card-price">' + price + ' <span>' + (l.currency || 'RWF') + unit + '</span></div>' +
                     '<button class="details-btn" onclick="event.preventDefault();event.stopPropagation();window.location.href=\'/Detail/?id=' + l.id + '\'">View Details</button>' +
                 '</div>' +
             '</div>';
