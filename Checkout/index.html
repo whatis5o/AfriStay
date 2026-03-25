@@ -103,9 +103,113 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 .hs-sub{font-size:12px;color:var(--muted);line-height:1.5}
 @media(max-width:780px){.page{grid-template-columns:1fr;padding-top:78px}.pay-card{position:static}#nav{top:0;left:0;transform:none;width:100%;border-radius:0;padding:0 16px}}
 @media(max-width:380px){.nets{grid-template-columns:1fr}}
+
+.stock-ticker:hover ul {
+  animation-play-state: paused;
+}
+.stock-ticker {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  transform: translateY(-50%);
+  z-index: 9999;
+  pointer-events: none; /* Lets you click through it */
+
+  background-color: #e40000;
+  color: #ffffff;
+  font-size: 42px;
+  text-transform: uppercase;
+  padding-block: 24px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  overflow: hidden;
+  user-select: none;
+
+  --gap: 40px;
+  display: flex; /* Keeps the two lists side-by-side */
+  gap: var(--gap);
+}
+
+.stock-ticker ul {
+  list-style: none;
+  flex-shrink: 0;
+  min-width: 100%;
+  display: flex;
+  justify-content: space-around; /* Spreads words out evenly */
+  align-items: center;
+  gap: var(--gap);
+
+  animation: scroll 20s linear infinite; /* Smooth, endless loop */
+}
+
+@keyframes scroll {
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+  }
+}
+.stock-ticker .company,
+.stock-ticker .price {
+  font-weight: 800; /* Extra bold */
+  color: #ffffff;
+}
+
+.stock-ticker .price {
+  margin-inline: 8px;
+}
+
+
+.stock-ticker ul:first-child {
+  /* background-color: yellow; */
+}
+
+.stock-ticker ul:last-child {
+  /* background-color: pink; */
+}
+.stock-ticker .plus .change,
+.stock-ticker .plus::before {
+  color: #089981;
+}
+
+.stock-ticker .minus .change,
+.stock-ticker .minus::before {
+  color: #f23645;
+}
+
 </style>
 </head>
 <body>
+<div class="stock-ticker">
+  <ul>
+    <li class="minus">
+      <span class="company">| PAYMENT SERVICES</span>
+      <span class="price">NOT AVAILABLE YET</span>
+    </li> 
+    <li class="plus">
+      <span class="company">| LAUNCHING SOON</span>
+      <span class="price">STAY TUNED</span>
+    </li>
+    <li class="minus">
+      <span class="company">|AFRISTAY</span>
+      <span class="price">RWANDA'S #1 STAYBOOKING PLATFORM</span>
+    </li>
+  </ul>
+  
+  <ul aria-hidden="true">
+    <li class="minus">
+      <span class="company">PAYMENT SERVICES</span>
+      <span class="price">NOT AVAILABLE YET</span>
+    </li> 
+    <li class="plus">
+      <span class="company">LAUNCHING SOON</span>
+      <span class="price">STAY TUNED</span>
+    </li>
+    <li class="minus">
+      <span class="company">AFRISTAY</span>
+      <span class="price">RWANDA'S #1 STAYBOOKING PLATFORM</span>
+    </li>
+  </ul>
+</div>
+
 <nav id="nav">
   <a href="/" class="nav-logo">
     <img src="/Pictures/light-afri1.png" alt="AfriStay"
