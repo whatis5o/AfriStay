@@ -417,10 +417,25 @@
             .explore-section { padding: 0 14px 50px; }
             .properties-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
         }
+        @media (max-width: 640px) {
+            /* Hero search: stack vertically */
+            .hero-search {
+                flex-direction: column;
+                border-radius: 16px;
+                padding: 12px;
+                gap: 10px;
+            }
+            .hero-search input { padding: 10px 4px; width: 100%; }
+            .hero-search button { width: 100%; justify-content: center; padding: 13px; border-radius: 10px; }
+        }
         @media (max-width: 520px) {
-            .hero h1 { font-size: 30px; }
+            .hero { padding: 84px 16px 60px; }
+            .hero h1 { font-size: 26px; }
+            .hero p { font-size: 14px; margin-bottom: 24px; }
             .properties-grid { grid-template-columns: 1fr; }
-            .cat-btn { padding: 8px 14px; font-size: 12px; }
+            .cat-btn { padding: 8px 12px; font-size: 12px; }
+            .filter-bar { gap: 8px; }
+            .explore-section { padding: 0 12px 44px; }
         }
     </style>
 </head>

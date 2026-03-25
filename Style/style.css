@@ -461,3 +461,113 @@
     .logo-area h1 { font-size: 26px; }
 }
 .toast a { color: #e8a94a; text-decoration: underline; pointer-events: auto; margin-left: 5px; }
+
+/* ═══════════════════════════════════════════════════════════
+   GLOBAL RESPONSIVE IMPROVEMENTS
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Nav: fix close-button position on mobile drawer ── */
+@media (max-width: 900px) {
+    .menu-close {
+        position: absolute !important;
+        top: 18px !important;
+        right: 20px !important;
+    }
+    .nav-wrapper {
+        padding: 64px 26px 32px !important;
+    }
+
+    /* ── Listings filter bar: horizontal scroll when it can't wrap ── */
+    .filter-bar {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        scrollbar-width: thin;
+        scrollbar-color: #e0e0e0 transparent;
+        padding-bottom: 6px;
+    }
+    .filter-bar::-webkit-scrollbar { height: 3px; }
+    .filter-bar::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+    .cat-toggle  { flex-shrink: 0; }
+    .filter-select { min-width: 118px; flex-shrink: 0; }
+    .filter-sep  { display: none; }
+    .results-count { display: none; }
+}
+
+/* ── Tablet: hero search bar stacks nicely ── */
+@media (max-width: 680px) {
+    .hero-search {
+        flex-direction: column;
+        border-radius: 16px;
+        padding: 14px;
+        gap: 10px;
+    }
+    .hero-search input {
+        padding: 10px 6px;
+        width: 100%;
+    }
+    .hero-search button {
+        width: 100%;
+        justify-content: center;
+        padding: 13px;
+        border-radius: 10px;
+    }
+}
+
+/* ── Small phones: better sizing across all pages ── */
+@media (max-width: 480px) {
+    /* Minimum 44px touch targets */
+    .signin-btn, .details-btn, .cta-btn, .search-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Profile sidebar nav: horizontal scroll so tabs don't wrap messily */
+    .sidebar-nav {
+        overflow-x: auto;
+        flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch;
+        padding: 10px 12px !important;
+        gap: 6px !important;
+        scrollbar-width: none;
+    }
+    .sidebar-nav::-webkit-scrollbar { display: none; }
+    .nav-item {
+        white-space: nowrap;
+        flex-shrink: 0 !important;
+        padding: 9px 14px !important;
+        font-size: 12px !important;
+    }
+
+    /* Stats row: stack single column on very small phones */
+    .stats-row { grid-template-columns: 1fr !important; }
+
+    /* Property card footer: slightly more padding on phones */
+    .card-content { padding: 14px 16px; }
+    .card-price   { font-size: 17px; }
+
+    /* Section headers */
+    .section-header h2 { font-size: 20px !important; }
+
+    /* Booking card buttons full width */
+    .booking-actions button,
+    .booking-actions a { width: 100%; text-align: center; }
+
+    /* Checkout: stacked summary first on tiny screens */
+    .pay-card { padding: 18px !important; }
+}
+
+/* ── Promo badge: prevent overflow on small screens ── */
+.promo-original { display: block; font-size: 11px; }
+.promo-badge    { display: inline-block; }
+
+/* ── Events grid: single column on phone ── */
+@media (max-width: 500px) {
+    .events-grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+    .ev-card { min-width: 0; }
+}

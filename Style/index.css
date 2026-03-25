@@ -477,30 +477,18 @@ body{
 }
 
 @media (max-width: 480px) {
-    .hero {
-        min-height: 400px;
-    }
+    .hero { min-height: 400px; }
+    .hero h1 { white-space: normal; margin-bottom: 16px; }
+    .hero p { padding: 0 5%; margin-bottom: 20px; }
+    .hero-btns { flex-direction: column; gap: 10px; width: 100%; }
+    .btn { width: 100%; max-width: 280px; min-height: 44px; }
+    .why-section { padding: 60px 4%; }
+    .building-img-wrap img { height: 240px; }
+}
 
-    .hero h1 {
-        white-space: normal;  /* definitely allows wrapping */
-        margin-bottom: 16px;
-    }
-
-    .hero p {
-        padding: 0 5%;
-        margin-bottom: 20px;
-    }
-
-    .hero-btns {
-        flex-direction: column;  /* stack buttons vertically */
-        gap: 10px;
-        width: 100%;
-    }
-
-    .btn {
-        width: 100%;
-        max-width: 280px;
-    }
+@media (max-width: 360px) {
+    .hero h1 { font-size: clamp(1.6rem, 6vw, 2rem); }
+    .why-left h2 { font-size: 1.8rem; }
 }
 
 /* ── CAROUSEL SECTION ── */
