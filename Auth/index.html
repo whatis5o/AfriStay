@@ -94,8 +94,45 @@
                     <input type="password" id="password" placeholder="Password">
                 </div>
 
+                <!-- Forgot password link — only visible on sign-in mode -->
+                <div id="forgotLink" style="text-align:right;margin-top:-6px;margin-bottom:10px;">
+                    <a href="#" onclick="toggleAuth('forgot');return false;"
+                       style="font-size:13px;color:#EB6753;text-decoration:none;font-weight:600;">
+                        Forgot password?
+                    </a>
+                </div>
+
+                <!-- Forgot password: email input -->
+                <div id="forgotGroup" class="hidden">
+                    <p style="font-size:14px;color:#666;margin-bottom:16px;line-height:1.5;">
+                        Enter the email linked to your account and we'll send you a reset link.
+                    </p>
+                    <div class="input-group">
+                        <input type="email" id="forgotEmail" placeholder="Your email address" autocomplete="email">
+                    </div>
+                    <p style="margin-top:4px;margin-bottom:0;">
+                        <a href="#" onclick="toggleAuth('signin');return false;"
+                           style="font-size:13px;color:#aaa;text-decoration:none;font-weight:600;">
+                            ← Back to Sign In
+                        </a>
+                    </p>
+                </div>
+
+                <!-- Reset password: new password inputs -->
+                <div id="resetGroup" class="hidden">
+                    <p style="font-size:14px;color:#666;margin-bottom:16px;line-height:1.5;">
+                        Choose a strong new password for your account.
+                    </p>
+                    <div class="input-group">
+                        <input type="password" id="newPassword" placeholder="New password (min. 6 chars)">
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="confirmPassword" placeholder="Confirm new password">
+                    </div>
+                </div>
+
                 <button type="submit" id="submitBtn">Login</button>
-                
+
                 <p id="authError" class="error-msg"></p>
                 <p id="authSuccess" class="success-msg"></p>
             </form>

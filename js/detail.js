@@ -363,29 +363,32 @@ async function initReviewForm() {
         return;
     }
 
-    // Check if this user has a confirmed booking whose end_date has passed
-    const today = new Date().toISOString().slice(0, 10);
-    const { data: completedBooking } = await _supabase
-        .from('bookings')
-        .select('id')
-        .eq('listing_id', LISTING_ID)
-        .eq('user_id', CURRENT_USER.id)
-        .in('status', ['confirmed', 'completed'])
-        .lt('end_date', today)
-        .maybeSingle();
+    // When open_reviews is true, any logged-in user may review (testing/open mode).
+    // Otherwise, require a confirmed/completed booking whose end_date has passed.
+    if (!REVIEWS_OPEN) {
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: completedBooking } = await _supabase
+            .from('bookings')
+            .select('id')
+            .eq('listing_id', LISTING_ID)
+            .eq('user_id', CURRENT_USER.id)
+            .in('status', ['confirmed', 'completed'])
+            .lt('end_date', today)
+            .maybeSingle();
 
-    if (!completedBooking) {
-        formSection.innerHTML =
-            '<div style="background:#f9f9f9;border:1.5px solid #e8e8e8;border-radius:16px;padding:24px 20px;text-align:center;">' +
-            '<div style="width:52px;height:52px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">' +
-            '<i class="fa-solid fa-lock" style="font-size:20px;color:#ccc;"></i></div>' +
-            '<p style="font-weight:800;color:#333;margin:0 0 8px;font-size:15px;">Review not available yet</p>' +
-            '<p style="color:#aaa;font-size:13px;margin:0 0 14px;line-height:1.6;">Only guests who completed a ' + noun + ' here can review. ' +
-            (isVeh ? 'Once your rental ends, come back to share your experience.' : 'Once your stay is complete, come back to share your experience.') +
-            '</p>' +
-            '<a href="/Listings" style="display:inline-flex;align-items:center;gap:7px;padding:9px 20px;background:#EB6753;color:#fff;border-radius:100px;font-size:13px;font-weight:700;text-decoration:none;"><i class="fa-solid fa-magnifying-glass"></i> Browse Listings</a>' +
-            '</div>';
-        return;
+        if (!completedBooking) {
+            formSection.innerHTML =
+                '<div style="background:#f9f9f9;border:1.5px solid #e8e8e8;border-radius:16px;padding:24px 20px;text-align:center;">' +
+                '<div style="width:52px;height:52px;border-radius:50%;background:#f0f0f0;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">' +
+                '<i class="fa-solid fa-lock" style="font-size:20px;color:#ccc;"></i></div>' +
+                '<p style="font-weight:800;color:#333;margin:0 0 8px;font-size:15px;">Review not available yet</p>' +
+                '<p style="color:#aaa;font-size:13px;margin:0 0 14px;line-height:1.6;">Only guests who completed a ' + noun + ' here can review. ' +
+                (isVeh ? 'Once your rental ends, come back to share your experience.' : 'Once your stay is complete, come back to share your experience.') +
+                '</p>' +
+                '<a href="/Listings" style="display:inline-flex;align-items:center;gap:7px;padding:9px 20px;background:#EB6753;color:#fff;border-radius:100px;font-size:13px;font-weight:700;text-decoration:none;"><i class="fa-solid fa-magnifying-glass"></i> Browse Listings</a>' +
+                '</div>';
+            return;
+        }
     }
 
     const { data: existingReview } = await _supabase.from('reviews').select('id').eq('listing_id', LISTING_ID).eq('user_id', CURRENT_USER.id).maybeSingle();

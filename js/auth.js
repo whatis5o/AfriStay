@@ -8,14 +8,17 @@
     const signupGroup     = document.getElementById('signupGroup');
     const otpGroup        = document.getElementById('otpGroup');
     const passwordGroup   = document.getElementById('passwordGroup');
-    
+    const forgotGroup     = document.getElementById('forgotGroup');
+    const resetGroup      = document.getElementById('resetGroup');
+    const forgotLink      = document.getElementById('forgotLink');
+
     const authForm        = document.getElementById('authForm');
     const authError       = document.getElementById('authError');
     const authSuccess     = document.getElementById('authSuccess');
     const formTitle       = document.getElementById('dynamicTitle');
     const submitBtn       = document.getElementById('submitBtn');
 
-    let mode = 'signin'; // 'signin', 'signup', or 'verify_otp'
+    let mode = 'signin'; // 'signin', 'signup', 'verify_otp', 'forgot', 'reset'
 
     function showError(msg) {
         if (authError)   { authError.style.display = 'block'; authError.innerText = msg; }
@@ -31,12 +34,15 @@
         showError('');
         showSuccess('');
 
-        // Reset visibility
+        // Reset all groups
         loginGroup.classList.add('hidden');
         signupGroup.classList.add('hidden');
         otpGroup.classList.add('hidden');
+        forgotGroup.classList.add('hidden');
+        resetGroup.classList.add('hidden');
         passwordGroup.classList.remove('hidden');
         authToggleCont.classList.remove('hidden');
+        if (forgotLink) forgotLink.style.display = 'none';
 
         toggleSignin.classList.remove('active');
         toggleSignup.classList.remove('active');
@@ -47,22 +53,43 @@
             formTitle.innerText = 'Sign Up';
             submitBtn.innerText = 'Create Account';
         } else if (mode === 'verify_otp') {
-            // Special state triggered during phone signup
             authToggleCont.classList.add('hidden');
             passwordGroup.classList.add('hidden');
             otpGroup.classList.remove('hidden');
             formTitle.innerText = 'Verify Phone';
             submitBtn.innerText = 'Verify & Login';
+        } else if (mode === 'forgot') {
+            authToggleCont.classList.add('hidden');
+            passwordGroup.classList.add('hidden');
+            forgotGroup.classList.remove('hidden');
+            formTitle.innerText = 'Reset Password';
+            submitBtn.innerText = 'Send Reset Link';
+        } else if (mode === 'reset') {
+            authToggleCont.classList.add('hidden');
+            passwordGroup.classList.add('hidden');
+            resetGroup.classList.remove('hidden');
+            formTitle.innerText = 'New Password';
+            submitBtn.innerText = 'Save New Password';
         } else {
             // Default: Sign In
             toggleSignin.classList.add('active');
             loginGroup.classList.remove('hidden');
+            if (forgotLink) forgotLink.style.display = 'block';
             formTitle.innerText = 'Sign In';
             submitBtn.innerText = 'Login';
         }
     };
 
     toggleAuth('signin');
+
+    // Auto-trigger reset mode when user lands via password-reset email link
+    (function waitForSupabase() {
+        const client = window.supabaseClient;
+        if (!client) { setTimeout(waitForSupabase, 100); return; }
+        client.auth.onAuthStateChange((event) => {
+            if (event === 'PASSWORD_RECOVERY') toggleAuth('reset');
+        });
+    })();
 
     async function handleSuccessfulLogin(client, user) {
         // Fetch profile — including banned flag
@@ -198,20 +225,59 @@
                     type: 'sms'
                 });
 
-                if (error) { 
-                    showError(error.message || 'Invalid code. Try again.'); 
+                if (error) {
+                    showError(error.message || 'Invalid code. Try again.');
                     submitBtn.innerText = 'Verify & Login';
-                    return; 
+                    return;
                 }
 
-                // If successful, Supabase automatically establishes a session
                 await handleSuccessfulLogin(client, data.user);
+
+            } else if (mode === 'forgot') {
+                // ── FORGOT PASSWORD: send reset email ──
+                const email = document.getElementById('forgotEmail')?.value?.trim();
+                if (!email) { showError('Please enter your email address'); return; }
+
+                submitBtn.innerText = 'Sending...';
+
+                const { error } = await client.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.origin + '/Auth/'
+                });
+
+                submitBtn.innerText = 'Send Reset Link';
+
+                if (error) { showError(error.message || 'Could not send reset email'); return; }
+
+                showSuccess('Check your inbox — we sent a password reset link.');
+
+            } else if (mode === 'reset') {
+                // ── RESET PASSWORD: set new password ──
+                const newPwd  = document.getElementById('newPassword')?.value;
+                const confPwd = document.getElementById('confirmPassword')?.value;
+
+                if (!newPwd || newPwd.length < 6) { showError('Password must be at least 6 characters'); return; }
+                if (newPwd !== confPwd) { showError('Passwords do not match'); return; }
+
+                submitBtn.innerText = 'Saving...';
+
+                const { error } = await client.auth.updateUser({ password: newPwd });
+
+                if (error) {
+                    showError(error.message || 'Could not update password');
+                    submitBtn.innerText = 'Save New Password';
+                    return;
+                }
+
+                showSuccess('Password updated! Signing you in...');
+                await client.auth.signOut();
+                setTimeout(() => { toggleAuth('signin'); }, 1800);
             }
 
         } catch (err) {
             console.error('Auth error', err);
             showError('Something went wrong. Please try again.');
-            submitBtn.innerText = mode === 'signup' ? 'Create Account' : (mode === 'verify_otp' ? 'Verify & Login' : 'Login');
+            const btnLabels = { signup: 'Create Account', verify_otp: 'Verify & Login', forgot: 'Send Reset Link', reset: 'Save New Password' };
+            submitBtn.innerText = btnLabels[mode] || 'Login';
         }
     });
 
