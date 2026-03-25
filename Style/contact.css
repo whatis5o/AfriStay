@@ -520,6 +520,8 @@ transform: translate(35px,-56px); /* Use this to nudge it higher/lower without m
     }
     .footer-cta {
         padding: 30px 5%;
+        box-shadow: none;
+        transform: translateY(-80px);
     }
     .footer-column {
         flex-direction: column;

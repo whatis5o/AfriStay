@@ -678,6 +678,8 @@ body {
 @media (max-width: 480px) {
     .footer-cta {
         padding: 30px 5%;
+        box-shadow: none;
+        transform: translateY(-80px);
     }
     .footer-column {
         flex-direction: column;
