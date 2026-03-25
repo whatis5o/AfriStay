@@ -3217,7 +3217,10 @@ window.downloadReceipt = async function(bookingId) {
             if (!receiptData) {
                 const { data: booking }  = await _supabase.from('bookings').select('*').eq('id', bookingId).single();
                 const { data: listing }  = await _supabase.from('listings').select('title,price,currency,address,province_id,district_id,owner_id').eq('id', booking.listing_id).single();
-                const { data: owner }    = await _supabase.from('profiles').select('full_name,email,phone').eq('id', listing?.owner_id).single().catch(() => ({ data: null }));
+                const ownerRes = listing?.owner_id
+                    ? await _supabase.from('profiles').select('full_name,email,phone').eq('id', listing.owner_id).single()
+                    : { data: null };
+                const owner = ownerRes.data || null;
 
                 let location = listing?.address || 'Rwanda';
                 try {

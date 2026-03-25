@@ -9,6 +9,7 @@ let CURRENT_USER = null;
 let CURRENT_LISTING = null;
 let MEDIA_ITEMS = [];
 let CURRENT_MEDIA_INDEX = 0;
+let REVIEWS_OPEN = false; // set from platform_config key='open_reviews' value='true'
 
 document.addEventListener('DOMContentLoaded', async () => {
     _supabase = window.supabaseClient;
@@ -22,11 +23,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         showDetailError('No listing ID found. Please go back and try again.');
         return;
     }
-    console.log('🔑 [DETAIL] Listing ID:', LISTING_ID);
 
-    const { data: { user } } = await _supabase.auth.getUser();
-    CURRENT_USER = user;
+    // Fetch user + reviews-open flag in parallel (fast)
+    const [authResult, configResult] = await Promise.all([
+        _supabase.auth.getUser(),
+        _supabase.from('platform_config').select('value').eq('key', 'open_reviews').maybeSingle(),
+    ]);
+
+    CURRENT_USER  = authResult.data?.user || null;
+    REVIEWS_OPEN  = configResult.data?.value === 'true';
     console.log(CURRENT_USER ? `✅ [DETAIL] Logged in: ${CURRENT_USER.email}` : 'ℹ️ [DETAIL] Not logged in');
+    console.log(`ℹ️ [DETAIL] Reviews open: ${REVIEWS_OPEN}`);
 
     if (CURRENT_USER) {
         document.getElementById('signInBtn')?.classList.add('hidden');
@@ -36,6 +43,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     await Promise.all([loadListingDetails(), loadReviews()]);
     initBookingForm();
     initReviewForm();
+
+    // If reviews are closed, hide the section title too
+    if (!REVIEWS_OPEN) {
+        const reviewsHeader = document.getElementById('reviewsSection');
+        if (reviewsHeader) reviewsHeader.style.display = 'none';
+    }
 });
 
 async function loadListingDetails() {
@@ -272,6 +285,8 @@ document.addEventListener('keydown', e => {
 function renderRatingBadge(avgRating, reviewsCount) {
     const badge = document.getElementById('listingRatingBadge');
     if (!badge) return;
+    // If reviews are closed, don't show the badge at all
+    if (!REVIEWS_OPEN) { badge.style.display = 'none'; return; }
     if (!avgRating || !reviewsCount) {
         badge.innerHTML = '<i class="fa-regular fa-star" style="color:#ddd;"></i> No ratings yet';
         return;
@@ -281,6 +296,19 @@ function renderRatingBadge(avgRating, reviewsCount) {
 }
 
 async function loadReviews() {
+    const list = document.getElementById('reviewsList');
+    if (!list) return;
+
+    if (!REVIEWS_OPEN) {
+        list.innerHTML =
+            '<div style="background:#f9f9f9;border:1.5px solid #ebebeb;border-radius:14px;padding:28px 20px;text-align:center;">' +
+            '<i class="fa-solid fa-lock" style="font-size:28px;color:#ccc;display:block;margin-bottom:10px;"></i>' +
+            '<p style="font-weight:700;color:#555;margin:0 0 6px;font-size:15px;">Reviews are currently closed</p>' +
+            '<p style="color:#bbb;font-size:13px;margin:0;line-height:1.6;">The host or admin has temporarily disabled reviews for this listing.</p>' +
+            '</div>';
+        return;
+    }
+
     const { data: reviews, error } = await _supabase
         .from('reviews')
         .select('id, rating, comment, created_at, user_id, profiles ( full_name )')
@@ -311,6 +339,12 @@ function renderReviews(reviews) {
 async function initReviewForm() {
     const formSection = document.getElementById('reviewFormSection');
     if (!formSection) return;
+
+    // Gate: reviews closed in platform_config
+    if (!REVIEWS_OPEN) {
+        formSection.style.display = 'none';
+        return;
+    }
 
     // Context-aware language based on listing type
     const isVeh = CURRENT_LISTING?.category_slug === 'vehicle';

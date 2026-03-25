@@ -713,15 +713,16 @@
     
         async function loadListings({ qtext='', province='', district='', sector='', category='' } = {}) {
             showSkeletons(6);
-    
+
             let q = sb.from('listings')
                 .select('id,title,price,currency,availability_status,status,category_slug,province_id,district_id,created_at')
+                .eq('status', 'approved')
+                .eq('availability_status', 'available')
                 .order('created_at', { ascending: false })
                 .limit(100);
-    
-            // Log all statuses to help debug — remove this after confirming
-            console.log('🔍 [LISTINGS] Fetching listings...');
-    
+
+            console.log('🔍 [LISTINGS] Fetching approved + available listings...');
+
             if (qtext)    q = q.ilike('title', `%${qtext}%`);
             if (province) q = q.eq('province_id', province);
             if (district) q = q.eq('district_id', district);
@@ -732,10 +733,8 @@
             if (error) { grid.innerHTML = `<div class="state-box"><i class="fa-solid fa-triangle-exclamation"></i><p>${esc(error.message)}</p></div>`; return; }
     
             console.log('📋 [LISTINGS] Fetched', data?.length || 0, 'listings');
-            if (data?.length) console.log('📊 [LISTINGS] Statuses:', [...new Set(data.map(l => l.status))]);
-    
             if (!data || !data.length) { grid.innerHTML = '<div class="state-box"><i class="fa-solid fa-house-circle-xmark"></i><p>No listings found. Try different filters.</p></div>'; countEl.textContent = '0 results'; return; }
-    
+
             countEl.textContent = data.length + ' result' + (data.length !== 1 ? 's' : '');
     
             // batch images — table first, then storage fallback
