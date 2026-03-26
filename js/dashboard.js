@@ -2770,7 +2770,7 @@ async function loadDashPendingListings() {
         let q = _supabase
             .from('listings')
             .select('id,title,price,currency,category_slug,province_id,district_id,owner_id,created_at')
-            .in('status', ['awaiting_approval', 'approved', 'pending'])
+            .neq('status', 'approved')
             .order('created_at', { ascending: false })
             .limit(15);
 
