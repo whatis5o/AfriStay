@@ -24,7 +24,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // Fetch user + reviews-open flag in parallel (fast)
+    // Fetch user + reviews-open flag + active promo in parallel
+    const today = new Date().toISOString().slice(0, 10);
     const [authResult, configResult] = await Promise.all([
         _supabase.auth.getUser(),
         _supabase.from('platform_config').select('value').eq('key', 'open_reviews').maybeSingle(),
@@ -40,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('userIcon')?.classList.remove('hidden');
     }
 
-    await Promise.all([loadListingDetails(), loadReviews()]);
+    await Promise.all([loadListingDetails(today), loadReviews()]);
     initBookingForm();
     initReviewForm();
 
@@ -51,25 +52,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-async function loadListingDetails() {
+async function loadListingDetails(today) {
+    if (!today) today = new Date().toISOString().slice(0, 10);
     console.log('📋 [DETAIL] Fetching listing...');
 
-    const { data: listing, error } = await _supabase
-        .from('listings')
-        .select(`
-            id, title, description, price, currency, address,
-            availability_status, status, avg_rating, reviews_count,
-            category_slug, landmark_description,
-            province_id, district_id, sector_id, owner_id,
-            provinces ( name ),
-            districts ( name ),
-            sectors ( name ),
-            real_estate_types ( name ),
-            listing_images ( id, image_url, created_at ),
-            listing_videos ( id, video_url, created_at )
-        `)
-        .eq('id', LISTING_ID)
-        .single();
+    const [{ data: listing, error }, { data: promoData }] = await Promise.all([
+        _supabase
+            .from('listings')
+            .select(`
+                id, title, description, price, currency, address,
+                availability_status, status, avg_rating, reviews_count,
+                category_slug, landmark_description,
+                province_id, district_id, sector_id, owner_id,
+                provinces ( name ),
+                districts ( name ),
+                sectors ( name ),
+                real_estate_types ( name ),
+                listing_images ( id, image_url, created_at ),
+                listing_videos ( id, video_url, created_at )
+            `)
+            .eq('id', LISTING_ID)
+            .single(),
+        _supabase
+            .from('promotions')
+            .select('discount, title, end_date')
+            .eq('listing_id', LISTING_ID)
+            .lte('start_date', today)
+            .gte('end_date', today)
+            .limit(1)
+            .maybeSingle(),
+    ]);
 
     if (error || !listing) {
         console.error('❌ [DETAIL] Not found:', error?.message);
@@ -116,11 +128,27 @@ async function loadListingDetails() {
         : locationParts.join(', ') || 'Rwanda';
     setEl('listingLocation', locationStr);
 
-    const currency = listing.currency || 'RWF';
-    const price = Number(listing.price).toLocaleString('en-RW');
+    const currency  = listing.currency || 'RWF';
+    const price     = Number(listing.price).toLocaleString('en-RW');
     const priceUnit = listing.category_slug === 'vehicle' ? '/ day' : '/ night';
-    const priceEl = document.getElementById('listingPrice');
-    if (priceEl) priceEl.innerHTML = price + ' <small>' + currency + '</small> <span style="font-size:14px;color:#bbb;font-weight:400;">' + priceUnit + '</span>';
+    const priceEl   = document.getElementById('listingPrice');
+    if (priceEl) {
+        if (promoData && promoData.discount) {
+            const discounted = Math.round(listing.price * (1 - promoData.discount / 100));
+            const discStr    = Number(discounted).toLocaleString('en-RW');
+            const endFmt     = new Date(promoData.end_date).toLocaleDateString('en-RW', { month: 'short', day: 'numeric' });
+            priceEl.innerHTML =
+                '<div class="detail-promo-wrap">' +
+                '<span class="detail-promo-original">' + price + ' <small>' + currency + '</small></span>' +
+                '<span>' + discStr + ' <small>' + currency + '</small> <span style="font-size:14px;color:#bbb;font-weight:400;">' + priceUnit + '</span>' +
+                '<span class="detail-promo-badge">' + promoData.discount + '% OFF</span>' +
+                '</span>' +
+                '<small style="color:#EB6753;font-size:12px;margin-top:2px;">Promo ends ' + endFmt + '</small>' +
+                '</div>';
+        } else {
+            priceEl.innerHTML = price + ' <small>' + currency + '</small> <span style="font-size:14px;color:#bbb;font-weight:400;">' + priceUnit + '</span>';
+        }
+    }
 
     const isAvailable = listing.availability_status === 'available';
     const badge = document.getElementById('listingAvailability');

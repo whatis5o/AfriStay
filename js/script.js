@@ -113,6 +113,30 @@ async function _cacheLocNames(sb, pvIds, dtIds) {
     return { pvMap, dtMap };
 }
 
+/* ─── Merge active promotions into listing objects ─── */
+async function applyActivePromos(sb, listings) {
+    if (!listings || !listings.length) return;
+    const ids   = listings.map(l => l.id);
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: promos } = await sb
+        .from('promotions')
+        .select('listing_id, discount')
+        .in('listing_id', ids)
+        .lte('start_date', today)
+        .gte('end_date', today);
+    if (!promos || !promos.length) return;
+    const promoMap = {};
+    promos.forEach(p => { promoMap[p.listing_id] = p.discount; });
+    listings.forEach(l => {
+        const disc = promoMap[l.id];
+        if (disc) {
+            l.promo_discount = disc;
+            l.promo_price    = Math.round(l.price * (1 - disc / 100));
+        }
+    });
+}
+window.applyActivePromos = applyActivePromos;
+
 window.fetchAndRenderSharedListings = async function(options) {
     const sb        = window.supabaseClient;
     const container = document.getElementById(options.containerId);
@@ -147,7 +171,10 @@ window.fetchAndRenderSharedListings = async function(options) {
 
     const pvIds = [...new Set(listings.map(l => l.province_id).filter(Boolean))];
     const dtIds = [...new Set(listings.map(l => l.district_id).filter(Boolean))];
-    const { pvMap, dtMap } = await _cacheLocNames(sb, pvIds, dtIds); // cached 5 min
+    const [{ pvMap, dtMap }] = await Promise.all([
+        _cacheLocNames(sb, pvIds, dtIds),
+        applyActivePromos(sb, listings),
+    ]);
 
     container.innerHTML = '';
     listings.forEach(l => {
@@ -158,8 +185,7 @@ window.fetchAndRenderSharedListings = async function(options) {
             finalImageUrl = pub.publicUrl;
         }
         l.final_thumb_url = finalImageUrl;
-        l.promo_discount = null;
-        l.promo_price = null;
+        if (!l.promo_discount) { l.promo_discount = null; l.promo_price = null; }
         const locName = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
         container.innerHTML += generateListingCard(l, locName);
     });

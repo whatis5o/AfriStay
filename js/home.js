@@ -86,15 +86,27 @@ async function loadFeaturedListings() {
 
     const ids = listings.map(l => l.id);
 
-    // Resolve images (table → storage fallback)
-    const imgMap = await resolveImages(sb, ids);
-
-    // Batch district + province names
+    // Resolve images + promos + location names in parallel
+    const today = new Date().toISOString().slice(0, 10);
     const pvIds = [...new Set(listings.map(l => l.province_id).filter(Boolean))];
     const dtIds = [...new Set(listings.map(l => l.district_id).filter(Boolean))];
-    const pvMap = {}, dtMap = {};
-    if (pvIds.length) { const { data: ps } = await sb.from('provinces').select('id,name').in('id', pvIds); (ps||[]).forEach(p => pvMap[p.id] = p.name); }
-    if (dtIds.length) { const { data: ds } = await sb.from('districts').select('id,name').in('id', dtIds); (ds||[]).forEach(d => dtMap[d.id] = d.name); }
+
+    const [imgMap, promoRes, pvRes, dtRes] = await Promise.all([
+        resolveImages(sb, ids),
+        sb.from('promotions').select('listing_id,discount').in('listing_id', ids).lte('start_date', today).gte('end_date', today),
+        pvIds.length ? sb.from('provinces').select('id,name').in('id', pvIds) : Promise.resolve({ data: [] }),
+        dtIds.length ? sb.from('districts').select('id,name').in('id', dtIds) : Promise.resolve({ data: [] }),
+    ]);
+
+    const pvMap = {}, dtMap = {}, promoMap = {};
+    (pvRes.data || []).forEach(p => pvMap[p.id] = p.name);
+    (dtRes.data || []).forEach(d => dtMap[d.id] = d.name);
+    (promoRes.data || []).forEach(p => { promoMap[p.listing_id] = p.discount; });
+    listings.forEach(l => {
+        const disc = promoMap[l.id];
+        l.promo_discount = disc || null;
+        l.promo_price    = disc ? Math.round(l.price * (1 - disc / 100)) : null;
+    });
 
     renderCards(listings, imgMap, dtMap, pvMap);
 }
@@ -111,9 +123,10 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
         const isVeh   = l.category_slug === 'vehicle';
         const catLbl  = isVeh ? 'Vehicle' : 'Real Estate';
         const catIcon = isVeh ? 'fa-car' : 'fa-house';
-        const unit    = isVeh ? '/day' : '/night';
-        const price   = Number(l.price).toLocaleString();
-        const loc     = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
+        const unit        = isVeh ? '/day' : '/night';
+        const price       = Number(l.price).toLocaleString();
+        const promoPrice  = l.promo_discount ? Number(l.promo_price).toLocaleString() : null;
+        const loc         = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
 
         console.log(`  🃏 [HOME] "${l.title}" | loc: ${loc} | img: ${thumb ? '✅' : '❌'}`);
 
@@ -142,7 +155,13 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
                     '<div class="feature"><i class="fa-solid fa-circle-check" style="color:#2ecc71"></i><span>' + avail + '</span></div>' +
                 '</div>' +
                 '<div class="card-footer">' +
-                    '<div class="card-price">' + price + ' <span>' + (l.currency || 'RWF') + unit + '</span></div>' +
+                    (promoPrice
+                        ? '<div class="card-price">' +
+                          '<span class="promo-original">' + price + ' <span style="font-size:11px;">' + (l.currency||'RWF') + unit + '</span></span>' +
+                          '<span class="promo-new-price">' + promoPrice + ' <span style="font-size:12px;font-weight:500;">' + (l.currency||'RWF') + unit + '</span></span>' +
+                          '<span class="promo-badge">' + l.promo_discount + '% OFF</span>' +
+                          '</div>'
+                        : '<div class="card-price">' + price + ' <span>' + (l.currency || 'RWF') + unit + '</span></div>') +
                     '<button class="details-btn" onclick="event.preventDefault();event.stopPropagation();window.location.href=\'/Detail/?id=' + l.id + '\'">View Details</button>' +
                 '</div>' +
             '</div>';

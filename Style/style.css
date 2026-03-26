@@ -559,9 +559,52 @@
     .pay-card { padding: 18px !important; }
 }
 
-/* ── Promo badge: prevent overflow on small screens ── */
-.promo-original { display: block; font-size: 11px; }
-.promo-badge    { display: inline-block; }
+/* ── Promo price display ── */
+.promo-original {
+    display: block;
+    font-size: 12px;
+    color: #bbb;
+    text-decoration: line-through;
+    font-weight: 400;
+    margin-bottom: 2px;
+    letter-spacing: 0;
+}
+.promo-badge {
+    display: inline-block;
+    background: #EB6753;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 5px;
+    vertical-align: middle;
+    letter-spacing: 0.4px;
+}
+.promo-new-price {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+/* Detail page promo price */
+.detail-promo-wrap { display: flex; flex-direction: column; gap: 2px; }
+.detail-promo-original {
+    font-size: 14px;
+    color: #bbb;
+    text-decoration: line-through;
+    font-weight: 400;
+}
+.detail-promo-badge {
+    display: inline-block;
+    background: #EB6753;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 20px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
 
 /* ── Events grid: single column on phone ── */
 @media (max-width: 500px) {

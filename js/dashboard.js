@@ -829,6 +829,7 @@ function applyRoleToUI(role) {
         console.log("  🏠 OWNER role - showing owner features");
         show('listings');
         show('bookings');
+        show('promotions');
         hide('messages');
         hide('users');
 
