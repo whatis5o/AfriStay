@@ -558,6 +558,27 @@ async function pay() {
       return;
     }
 
+    // ── Duplicate booking check ──
+    setBusy(true, 'Checking your bookings…');
+    const { data: existing } = await sb
+      .from('bookings')
+      .select('id, start_date, end_date, status')
+      .eq('user_id', user.id)
+      .eq('listing_id', LISTING)
+      .in('status', ['pending', 'approved', 'confirmed'])
+      .maybeSingle();
+
+    if (existing) {
+      setBusy(false);
+      const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const statusLabel = { pending: 'pending approval', approved: 'approved — awaiting your confirmation', confirmed: 'already confirmed' }[existing.status] || existing.status;
+      showErr(
+        `You already have an active booking for this listing (${fmt(existing.start_date)} → ${fmt(existing.end_date)}) — currently ${statusLabel}. ` +
+        `Check your bookings in your Profile before booking again.`
+      );
+      return;
+    }
+
     const { data: { session } } = await sb.auth.getSession();
     const token   = session?.access_token || CONFIG.SUPABASE_KEY;
     const fnBase  = (CONFIG?.FUNCTIONS_BASE || '').replace(/\/$/, '');
