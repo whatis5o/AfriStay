@@ -38,10 +38,20 @@
     .sub   { font-size: 14px; color: #888; line-height: 1.7; }
     .logo  { margin-top: 28px; font-size: 13px; color: #bbb; }
     .logo a { color: #EB6753; text-decoration: none; font-weight: 600; }
-
-    /* Success/Error states */
-    .icon-ok  { font-size: 52px; margin-bottom: 16px; color: #16a34a; }
-    .icon-err { font-size: 52px; margin-bottom: 16px; color: #ef4444; }
+    .btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 24px;
+      background: #EB6753;
+      color: #fff;
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+    }
   </style>
 </head>
 <body>
@@ -56,50 +66,98 @@
 <script src="/js/config.js"></script>
 <script>
 (async function () {
-  const p      = new URLSearchParams(window.location.search);
-  const token  = p.get('token')  || '';
-  const action = p.get('action') || 'approve'; // approve | reject
+  const p         = new URLSearchParams(window.location.search);
+  const bookingId = p.get('token') || p.get('booking') || '';
+  const action    = p.get('action') || 'approve'; // approve | reject
 
   const titleEl   = document.getElementById('title');
   const subEl     = document.getElementById('sub');
   const spinnerEl = document.getElementById('spinner');
+  const card      = document.getElementById('card');
 
-  function setDone(icon, title, msg) {
+  function setDone(icon, title, msg, showDashBtn) {
     spinnerEl.style.display = 'none';
     const ic = document.createElement('div');
     ic.textContent = icon;
     ic.style.cssText = 'font-size:52px;margin-bottom:16px';
-    document.getElementById('card').insertBefore(ic, titleEl);
+    card.insertBefore(ic, titleEl);
     titleEl.textContent = title;
     subEl.textContent   = msg;
-    setTimeout(() => window.location.replace('/'), 2400);
+    if (showDashBtn) {
+      const btn = document.createElement('a');
+      btn.href = '/Dashboard';
+      btn.className = 'btn';
+      btn.textContent = 'Go to Dashboard';
+      card.appendChild(btn);
+    } else {
+      setTimeout(() => window.location.replace('/Dashboard'), 2800);
+    }
   }
 
-  if (!token) {
-    setDone('❌', 'Invalid Link', 'No token found. Please use the link from your email.');
+  if (!bookingId) {
+    setDone('❌', 'Invalid Link', 'No booking ID found. Please use the link from your email.', true);
     return;
   }
 
-  try {
-    // Call the approve-booking edge function which handles token-based auth
-    const url = CONFIG.FUNCTIONS_BASE + '/approve-booking?token=' + encodeURIComponent(token) + '&action=' + action;
-    const res = await fetch(url, { method: 'GET' });
+  // Wait for supabase client
+  let sb = window.supabaseClient;
+  if (!sb) {
+    await new Promise(r => setTimeout(r, 400));
+    sb = window.supabaseClient;
+  }
+  if (!sb) {
+    setDone('❌', 'Configuration Error', 'Could not connect to the database. Please try again later.', true);
+    return;
+  }
 
-    // The edge function returns HTML for GET — check response status
-    if (res.ok) {
-      if (action === 'reject') {
-        setDone('✅', 'Booking Rejected', 'The guest has been notified. Redirecting…');
-      } else {
-        setDone('✅', 'Booking Approved!', 'The guest has been emailed to confirm their stay. Redirecting…');
-      }
-    } else {
-      const data = await res.text();
-      setDone('❌', 'Something Went Wrong', 'Could not process. Please try again or contact support.');
-      console.error('[APPROVE] Error:', data);
-    }
-  } catch (e) {
-    setDone('❌', 'Connection Error', 'Please check your internet and try again.');
-    console.error('[APPROVE] Fetch error:', e);
+  // Check login
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) {
+    // Redirect to auth, come back here after login
+    window.location.href = '/Auth/?redirect=' + encodeURIComponent(window.location.href);
+    return;
+  }
+
+  // Fetch the booking and verify this user is the listing owner
+  const { data: booking, error: bErr } = await sb
+    .from('bookings')
+    .select('id, status, listing_id, listings ( owner_id, title )')
+    .eq('id', bookingId)
+    .single();
+
+  if (bErr || !booking) {
+    setDone('❌', 'Booking Not Found', 'This booking no longer exists or the link has expired.', true);
+    return;
+  }
+
+  const ownerId = booking.listings?.owner_id;
+  if (ownerId !== user.id) {
+    setDone('🔒', 'Not Authorized', 'You are not the owner of this listing.', true);
+    return;
+  }
+
+  if (booking.status === 'confirmed' || booking.status === 'rejected') {
+    const already = booking.status === 'confirmed' ? 'already approved' : 'already rejected';
+    setDone('ℹ️', 'Already Processed', 'This booking was ' + already + '.', true);
+    return;
+  }
+
+  // Apply the action
+  const newStatus = action === 'reject' ? 'rejected' : 'confirmed';
+  const { error: upErr } = await sb
+    .from('bookings')
+    .update({ status: newStatus })
+    .eq('id', bookingId);
+
+  if (upErr) {
+    setDone('❌', 'Update Failed', upErr.message || 'Could not update the booking. Please try from the Dashboard.', true);
+    return;
+  }
+
+  if (action === 'reject') {
+    setDone('✅', 'Booking Rejected', 'The booking has been rejected. Redirecting to Dashboard…');
+  } else {
+    setDone('✅', 'Booking Approved!', 'The booking is now confirmed. Redirecting to Dashboard…');
   }
 })();
 </script>
