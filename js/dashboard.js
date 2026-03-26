@@ -345,8 +345,15 @@ function bindUIInteractions() {
             e.preventDefault();
             console.log("📝 [LISTING] Submitting listing form");
             await handleCreateListing();
-            closeModal('listingModal');
-            await loadListingsTable();
+            // Only close if listing was created (status shows success)
+            const statusEl = document.getElementById('listingCreateStatus');
+            if (statusEl && statusEl.style.background && statusEl.style.background.includes('e9faf0')) {
+                setTimeout(() => {
+                    closeModal('listingModal');
+                    if (statusEl) statusEl.style.display = 'none';
+                    loadListingsTable();
+                }, 2000);
+            }
         });
     }
 
@@ -811,9 +818,12 @@ function applyRoleToUI(role) {
         ['users', 'messages', 'listing-requests', 'events', 'promotions'].forEach(t => show(t));
         if (createListingBtn) createListingBtn.style.display = '';
         if (quickMenu) quickMenu.querySelectorAll('button').forEach(b => b.style.display = '');
+        // Show owner-assignment field for admin
+        const assignGroup = document.getElementById('assignOwnerGroup');
+        if (assignGroup) assignGroup.style.display = '';
         // Inject listing-requests nav button if not in HTML
         injectListingRequestsTab();
-    } 
+    }
     // OWNER: manages listings and bookings
     else if (role === 'owner') {
         console.log("  🏠 OWNER role - showing owner features");
@@ -1794,115 +1804,131 @@ async function promoteToOwner(userId) {
 
 async function handleCreateListing() {
     console.log("➕ [LISTING] Creating new listing (with media)...");
-    const title = $('#listTitle')?.value;
-    const price = Number($('#listPrice')?.value || 0);
-    const desc = $('#listDesc')?.value;
+
+    const title    = $('#listTitle')?.value?.trim();
+    const price    = Number($('#listPrice')?.value || 0);
+    const desc     = $('#listDesc')?.value?.trim();
     const category = $('#listCategory')?.value;
-    const ownerId = $('#selectedOwnerId')?.value || (CURRENT_PROFILE && CURRENT_PROFILE.id);
+    // Admin picks an owner; owner always gets themselves
+    const ownerId  = CURRENT_ROLE === 'admin'
+        ? ($('#selectedOwnerId')?.value || (CURRENT_PROFILE && CURRENT_PROFILE.id))
+        : (CURRENT_PROFILE && CURRENT_PROFILE.id);
 
     const provinceId = $('#selProvince')?.value || null;
     const districtId = $('#selDistrict')?.value || null;
-    const sectorId = $('#selSector')?.value || null;
-    const address = $('#listAddress')?.value || '';
+    const sectorId   = $('#selSector')?.value || null;
+    const address    = $('#listAddress')?.value?.trim() || '';
+
+    const statusEl  = document.getElementById('listingCreateStatus');
+    const createBtn = document.getElementById('createBtn');
+
+    function setStatus(msg, type) {
+        if (!statusEl) return;
+        const colors = { info: '#e8f4fd', success: '#e9faf0', error: '#fdecea', warning: '#fff8e1' };
+        const text   = { info: '#1565c0', success: '#1b7a3e', error: '#c0392b', warning: '#7c5c00' };
+        statusEl.style.display  = 'block';
+        statusEl.style.background = colors[type] || colors.info;
+        statusEl.style.color    = text[type] || text.info;
+        statusEl.style.border   = `1px solid ${text[type] || text.info}33`;
+        statusEl.innerHTML      = msg;
+    }
+    function clearStatus() { if (statusEl) statusEl.style.display = 'none'; }
 
     if (!title || !price || !desc || !ownerId) {
-        alert('Fill required fields');
+        setStatus('Please fill in all required fields.', 'error');
         return;
     }
 
-    // validate files
     const imagesInput = document.getElementById('listImageFiles');
     const videosInput = document.getElementById('listVideoFiles');
     const images = imagesInput ? Array.from(imagesInput.files || []) : [];
     const videos = videosInput ? Array.from(videosInput.files || []) : [];
 
-    if (images.length > 10) { alert('Max 10 images allowed'); return; }
-    if (videos.length > 3) { alert('Max 3 videos allowed'); return; }
+    if (images.length > 10) { setStatus('Max 10 images allowed.', 'error'); return; }
+    if (videos.length > 3)  { setStatus('Max 3 videos allowed.', 'error'); return; }
 
-    // ── Progress toast helper ──
-    function progressToast(msg) { toast(msg, 'info', 8000); }
+    if (createBtn) { createBtn.disabled = true; createBtn.textContent = 'Working…'; }
+    clearStatus();
 
     try {
-        // 1) create listing row
-        progressToast('⏳ Creating listing…');
+        // 1) Create listing row
+        setStatus('<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Saving your listing…', 'info');
         const { data: created, error: createErr } = await _supabase
-        .from('listings')
-        .insert([{
-            owner_id: ownerId,
-            title,
-            description: desc,
-            price,
-            currency: 'RWF',
-            province_id: provinceId,
-            district_id: districtId,
-            sector_id: sectorId,
-            address,
-            category_slug: category,
-            status: 'pending',
-            availability_status: 'available'
-        }])
-        .select()
-        .single();
+            .from('listings')
+            .insert([{
+                owner_id: ownerId,
+                title,
+                description: desc,
+                price,
+                currency: 'RWF',
+                province_id: provinceId,
+                district_id: districtId,
+                sector_id: sectorId,
+                address,
+                category_slug: category,
+                status: 'pending',
+                availability_status: 'available'
+            }])
+            .select()
+            .single();
 
         if (createErr) throw createErr;
-
         const listingId = created.id;
-        console.log('Created listing id:', listingId);
 
         // 2) Upload images
         const uploadedImageRows = [];
-        if (images.length) {
         for (let i = 0; i < images.length; i++) {
             const file = images[i];
-            progressToast(`🖼️ Uploading image ${i + 1} of ${images.length}: ${file.name}…`);
+            setStatus(`<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Uploading image ${i + 1} of ${images.length}: <strong>${file.name}</strong>…`, 'info');
             const path = `${ownerId}/${listingId}/${Date.now()}-${file.name}`;
             const { error: upErr } = await _supabase.storage.from('listing-images').upload(path, file, { upsert: false });
             if (upErr) {
-            console.warn('Image upload failed for', file.name, upErr);
-            toast(`⚠️ Image "${file.name}" failed: ${upErr.message}`, 'warning');
-            continue;
+                setStatus(`<i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>Image <strong>${file.name}</strong> failed: ${upErr.message}. Continuing with next…`, 'warning');
+                await new Promise(r => setTimeout(r, 1500));
+                continue;
             }
             const { data: urlData } = await _supabase.storage.from('listing-images').getPublicUrl(path);
-            const publicUrl = urlData?.publicUrl || null;
-            uploadedImageRows.push({ listing_id: listingId, image_url: publicUrl, filename: file.name, mime_type: file.type });
+            uploadedImageRows.push({ listing_id: listingId, image_url: urlData?.publicUrl || null, filename: file.name, mime_type: file.type });
         }
-
         if (uploadedImageRows.length) {
-            const { error: imgInsertErr } = await _supabase.from('listing_images').insert(uploadedImageRows);
-            if (imgInsertErr) console.warn('listing_images insert error', imgInsertErr);
-        }
+            const { error: imgErr } = await _supabase.from('listing_images').insert(uploadedImageRows);
+            if (imgErr) console.warn('listing_images insert error', imgErr);
         }
 
         // 3) Upload videos
         const uploadedVideoRows = [];
-        if (videos.length) {
         for (let i = 0; i < videos.length; i++) {
             const file = videos[i];
-            progressToast(`🎬 Uploading video ${i + 1} of ${videos.length}: ${file.name}…`);
+            setStatus(`<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Uploading video ${i + 1} of ${videos.length}: <strong>${file.name}</strong>…`, 'info');
             const path = `${ownerId}/${listingId}/${Date.now()}-${file.name}`;
             const { error: upErr } = await _supabase.storage.from('listing-videos').upload(path, file, { upsert: false });
             if (upErr) {
-            console.warn('Video upload failed for', file.name, upErr);
-            toast(`⚠️ Video "${file.name}" failed: ${upErr.message}`, 'warning');
-            continue;
+                setStatus(`<i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>Video <strong>${file.name}</strong> failed: ${upErr.message}. Continuing with next…`, 'warning');
+                await new Promise(r => setTimeout(r, 1500));
+                continue;
             }
             const { data: urlData } = await _supabase.storage.from('listing-videos').getPublicUrl(path);
-            const publicUrl = urlData?.publicUrl || null;
-            uploadedVideoRows.push({ listing_id: listingId, video_url: publicUrl, filename: file.name, mime_type: file.type });
+            uploadedVideoRows.push({ listing_id: listingId, video_url: urlData?.publicUrl || null, filename: file.name, mime_type: file.type });
         }
-
         if (uploadedVideoRows.length) {
-            const { error: vidInsertErr } = await _supabase.from('listing_videos').insert(uploadedVideoRows);
-            if (vidInsertErr) console.warn('listing_videos insert error', vidInsertErr);
-        }
+            const { error: vidErr } = await _supabase.from('listing_videos').insert(uploadedVideoRows);
+            if (vidErr) console.warn('listing_videos insert error', vidErr);
         }
 
         const mediaCount = uploadedImageRows.length + uploadedVideoRows.length;
-        toast(`✅ Listing created${mediaCount ? ` with ${mediaCount} media file${mediaCount > 1 ? 's' : ''}` : ''}! Pending admin approval.`, 'success', 5000);
+        setStatus(
+            `<i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>` +
+            `Listing submitted${mediaCount ? ` with ${mediaCount} file${mediaCount > 1 ? 's' : ''}` : ''}! ` +
+            (CURRENT_ROLE === 'owner' ? 'An admin will review and approve it shortly.' : 'It is now pending approval.'),
+            'success'
+        );
         console.log('✅ Listing and media created');
+
     } catch (err) {
         console.error('❌ [LISTING] Error creating listing:', err);
-        toast('Failed to create listing: ' + (err.message || JSON.stringify(err)), 'error');
+        setStatus(`<i class="fa-solid fa-circle-xmark" style="margin-right:6px;"></i>Failed: ${err.message || 'Something went wrong. Please try again.'}`, 'error');
+    } finally {
+        if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create Listing'; }
     }
 }
 

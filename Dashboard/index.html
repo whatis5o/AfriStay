@@ -354,7 +354,7 @@
                 <button class="close-modal" onclick="closeModal('listingModal')">&times;</button>
             </div>
             <form id="listingForm" class="form-body">
-                <div class="form-group" style="position: relative;">
+                <div id="assignOwnerGroup" class="form-group" style="position: relative; display:none;">
                     <label>Assign to Owner</label>
                     <div class="search-wrapper" style="position:relative;">
                         <input type="text" id="ownerSearch" class="form-control" placeholder="Search Owner Name..." autocomplete="off">
@@ -405,6 +405,7 @@
                     <small style="color:#666;">Uploads to 'listing-videos' bucket. Max 3 videos.</small>
                 </div>
 
+                <div id="listingCreateStatus" style="display:none;margin-bottom:12px;padding:12px 16px;border-radius:10px;font-size:14px;font-weight:500;"></div>
                 <button type="submit" class="btn-primary" id="createBtn">Create Listing</button>
             </form>
         </div>
