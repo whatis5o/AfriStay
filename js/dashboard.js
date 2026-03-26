@@ -808,7 +808,7 @@ function applyRoleToUI(role) {
     // ADMIN: sees everything
     if (role === 'admin') {
         console.log("  👑 ADMIN role - showing all features");
-        ['users', 'messages', 'listing-requests'].forEach(t => show(t));
+        ['users', 'messages', 'listing-requests', 'events', 'promotions'].forEach(t => show(t));
         if (createListingBtn) createListingBtn.style.display = '';
         if (quickMenu) quickMenu.querySelectorAll('button').forEach(b => b.style.display = '');
         // Inject listing-requests nav button if not in HTML

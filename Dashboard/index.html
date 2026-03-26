@@ -175,25 +175,11 @@
             <div class="data-section">
                 <div class="section-header">
                     <h2>Events</h2>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <div class="search-box">
-                            <i class="fa-solid fa-search"></i>
-                            <input type="text" id="eventSearchInput"
-                                placeholder="Search events..."
-                                onkeyup="filterTable('eventSearchInput','eventsTableBody')">
-                        </div>
-                        <button class="action-btn" onclick="openModal('eventModal')">
-                            <i class="fa-solid fa-plus"></i> Add Event
-                        </button>
-                    </div>
+                    <button class="action-btn" onclick="openCreateEventModal()">
+                        <i class="fa-solid fa-plus"></i> Add Event
+                    </button>
                 </div>
-
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead><tr><th>#</th><th>Title</th><th>Date</th><th>Location</th><th>Action</th></tr></thead>
-                        <tbody id="eventsTableBody"></tbody>
-                    </table>
-                </div>
+                <div id="eventsCardsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:16px;"></div>
             </div>
         </div>
 
@@ -202,14 +188,9 @@
             <div class="data-section">
                 <div class="section-header">
                     <h2>Promotions</h2>
-                    <button class="action-btn" onclick="openModal('promotionModal')"><i class="fa-solid fa-plus"></i> Add Promo</button>
+                    <button class="action-btn" onclick="openCreatePromoModal()"><i class="fa-solid fa-plus"></i> Add Promo</button>
                 </div>
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead><tr><th>#</th><th>Title</th><th>Image</th><th>Code</th><th>Listing</th><th>Discount</th><th>Dates</th><th>Action</th></tr></thead>
-                        <tbody id="promotionsTableBody"></tbody>
-                    </table>
-                </div>
+                <div id="promosCardsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;margin-top:16px;"></div>
             </div>
         </div>
 
