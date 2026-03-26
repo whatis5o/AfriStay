@@ -113,7 +113,7 @@ async function loadOverview() {
         { count: favCnt }
     ] = await Promise.all([
         _sb.from('bookings').select('id', { count: 'exact', head: true })
-            .eq('user_id', _user.id).in('status', ['pending', 'approved']),
+            .eq('user_id', _user.id).in('status', ['pending', 'approved', 'confirmed']),
         _sb.from('bookings').select('id', { count: 'exact', head: true })
             .eq('user_id', _user.id).in('status', ['completed', 'rejected', 'cancelled']),
         _sb.from('favorites').select('id', { count: 'exact', head: true })
@@ -161,7 +161,7 @@ async function loadActiveBookings() {
         .from('bookings')
         .select('id, listing_id, start_date, end_date, total_amount, status, payment_method, created_at')
         .eq('user_id', _user.id)
-        .in('status', ['pending', 'approved'])
+        .in('status', ['pending', 'approved', 'confirmed'])
         .order('created_at', { ascending: false });
 
     if (error || !data || !data.length) {
@@ -236,19 +236,23 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
             ? `<img class="booking-thumb" src="${esc(thumb)}" alt="${esc(l.title)}" onerror="this.parentNode.innerHTML='<div class=booking-thumb-placeholder><i class=fa-solid\\ fa-image style=color:#ddd;font-size:24px></i></div>'">`
             : `<div class="booking-thumb-placeholder"><i class="fa-solid fa-image" style="color:#ddd;font-size:24px;"></i></div>`;
 
-        const receiptBtnHtml = (showReceipt && b.status === 'approved')
+        const receiptBtnHtml = (showReceipt && ['approved','confirmed','completed'].includes(b.status))
             ? `<button class="receipt-btn" onclick="event.stopPropagation();downloadReceipt('${b.id}')"><i class="fa-solid fa-download"></i> Receipt</button>`
             : '';
 
-        const canCancel = b.status === 'pending' || b.status === 'approved';
+        const canCancel = b.status === 'pending' || b.status === 'approved' || b.status === 'confirmed';
         const cancelBtnHtml = canCancel
-            ? `<button class="cancel-booking-btn" onclick="event.preventDefault();event.stopPropagation();cancelBooking('${b.id}',this)"><i class="fa-solid fa-xmark"></i> Cancel</button>`
+            ? `<button class="cancel-booking-btn" onclick="event.stopPropagation();cancelBooking('${b.id}',this)"><i class="fa-solid fa-xmark"></i> Cancel</button>`
             : '';
 
-        const card = document.createElement('a');
-        card.href = `/Detail/?id=${b.listing_id}`;
+        const viewBtnHtml = `<a class="booking-view-btn" href="/Detail/?id=${b.listing_id}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i> View</a>`;
+
+        // Use div (not <a>) so button clicks don't accidentally navigate
+        const card = document.createElement('div');
         card.className = 'booking-card';
         card.id = 'booking-card-' + b.id;
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', () => window.location.href = `/Detail/?id=${b.listing_id}`);
         card.innerHTML = `
             ${imgHtml}
             <div class="booking-info">
@@ -261,7 +265,8 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
                 </div>
                 <div class="booking-footer">
                     <div class="booking-price">${priceFmt} <span>${currency}</span></div>
-                    <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        ${viewBtnHtml}
                         ${receiptBtnHtml}
                         ${cancelBtnHtml}
                         <span class="status-pill status-${b.status}" id="pill-${b.id}">${b.status}</span>

@@ -217,12 +217,24 @@
             display: flex;
             gap: 16px;
             align-items: flex-start;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
             cursor: pointer;
-            text-decoration: none;
             color: inherit;
+            user-select: none;
         }
-        .booking-card:hover { border-color: var(--primary); box-shadow: 0 4px 16px rgba(235,103,83,0.1); }
+        .booking-card:hover {
+            border-color: #e0e0e0;
+            background: #fafafa;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        /* Buttons inside the card override the card hover — they have their own distinct hover */
+        .booking-card button,
+        .booking-card a.booking-view-btn,
+        .booking-card .receipt-btn,
+        .booking-card .cancel-booking-btn {
+            position: relative;
+            z-index: 1;
+        }
 
         .booking-thumb {
             width: 80px; height: 80px;
@@ -288,6 +300,25 @@
         .status-rejected  { background: #fde8e8; color: #c0392b; }
         .status-cancelled { background: #f5f5f5; color: #999; }
 
+        .booking-view-btn {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 14px;
+            background: #f5f5f5;
+            color: #555;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .booking-view-btn:hover { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
         .receipt-btn {
             display: flex;
             align-items: center;
@@ -302,8 +333,9 @@
             cursor: pointer;
             font-family: 'Inter', sans-serif;
             transition: all 0.2s;
+            white-space: nowrap;
         }
-        .receipt-btn:hover { background: #3498db; color: #fff; }
+        .receipt-btn:hover { background: #3498db; color: #fff; border-color: #3498db; }
 
         /* ── EMPTY STATE ── */
         .empty-state {

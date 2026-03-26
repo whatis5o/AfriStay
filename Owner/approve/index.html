@@ -118,21 +118,29 @@
     return;
   }
 
-  // Fetch the booking and verify this user is the listing owner
-  const { data: booking, error: bErr } = await sb
-    .from('bookings')
-    .select('id, status, listing_id, listings ( owner_id, title )')
-    .eq('id', bookingId)
-    .single();
+  // Step 1 — fetch this user's listing IDs (owner_id = current user)
+  const { data: ownedListings } = await sb
+    .from('listings')
+    .select('id, title')
+    .eq('owner_id', user.id);
 
-  if (bErr || !booking) {
-    setDone('❌', 'Booking Not Found', 'This booking no longer exists or the link has expired.', true);
+  const ownedIds = (ownedListings || []).map(l => l.id);
+
+  if (!ownedIds.length) {
+    setDone('🔒', 'Not Authorized', 'You have no listings associated with this account.', true);
     return;
   }
 
-  const ownerId = booking.listings?.owner_id;
-  if (ownerId !== user.id) {
-    setDone('🔒', 'Not Authorized', 'You are not the owner of this listing.', true);
+  // Step 2 — fetch the booking, confirming it belongs to one of the owner's listings
+  const { data: booking, error: bErr } = await sb
+    .from('bookings')
+    .select('id, status, listing_id')
+    .eq('id', bookingId)
+    .in('listing_id', ownedIds)
+    .maybeSingle();
+
+  if (bErr || !booking) {
+    setDone('❌', 'Booking Not Found', 'This booking does not exist, already expired, or does not belong to your listings.', true);
     return;
   }
 
