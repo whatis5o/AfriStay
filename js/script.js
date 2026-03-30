@@ -11,7 +11,7 @@ async function initGlobalNav() {
 
     const cachedRole = localStorage.getItem('afriStay_role');
     if (cachedRole) {
-        const profileLink = (cachedRole === 'admin' || cachedRole === 'owner') ? '/Dashboard' : '/Profile';
+        const profileLink = cachedRole === 'admin' ? '/Dashboards/Admin/' : cachedRole === 'owner' ? '/Dashboards/Owner/' : '/Dashboards/Profile/';
         navRight.innerHTML = `
             <a href="/Favorites" class="icon-link" title="Favorites"><i class="fa-regular fa-heart"></i></a>
             <a href="${profileLink}" class="icon-link" title="${cachedRole === 'user' ? 'Profile' : 'Dashboard'}">
@@ -57,7 +57,7 @@ function generateListingCard(listing, locationName) {
     }
 
     return `
-        <a href="/Detail/?id=${listing.id}" class="property-card">
+        <a href="/Listings/Detail/?id=${listing.id}" class="property-card">
             <div class="card-image">
                 ${thumb
                     ? `<img src="${esc(thumb)}" alt="${esc(listing.title)}" loading="lazy">`
@@ -86,7 +86,7 @@ function generateListingCard(listing, locationName) {
                           '</div>'
                         : '<div class="card-price">' + (currency === 'RWF' ? '' : currency + ' ') + price + ' <span>' + (currency === 'RWF' ? 'RWF' : '') + unit + '</span></div>'
                     }
-                    <button class="details-btn" onclick="event.preventDefault();window.location.href='/Detail/?id=${listing.id}'">View Details</button>
+                    <button class="details-btn" onclick="event.preventDefault();window.location.href='/Listings/Detail/?id=${listing.id}'">View Details</button>
                 </div>
             </div>
         </a>

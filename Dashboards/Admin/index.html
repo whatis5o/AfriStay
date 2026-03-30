@@ -9,28 +9,30 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/Style/style.css">
     <style>
-        :root{--primary:#EB6753;--ps:#fff0ee;--sw:240px;}
+        :root{--primary:#EB6753;--ps:#fff0ee;--sw:260px;}
         *{box-sizing:border-box;}
         body{margin:0;background:#f5f6fa;font-family:'Inter',sans-serif;display:flex;min-height:100vh;}
-        #sidebar{width:var(--sw);background:#1a1a2e;display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform .3s;overflow-y:auto;}
-        .sb-logo{padding:22px 20px 16px;border-bottom:1px solid rgba(255,255,255,.08);}
+        #sidebar{width:var(--sw);background:#fff;box-shadow:2px 0 20px rgba(0,0,0,.06);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform .3s;overflow-y:auto;}
+        .sb-logo{padding:24px 20px 16px;border-bottom:1px solid #f0f0f0;}
         .sb-logo img{height:30px;}
-        .sb-user{padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:12px;}
-        .s-av{width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex-shrink:0;}
-        .s-nm{font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-        .s-role{font-size:10px;color:var(--primary);font-weight:700;background:rgba(235,103,83,.2);padding:2px 8px;border-radius:20px;display:inline-block;margin-top:2px;text-transform:uppercase;letter-spacing:.5px;}
-        .sb-nav{padding:10px 0;}
-        .nav-sec{font-size:10px;font-weight:700;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:.8px;padding:14px 20px 6px;}
-        .nav-btn{display:flex;align-items:center;gap:11px;padding:11px 20px;width:100%;border:none;background:none;font-size:13px;font-weight:500;color:rgba(255,255,255,.6);cursor:pointer;text-align:left;font-family:'Inter',sans-serif;transition:all .2s;position:relative;text-decoration:none;}
-        .nav-btn i{width:16px;text-align:center;font-size:13px;color:rgba(255,255,255,.3);transition:color .2s;}
-        .nav-btn:hover{background:rgba(255,255,255,.06);color:#fff;}
-        .nav-btn:hover i{color:var(--primary);}
-        .nav-btn.active{background:rgba(235,103,83,.15);color:#fff;font-weight:600;}
-        .nav-btn.active i{color:var(--primary);}
-        .nav-btn.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:55%;background:var(--primary);border-radius:0 3px 3px 0;}
-        .nav-btn.danger{color:rgba(231,76,60,.8);}
-        .nav-btn.danger i{color:rgba(231,76,60,.7);}
-        .nav-btn.danger:hover{background:rgba(231,76,60,.12);color:#e74c3c;}
+        .sb-user{padding:16px 20px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;gap:12px;}
+        .s-av{width:42px;height:42px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;flex-shrink:0;}
+        .s-nm{font-size:14px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .s-role{font-size:11px;color:var(--primary);font-weight:600;background:var(--ps);padding:2px 8px;border-radius:20px;display:inline-block;margin-top:2px;}
+        .sb-nav{flex:1;padding:10px 0;overflow-y:auto;}
+        .nav-sec{font-size:10px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.8px;padding:14px 20px 4px;}
+        .nav-btn{display:flex;align-items:center;gap:14px;padding:14px 16px;margin:2px 12px;width:calc(100% - 24px);border:none;background:none;font-size:15px;font-weight:600;color:#1a1a1a;cursor:pointer;text-align:left;font-family:'Inter',sans-serif;transition:all .2s;position:relative;text-decoration:none;border-radius:12px;}
+        .nav-btn i{width:20px;text-align:center;font-size:16px;color:#1a1a1a;transition:color .2s;}
+        .nav-btn:hover{background:#f5f5f5;color:#1a1a1a;}
+        .nav-btn:hover i{color:#1a1a1a;}
+        .nav-btn.active{background:var(--primary);color:#fff;font-weight:700;}
+        .nav-btn.active i{color:#fff;}
+        .nav-btn.active::before{display:none;}
+        .nav-btn.danger{color:var(--primary);}
+        .nav-btn.danger i{color:var(--primary);}
+        .nav-btn.danger:hover{background:var(--ps);color:var(--primary);}
+        .nav-sep{height:1px;background:#f0f0f0;margin:8px 12px;}
+        .nav-badge{margin-left:auto;background:var(--primary);color:#fff;font-size:10px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 5px;}
         .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:100vh;}
         .topbar{background:#fff;padding:14px 28px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:16px;}
         .topbar h1{font-size:20px;font-weight:800;color:#1a1a1a;margin:0;}
@@ -116,6 +118,7 @@
             #sidebarOverlay.active{opacity:1;pointer-events:all;}
             .content-area{padding:16px;}
             .chat-list{width:220px;}
+            .fi{font-size:16px!important;}
         }
         @media(max-width:600px){
             .stats-grid{grid-template-columns:1fr;}
@@ -123,7 +126,26 @@
             .chat-container{flex-direction:column;height:auto;}
             .chat-list{width:100%;height:200px;border-right:none;border-bottom:1px solid #f0f0f0;}
         }
+        @media(max-width:480px){
+            .content-area{padding:12px;}
+            .top-bar{padding:0 12px;height:52px;}
+            .top-bar h1{font-size:15px;}
+            .tab-btn{padding:8px 12px;font-size:12px;}
+            .panel-title{font-size:16px;}
+            .btn-p,.btn-s{font-size:12px;padding:8px 12px;}
+            .card-grid,.g2,.g3{grid-template-columns:1fr;}
+            .modal-box{padding:20px 16px;}
+            .modal-box h2{font-size:17px;}
+        }
     </style>
+    <!-- Immediate role guard — runs before anything renders -->
+    <script>
+        (function(){
+            var r = localStorage.getItem('afriStay_role');
+            if (r === 'owner') { window.location.replace('/Dashboards/Owner/'); }
+            else if (r && r !== 'admin') { window.location.replace('/'); }
+        })();
+    </script>
 </head>
 <body>
 
@@ -350,6 +372,10 @@
                     </select>
                 </div>
                 <div class="fg"><label id="priceLabel">Price per Night (RWF) *</label><input type="number" class="fi" id="listPrice" placeholder="e.g. 50000" min="0" required></div>
+            </div>
+            <div class="fg" id="vehiclePricingGroup" style="display:none;">
+                <label>Price Outside Kigali (RWF/day) — optional</label>
+                <input type="number" class="fi" id="listPriceOutside" placeholder="e.g. 75000" min="0">
             </div>
             <div class="fg location-box" style="position:relative;">
                 <label>Location</label>

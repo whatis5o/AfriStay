@@ -614,3 +614,48 @@
     }
     .ev-card { min-width: 0; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   iOS SAFARI: prevent auto-zoom when focusing inputs
+   (Safari zooms in if font-size < 16px on a focused input)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="tel"],
+    input[type="search"],
+    input[type="date"],
+    input[type="url"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TABLET PORTRAIT (≤ 640px) — single-column grids, tighter spacing
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+    /* Cards always single column on portrait tablets */
+    .listings-grid, .cards-grid {
+        grid-template-columns: 1fr !important;
+    }
+    /* Footer stack earlier */
+    .footer-grid {
+        grid-template-columns: 1fr 1fr !important;
+    }
+    /* Checkout summary body: slightly tighter */
+    .s-body { padding: 16px !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   VERY SMALL PHONES (≤ 360px) — last-resort overrides
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 360px) {
+    .footer-grid { grid-template-columns: 1fr !important; }
+    .nav-links li a { font-size: 17px; }
+    .meta-chip { font-size: 11px !important; padding: 3px 8px !important; }
+    .section-header h2, .section-title { font-size: 18px !important; }
+}

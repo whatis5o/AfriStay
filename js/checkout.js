@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update nav avatar
     const authBtn = document.getElementById('auth-btn');
     if (authBtn) {
-        authBtn.outerHTML = `<a href="/Profile" class="icon-link">
+        authBtn.outerHTML = `<a href="/Dashboards/Profile/" class="icon-link">
             <i class="fa-solid fa-circle-user" style="font-size:22px;color:#EB6753"></i></a>`;
     }
 
@@ -218,7 +218,7 @@ function showSuccessScreen(data) {
       </div>
 
       <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-        <a href="/Dashboard" style="background:#EB6753;color:#fff;padding:14px 26px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px">
+        <a href="/Dashboards/Profile/?tab=bookings" style="background:#EB6753;color:#fff;padding:14px 26px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px">
           <i class="fa-solid fa-gauge"></i> View Bookings
         </a>
         <a href="/" style="background:#f5f5f5;color:#333;padding:14px 26px;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px">

@@ -60,7 +60,7 @@ async function loadListingDetails(today) {
         _supabase
             .from('listings')
             .select(`
-                id, title, description, price, currency, address,
+                id, title, description, price, price_outside_kigali, currency, address,
                 availability_status, status, avg_rating, reviews_count,
                 category_slug, landmark_description,
                 province_id, district_id, sector_id, owner_id,
@@ -131,9 +131,17 @@ async function loadListingDetails(today) {
     const currency  = listing.currency || 'RWF';
     const price     = Number(listing.price).toLocaleString('en-RW');
     const priceUnit = listing.category_slug === 'vehicle' ? '/ day' : '/ night';
+    const isVehDual = listing.category_slug === 'vehicle' && listing.price_outside_kigali;
     const priceEl   = document.getElementById('listingPrice');
     if (priceEl) {
-        if (promoData && promoData.discount) {
+        if (isVehDual) {
+            const oStr = Number(listing.price_outside_kigali).toLocaleString('en-RW');
+            priceEl.innerHTML =
+                '<div style="font-size:13px;line-height:2.2;">' +
+                '🏙️ Kigali: <strong>' + price + ' <small>' + currency + '</small><span style="font-size:12px;color:#bbb;font-weight:400;"> /day</span></strong><br>' +
+                '🌍 Outside Kigali: <strong>' + oStr + ' <small>' + currency + '</small><span style="font-size:12px;color:#bbb;font-weight:400;"> /day</span></strong>' +
+                '</div>';
+        } else if (promoData && promoData.discount) {
             const discounted = Math.round(listing.price * (1 - promoData.discount / 100));
             const discStr    = Number(discounted).toLocaleString('en-RW');
             const endFmt     = new Date(promoData.end_date).toLocaleDateString('en-RW', { month: 'short', day: 'numeric' });
@@ -507,14 +515,36 @@ function initBookingForm() {
         if (!s || !e || !totalEl) return;
         const days = Math.round((new Date(e) - new Date(s)) / 86400000);
         if (days <= 0) { totalEl.textContent = ''; return; }
-        const price = CURRENT_LISTING?.price || 0, currency = CURRENT_LISTING?.currency || 'RWF';
         const isVeh = CURRENT_LISTING?.category_slug === 'vehicle';
         const unit = isVeh ? 'day' : 'night';
+        const selectedZone = document.querySelector('input[name="zone"]:checked')?.value || 'kigali';
+        const price = isVeh && selectedZone === 'outside_kigali' && CURRENT_LISTING?.price_outside_kigali
+            ? CURRENT_LISTING.price_outside_kigali
+            : (CURRENT_LISTING?.price || 0);
+        const currency = CURRENT_LISTING?.currency || 'RWF';
         totalEl.innerHTML = days + ' ' + unit + (days > 1 ? 's' : '') + ' × ' + Number(price).toLocaleString('en-RW') + ' ' + currency + ' = <span style="color:#EB6753;font-weight:700;">' + Number(days * price).toLocaleString('en-RW') + ' ' + currency + '</span>';
     }
     startDate?.addEventListener('change', () => { calcTotal(); if (endDate && startDate.value) endDate.min = startDate.value; });
     endDate?.addEventListener('change', calcTotal);
     document.getElementById('bookingBtn')?.addEventListener('click', goToCheckout);
+
+    // Zone selector for vehicles with dual pricing
+    if (CURRENT_LISTING?.category_slug === 'vehicle' && CURRENT_LISTING?.price_outside_kigali) {
+        const zoneEl = document.createElement('div');
+        zoneEl.id = 'zoneSelector';
+        zoneEl.style.cssText = 'margin:10px 0 4px;padding:12px 14px;background:#f9fafb;border-radius:10px;border:1px solid #eee;font-size:13px;';
+        zoneEl.innerHTML =
+            '<p style="font-weight:700;color:#555;margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;">Zone</p>' +
+            '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:7px;">' +
+            '<input type="radio" name="zone" value="kigali" checked> ' +
+            '🏙️ Within Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price).toLocaleString('en-RW') + ' RWF/day</span></label>' +
+            '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
+            '<input type="radio" name="zone" value="outside_kigali"> ' +
+            '🌍 Outside Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price_outside_kigali).toLocaleString('en-RW') + ' RWF/day</span></label>';
+        const totalEl2 = document.getElementById('bookingTotal');
+        if (totalEl2) totalEl2.before(zoneEl);
+        zoneEl.querySelectorAll('input[name="zone"]').forEach(r => r.addEventListener('change', calcTotal));
+    }
 }
 
 function goToCheckout() {
@@ -522,13 +552,18 @@ function goToCheckout() {
     const endDate = document.getElementById('bookingEndDate')?.value;
     const statusEl = document.getElementById('bookingStatus');
     const btn = document.getElementById('bookingBtn');
-    if (!startDate || !endDate) { if (statusEl) { statusEl.style.color = '#e74c3c'; statusEl.textContent = 'Please select check-in and check-out dates.'; } return; }
+    const isVeh = CURRENT_LISTING?.category_slug === 'vehicle';
+    if (!startDate || !endDate) { if (statusEl) { statusEl.style.color = '#e74c3c'; statusEl.textContent = isVeh ? 'Please select pick-up and return dates.' : 'Please select check-in and check-out dates.'; } return; }
     const days = Math.round((new Date(endDate) - new Date(startDate)) / 86400000);
-    if (days <= 0) { if (statusEl) { statusEl.style.color = '#e74c3c'; statusEl.textContent = 'Check-out must be after check-in.'; } return; }
-    const totalAmount = days * (CURRENT_LISTING?.price || 0);
+    if (days <= 0) { if (statusEl) { statusEl.style.color = '#e74c3c'; statusEl.textContent = isVeh ? 'Return must be after pick-up.' : 'Check-out must be after check-in.'; } return; }
+    const selectedZone = document.querySelector('input[name="zone"]:checked')?.value || 'kigali';
+    const selectedPrice = isVeh && selectedZone === 'outside_kigali' && CURRENT_LISTING?.price_outside_kigali
+        ? CURRENT_LISTING.price_outside_kigali
+        : (CURRENT_LISTING?.price || 0);
+    const totalAmount = days * selectedPrice;
     const currency = CURRENT_LISTING?.currency || 'RWF';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Redirecting...'; }
-    const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: CURRENT_LISTING?.price || 0, currency, total: totalAmount, category: CURRENT_LISTING?.category_slug || 'property' });
+    const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: selectedPrice, currency, total: totalAmount, category: CURRENT_LISTING?.category_slug || 'property', price_zone: selectedZone });
     window.location.href = '/Checkout/?' + params.toString();
 }
 

@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ── Auth guard ──
     const { data: { user } } = await _sb.auth.getUser();
     if (!user) {
-        window.location.href = '/Auth?next=/Profile';
+        window.location.href = '/Auth?next=/Dashboards/Profile/';
         return;
     }
     _user = user;
@@ -66,10 +66,21 @@ function updateSidebar() {
     const av = document.getElementById('sidebarAvatar');
     const nm = document.getElementById('sidebarName');
     const em = document.getElementById('sidebarEmail');
+    const ro = document.getElementById('sidebarRole');
 
     if (av) av.textContent = initials;
     if (nm) nm.textContent = _profile.full_name || 'No name set';
     if (em) em.textContent = _profile.email || _user.email;
+
+    const role = _profile.role || 'user';
+    if (ro) ro.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+
+    // Show back-to-dashboard link for admin/owner
+    const dashLink = document.getElementById('dashboardLink');
+    if (dashLink && (role === 'admin' || role === 'owner')) {
+        dashLink.href = role === 'admin' ? '/Dashboards/Admin/' : '/Dashboards/Owner/';
+        dashLink.style.display = 'flex';
+    }
 }
 
 /* ══════════════════════════════════════════════
@@ -84,16 +95,20 @@ const TAB_LOADERS = {
 
 let loadedTabs = new Set(['overview']);
 
+const TAB_TITLES = { overview: 'Overview', profile: 'Edit Profile', bookings: 'My Bookings', history: 'History', favorites: 'Favorites', settings: 'Security' };
+
 window.switchTab = function(name) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.nav-btn[data-tab]').forEach(b => b.classList.remove('active'));
 
     const panel = document.getElementById('tab-' + name);
     if (panel) panel.classList.add('active');
 
-    document.querySelectorAll('.nav-item').forEach(btn => {
-        if (btn.getAttribute('onclick') === `switchTab('${name}')`) btn.classList.add('active');
-    });
+    const activeBtn = document.querySelector(`.nav-btn[data-tab="${name}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    const titleEl = document.getElementById('panelTitle');
+    if (titleEl) titleEl.textContent = TAB_TITLES[name] || name;
 
     // Load data the first time tab is opened
     if (!loadedTabs.has(name) && TAB_LOADERS[name]) {
@@ -245,14 +260,14 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
             ? `<button class="cancel-booking-btn" onclick="event.stopPropagation();cancelBooking('${b.id}',this)"><i class="fa-solid fa-xmark"></i> Cancel</button>`
             : '';
 
-        const viewBtnHtml = `<a class="booking-view-btn" href="/Detail/?id=${b.listing_id}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i> View</a>`;
+        const viewBtnHtml = `<a class="booking-view-btn" href="/Listings/Detail/?id=${b.listing_id}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i> View</a>`;
 
         // Use div (not <a>) so button clicks don't accidentally navigate
         const card = document.createElement('div');
         card.className = 'booking-card';
         card.id = 'booking-card-' + b.id;
         card.style.cursor = 'pointer';
-        card.addEventListener('click', () => window.location.href = `/Detail/?id=${b.listing_id}`);
+        card.addEventListener('click', () => window.location.href = `/Listings/Detail/?id=${b.listing_id}`);
         card.innerHTML = `
             ${imgHtml}
             <div class="booking-info">

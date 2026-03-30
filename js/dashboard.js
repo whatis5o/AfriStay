@@ -504,6 +504,7 @@ function updateFormLabels() {
     const locationBox = document.querySelector('.location-box');
     const locationInputs = locationBox ? locationBox.querySelectorAll('select, input') : [];
 
+    const vehiclePricingGroup = document.getElementById('vehiclePricingGroup');
     if (cat === 'vehicle') {
         if (locationBox) {
             locationBox.style.opacity = '0.4';
@@ -519,7 +520,8 @@ function updateFormLabels() {
                 locationBox.appendChild(lbl);
             }
         }
-        if (priceLabel) priceLabel.innerText = 'Price per Day (RWF)';
+        if (priceLabel) priceLabel.innerText = 'Price in Kigali (RWF/day) *';
+        if (vehiclePricingGroup) vehiclePricingGroup.style.display = '';
         locationInputs.forEach(el => el.removeAttribute('required'));
     } else {
         if (locationBox) {
@@ -528,7 +530,8 @@ function updateFormLabels() {
             const lbl = locationBox.querySelector('.vehicle-note');
             if (lbl) lbl.remove();
         }
-        if (priceLabel) priceLabel.innerText = 'Price per Night (RWF)';
+        if (priceLabel) priceLabel.innerText = 'Price per Night (RWF) *';
+        if (vehiclePricingGroup) vehiclePricingGroup.style.display = 'none';
     }
 }
 window.updateFormLabels = updateFormLabels;
@@ -957,7 +960,7 @@ async function loadListingsGrid(filters = {}) {
         card.className = 'listing-card';
         card.style.cssText = 'background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);display:flex;flex-direction:column;';
         card.innerHTML = `
-            <a href="/Detail/?id=${l.id}" style="text-decoration:none;color:inherit;display:block;">
+            <a href="/Listings/Detail/?id=${l.id}" style="text-decoration:none;color:inherit;display:block;">
                 <div style="height:180px;background:#f0f0f0;overflow:hidden;position:relative;">
                     ${thumb
                         ? `<img src="${thumb}" alt="${escapeHtml(l.title)}" style="width:100%;height:100%;object-fit:cover;">`
@@ -967,17 +970,22 @@ async function loadListingsGrid(filters = {}) {
                 </div>
             </a>
             <div style="padding:14px;flex:1;display:flex;flex-direction:column;gap:6px;">
-                <a href="/Detail/?id=${l.id}" style="text-decoration:none;"><h4 style="margin:0;font-size:15px;font-weight:600;color:#222;">${escapeHtml(l.title)}</h4></a>
+                <a href="/Listings/Detail/?id=${l.id}" style="text-decoration:none;"><h4 style="margin:0;font-size:15px;font-weight:600;color:#222;">${escapeHtml(l.title)}</h4></a>
                 <p style="margin:0;color:#888;font-size:13px;">${l.category_slug || ''} • ${ownerMap[l.owner_id] || 'Unknown'}</p>
                 <p style="margin:0;color:var(--primary,#EB6753);font-weight:700;font-size:14px;">${Number(l.price).toLocaleString()} ${l.currency || 'RWF'}</p>
-                <div style="display:flex;gap:8px;margin-top:auto;padding-top:10px;flex-wrap:wrap;">
+                <div style="display:flex;gap:6px;margin-top:auto;padding-top:10px;flex-wrap:wrap;">
                     ${CURRENT_ROLE === 'admin' ? `
-                        <button class="btn-small" onclick="approveListing('${l.id}')" style="flex:1"><i class="fa-solid fa-check"></i> Approve</button>
-                        <button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1">${l.availability_status === 'available' ? '<i class="fa-solid fa-eye-slash"></i> Disable' : '<i class="fa-solid fa-eye"></i> Enable'}</button>
-                        <button class="btn-small btn-danger" onclick="deleteListing('${l.id}')" style="flex:1"><i class="fa-solid fa-trash"></i> Delete</button>
+                        ${l.availability_status === 'available'
+                            ? `<button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1;background:#fff3e0;color:#e67e22;border:1px solid #f5cba7;font-weight:600;gap:5px;"><i class="fa-solid fa-eye-slash"></i> Disable</button>`
+                            : `<button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1;background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:5px;"><i class="fa-solid fa-eye"></i> Enable</button>`
+                        }
+                        <button class="btn-small" onclick="deleteListing('${l.id}')" style="flex:1;background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:5px;"><i class="fa-solid fa-trash"></i> Delete</button>
                     ` : ''}
                     ${CURRENT_ROLE === 'owner' && l.availability_status !== 'booked' ? `
-                        <button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1">${l.availability_status === 'available' ? 'Set Unavailable' : 'Set Available'}</button>
+                        ${l.availability_status === 'available'
+                            ? `<button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1;background:#fff3e0;color:#e67e22;border:1px solid #f5cba7;font-weight:600;gap:5px;"><i class="fa-solid fa-eye-slash"></i> Set Unavailable</button>`
+                            : `<button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1;background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:5px;"><i class="fa-solid fa-eye"></i> Set Available</button>`
+                        }
                     ` : ''}
                 </div>
             </div>
@@ -1292,11 +1300,18 @@ async function loadListingsTable() {
                 <td>${row.price} ${row.currency}</td>
                 <td>${row.availability_status || 'available'}</td>
                 <td>${ownersMap[row.owner_id] || shortId(row.owner_id)}</td>
-                <td>
-                    ${CURRENT_ROLE === 'admin' ? `<button class="btn-small" onclick="approveListing('${row.id}')">Approve</button>` : ''}
-                    ${CURRENT_ROLE === 'owner' && row.availability_status !== 'booked' ? `<button class="btn-small" onclick="toggleListingAvailability('${row.id}', '${row.availability_status}')">
-                        ${row.availability_status === 'available' ? 'Set Unavailable' : 'Set Available'}
-                    </button>` : ''}
+                <td style="white-space:nowrap;">
+                    ${CURRENT_ROLE === 'admin' ? `
+                        ${row.availability_status === 'available'
+                            ? `<button class="btn-small" onclick="toggleListingAvailability('${row.id}','${row.availability_status}')" style="background:#fff3e0;color:#e67e22;border:1px solid #f5cba7;font-weight:600;margin-right:4px;gap:4px;"><i class="fa-solid fa-eye-slash"></i> Disable</button>`
+                            : `<button class="btn-small" onclick="toggleListingAvailability('${row.id}','${row.availability_status}')" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;margin-right:4px;gap:4px;"><i class="fa-solid fa-eye"></i> Enable</button>`}
+                        <button class="btn-small" onclick="deleteListing('${row.id}')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-trash"></i> Delete</button>
+                    ` : ''}
+                    ${CURRENT_ROLE === 'owner' && row.availability_status !== 'booked' ? `
+                        ${row.availability_status === 'available'
+                            ? `<button class="btn-small" onclick="toggleListingAvailability('${row.id}','${row.availability_status}')" style="background:#fff3e0;color:#e67e22;border:1px solid #f5cba7;font-weight:600;gap:4px;"><i class="fa-solid fa-eye-slash"></i> Set Unavailable</button>`
+                            : `<button class="btn-small" onclick="toggleListingAvailability('${row.id}','${row.availability_status}')" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:4px;"><i class="fa-solid fa-eye"></i> Set Available</button>`}
+                    ` : ''}
                 </td>
             `;
             tbody.appendChild(tr);
@@ -1325,7 +1340,7 @@ async function loadBookingsTable() {
     tbody.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
 
     try {
-        let q = _supabase.from('bookings').select('id, listing_id, start_date, end_date, total_amount, status, payment_status, payment_method, user_id, guest_name, guest_email, created_at');
+        let q = _supabase.from('bookings').select('id, listing_id, start_date, end_date, total_amount, status, payment_status, payment_method, user_id, guest_name, guest_email, created_at, category_slug, price_zone');
 
         if (CURRENT_ROLE === 'owner') {
             console.log("  Filtering for owner's listing bookings");
@@ -1363,9 +1378,11 @@ async function loadBookingsTable() {
             
             const { data: listing } = await _supabase
                 .from('listings')
-                .select('title, owner_id')
+                .select('title, owner_id, category_slug')
                 .eq('id', r.listing_id)
                 .maybeSingle();
+            const rowCat = r.category_slug || listing?.category_slug || 'real_estate';
+            const isVehRow = rowCat === 'vehicle';
             
             const row = document.createElement('tr');
             // Determine which action buttons to show
@@ -1397,21 +1414,25 @@ async function loadBookingsTable() {
                 <td style="font-family:monospace;font-size:12px;">${shortId(r.id)}</td>
                 <td>${escapeHtml(listing?.title || '—')}</td>
                 <td style="font-size:12px;">${r.guest_name || shortId(r.user_id)}<br><span style="color:#aaa;font-size:11px;">${r.guest_email || ''}</span></td>
-                <td style="font-size:12px;">${r.start_date}<br><span style="color:#aaa">→ ${r.end_date}</span></td>
+                <td style="font-size:12px;">
+                    <span style="font-size:10px;color:#aaa;">${isVehRow ? 'Pick-up' : 'Check-in'}:</span> ${r.start_date}<br>
+                    <span style="font-size:10px;color:#aaa;">${isVehRow ? 'Return' : 'Check-out'}:</span> ${r.end_date}
+                    ${isVehRow && r.price_zone ? `<br><span style="font-size:10px;color:#aaa;">${r.price_zone === 'outside_kigali' ? '🌍 Outside Kigali' : '🏙️ Kigali'}</span>` : ''}
+                </td>
                 <td style="font-weight:700;color:#EB6753;">${fmtAmt} RWF<br><span style="font-size:11px;color:#aaa;font-weight:400;">${pmLabel}</span></td>
                 <td>
                     <span class="status-badge status-${r.status}" style="white-space:nowrap;">${statusLabel}</span>
-                    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
+                    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;">
                         ${canApprove ? `
-                            <button class="btn-small" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;" onclick="approveBooking('${r.id}')">
+                            <button class="btn-small" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:5px;" onclick="approveBooking('${r.id}')">
                                 <i class="fa-solid fa-check"></i> Approve
                             </button>` : ''}
                         ${canReject ? `
-                            <button class="btn-small" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;" onclick="rejectBooking('${r.id}')">
+                            <button class="btn-small" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:5px;" onclick="rejectBooking('${r.id}')">
                                 <i class="fa-solid fa-xmark"></i> Reject
                             </button>` : ''}
                         ${isPaid ? `
-                            <button class="btn-small" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;" onclick="downloadReceipt('${r.id}')">
+                            <button class="btn-small" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;font-weight:600;gap:5px;" onclick="downloadReceipt('${r.id}')">
                                 <i class="fa-solid fa-receipt"></i> Receipt
                             </button>` : ''}
                         ${hasFailed ? `
@@ -1486,12 +1507,9 @@ async function loadUsersTable(searchTerm = '') {
         `;
 
         const isBanned = u.banned === true;
-        const actionSelectHtml = `
-            <select class="status-select" onchange="toggleUserBan('${u.id}', this.value)">
-            <option value="active" ${!isBanned ? 'selected' : ''}>active</option>
-            <option value="banned" ${isBanned ? 'selected' : ''}>ban</option>
-            </select>
-        `;
+        const actionSelectHtml = isBanned
+            ? `<button class="btn-small" onclick="toggleUserBan('${u.id}','active')" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:4px;"><i class="fa-solid fa-unlock"></i> Unban</button>`
+            : `<button class="btn-small" onclick="toggleUserBan('${u.id}','banned')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-ban"></i> Ban</button>`;
 
         tr.innerHTML = `
             <td>${i + 1}.</td>
@@ -1502,7 +1520,7 @@ async function loadUsersTable(searchTerm = '') {
             <td>-</td>
             <td>${actionSelectHtml}</td>
             <td>
-            <button class="btn-small btn-danger" onclick="deleteUser('${u.id}')">Delete</button>
+            <button class="btn-small" onclick="deleteUser('${u.id}')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-trash"></i> Delete</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -1810,6 +1828,9 @@ async function handleCreateListing() {
     const price    = Number($('#listPrice')?.value || 0);
     const desc     = $('#listDesc')?.value?.trim();
     const category = $('#listCategory')?.value;
+    const priceOutsideKigali = category === 'vehicle'
+        ? (Number($('#listPriceOutside')?.value) || null)
+        : null;
     // Admin picks an owner; owner always gets themselves
     const ownerId  = CURRENT_ROLE === 'admin'
         ? ($('#selectedOwnerId')?.value || (CURRENT_PROFILE && CURRENT_PROFILE.id))
@@ -1867,6 +1888,7 @@ async function handleCreateListing() {
                 sector_id: sectorId,
                 address,
                 category_slug: category,
+                price_outside_kigali: priceOutsideKigali,
                 status: 'pending',
                 availability_status: 'available'
             }])
@@ -2066,7 +2088,7 @@ async function loadEventsCards() {
                 '<p style="font-size:13px;color:#888;margin:0 0 8px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">' + escapeHtml(ev.description||'') + '</p>' +
                 (locLine ? '<p style="font-size:12px;color:#EB6753;margin:0 0 12px;"><i class="fa-solid fa-location-dot"></i> ' + escapeHtml(locLine) + '</p>' : '') +
                 '<div style="display:flex;gap:8px;">' +
-                '<a href="/Event/?id=' + ev.id + '" style="flex:1;text-align:center;background:#f5f5f5;color:#333;padding:8px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;"><i class="fa-solid fa-eye"></i> View</a>' +
+                '<a href="/Events/Event/?id=' + ev.id + '" style="flex:1;text-align:center;background:#f5f5f5;color:#333;padding:8px;border-radius:8px;font-size:12px;font-weight:600;text-decoration:none;"><i class="fa-solid fa-eye"></i> View</a>' +
                 (CURRENT_ROLE === 'admin'
                     ? '<button onclick="deleteEvent(\'' + ev.id + '\')" style="flex:1;background:#fde8e8;color:#e74c3c;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-trash"></i> Delete</button>'
                     : '') +
@@ -2703,7 +2725,7 @@ async function loadNewBookings() {
         }
         const { data, error } = await _supabase
             .from('bookings')
-            .select('id,listing_id,user_id,start_date,end_date,total_amount,created_at')
+            .select('id,listing_id,user_id,start_date,end_date,total_amount,created_at,category_slug')
             .in('listing_id', listingIds)
             .in('status', ['awaiting_approval', 'approved', 'pending'])
             .order('created_at', { ascending: false });
@@ -2724,13 +2746,15 @@ async function loadNewBookings() {
         container.innerHTML = '';
         data.forEach(b => {
             const user = usrM[b.user_id] || {};
-            const nights = b.start_date && b.end_date ? Math.max(1, Math.round((new Date(b.end_date)-new Date(b.start_date))/86400000)) : '?';
+            const dur = b.start_date && b.end_date ? Math.max(1, Math.round((new Date(b.end_date)-new Date(b.start_date))/86400000)) : '?';
+            const isVehNb = b.category_slug === 'vehicle';
+            const nights = dur + (dur === '?' ? '' : (isVehNb ? (dur === 1 ? ' day' : ' days') : (dur === 1 ? ' night' : ' nights')));
             const row = document.createElement('div');
             row.style.cssText = 'background:#fff;border-radius:14px;padding:18px 20px;margin-bottom:12px;display:flex;align-items:center;gap:16px;box-shadow:0 3px 12px rgba(0,0,0,0.07);flex-wrap:wrap;border-left:4px solid #f39c12;';
             row.innerHTML =
                 '<div style="flex:1;min-width:160px;">' +
                 '<p style="font-size:14px;font-weight:700;color:#1a1a1a;margin:0 0 3px;">' + escapeHtml(lstM[b.listing_id]||'Unknown listing') + '</p>' +
-                '<p style="font-size:12px;color:#888;margin:0;"><i class="fa-regular fa-calendar" style="color:#EB6753;"></i> ' + (b.start_date||'') + ' → ' + (b.end_date||'') + ' (' + nights + ' nights)</p></div>' +
+                '<p style="font-size:12px;color:#888;margin:0;"><i class="fa-regular fa-calendar" style="color:#EB6753;"></i> ' + (b.start_date||'') + ' → ' + (b.end_date||'') + ' (' + nights + ')</p></div>' +
                 '<div style="min-width:160px;">' +
                 '<p style="font-size:13px;font-weight:600;color:#555;margin:0;">' + escapeHtml(user.full_name||'Guest') + '</p>' +
                 '<p style="font-size:12px;color:#aaa;margin:2px 0 0;">' + escapeHtml(user.email||'') + '</p></div>' +
@@ -2851,12 +2875,12 @@ async function loadDashPendingListings() {
             row.style.cssText = 'display:flex;gap:14px;padding:14px 0;border-bottom:1px solid #f5f5f5;align-items:center;flex-wrap:wrap;transition:opacity 0.3s;';
             row.innerHTML =
                 // Thumbnail → links to preview
-                '<a href="/Detail/?id=' + l.id + '&preview=1" target="_blank" style="flex-shrink:0;width:76px;height:62px;border-radius:12px;overflow:hidden;background:#f0f0f0;display:flex;align-items:center;justify-content:center;text-decoration:none;">' +
+                '<a href="/Listings/Detail/?id=' + l.id + '&preview=1" target="_blank" style="flex-shrink:0;width:76px;height:62px;border-radius:12px;overflow:hidden;background:#f0f0f0;display:flex;align-items:center;justify-content:center;text-decoration:none;">' +
                 (img ? '<img src="' + escapeHtml(img) + '" style="width:100%;height:100%;object-fit:cover;">' : '<i class="fa-solid fa-image" style="color:#ddd;font-size:20px;"></i>') +
                 '</a>' +
                 // Title + location
                 '<div style="flex:1;min-width:140px;">' +
-                '<a href="/Detail/?id=' + l.id + '&preview=1" target="_blank" style="text-decoration:none;">' +
+                '<a href="/Listings/Detail/?id=' + l.id + '&preview=1" target="_blank" style="text-decoration:none;">' +
                 '<p style="margin:0 0 2px;font-size:14px;font-weight:700;color:#1a1a1a;line-height:1.3;">' + escapeHtml(l.title) + '</p></a>' +
                 '<p style="margin:0;font-size:12px;color:#aaa;"><i class="fa-solid fa-location-dot" style="color:#EB6753;font-size:10px;"></i> ' + escapeHtml(loc) + '</p>' +
                 (CURRENT_ROLE === 'admin' && owner.full_name

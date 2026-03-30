@@ -87,9 +87,9 @@
     document.getElementById('mainCard').innerHTML = `
       <div style="text-align:center;padding:44px 28px;">
         <div style="width:80px;height:80px;background:#dcfce7;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:18px;">✅</div>
-        <h2 style="font-size:24px;font-weight:800;color:#1a1a1a;margin-bottom:10px;">Stay Confirmed!</h2>
+        <h2 style="font-size:24px;font-weight:800;color:#1a1a1a;margin-bottom:10px;">${isVeh ? 'Rental Confirmed!' : 'Stay Confirmed!'}</h2>
         <p style="color:#666;font-size:14px;line-height:1.7;margin-bottom:24px;">
-          Your booking is locked in. A confirmation email has been sent to
+          Your ${isVeh ? 'rental' : 'booking'} is locked in. A confirmation email has been sent to
           <strong>${esc(guestEmail || 'your email')}</strong>.
         </p>
         <a href="/" style="display:inline-block;padding:14px 32px;background:#EB6753;color:#fff;border-radius:14px;text-decoration:none;font-weight:800;font-size:15px;">
@@ -137,17 +137,18 @@
   const nights = booking.nights || Math.ceil(
     (new Date(booking.end_date + 'T00:00:00') - new Date(booking.start_date + 'T00:00:00')) / 86400000
   ) || 1;
+  const isVeh = booking.category_slug === 'vehicle';
 
   bodyEl.innerHTML = `
     <p style="color:#555;font-size:15px;margin-bottom:20px;">
       Hi <strong>${esc(booking.guest_name || 'Guest')}</strong>,
-      your host approved your request. Click below to confirm your stay.
+      your host approved your request. Click below to confirm your ${isVeh ? 'rental' : 'stay'}.
     </p>
     <div style="background:#f9fafb;border-radius:14px;padding:18px;margin-bottom:18px;border:1px solid #eee;">
-      <div class="summary-row"><span class="label">Property</span><span class="value">${esc(booking.listing_title)}</span></div>
-      <div class="summary-row"><span class="label">Check-in</span><span class="value">${fmt(booking.start_date)}</span></div>
-      <div class="summary-row"><span class="label">Check-out</span><span class="value">${fmt(booking.end_date)}</span></div>
-      <div class="summary-row"><span class="label">Duration</span><span class="value">${nights} night${nights !== 1 ? 's' : ''}</span></div>
+      <div class="summary-row"><span class="label">${isVeh ? 'Vehicle' : 'Property'}</span><span class="value">${esc(booking.listing_title)}</span></div>
+      <div class="summary-row"><span class="label">${isVeh ? 'Pick-up' : 'Check-in'}</span><span class="value">${fmt(booking.start_date)}</span></div>
+      <div class="summary-row"><span class="label">${isVeh ? 'Return' : 'Check-out'}</span><span class="value">${fmt(booking.end_date)}</span></div>
+      <div class="summary-row"><span class="label">Duration</span><span class="value">${nights} ${isVeh ? (nights !== 1 ? 'days' : 'day') : (nights !== 1 ? 'nights' : 'night')}</span></div>
       ${booking.booking_reference ? `<div class="summary-row"><span class="label">Booking Ref</span><span class="value" style="font-family:monospace;color:#EB6753;font-size:13px;">${esc(booking.booking_reference)}</span></div>` : ''}
       <div class="summary-row total"><span class="label">Total</span><span class="value">${fmtMoney(booking.total_amount, booking.currency)}</span></div>
     </div>
@@ -156,7 +157,7 @@
       Payment will be collected directly by the host.
     </div>
     <button class="btn-confirm" id="confirmBtn" onclick="doConfirm()">
-      <i class="fa-solid fa-circle-check"></i> Confirm My Stay
+      <i class="fa-solid fa-circle-check"></i> ${isVeh ? 'Confirm My Rental' : 'Confirm My Stay'}
     </button>`;
 
   /* ── Confirm action ── */

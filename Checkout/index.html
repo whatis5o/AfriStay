@@ -101,8 +101,38 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 .hs-body{padding-bottom:14px}
 .hs-title{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:2px}
 .hs-sub{font-size:12px;color:var(--muted);line-height:1.5}
-@media(max-width:780px){.page{grid-template-columns:1fr;padding-top:78px}.pay-card{position:static}#nav{top:0;left:0;transform:none;width:100%;border-radius:0;padding:0 16px}}
-@media(max-width:380px){.nets{grid-template-columns:1fr}}
+@media(max-width:780px){
+  .page{grid-template-columns:1fr;padding-top:78px;gap:18px}
+  .pay-card{position:static}
+  #nav{top:0;left:0;transform:none;width:100%;border-radius:0;padding:0 16px}
+  /* iOS Safari: prevent auto-zoom on input focus */
+  .fg input,.fg select,.ph-wrap input{font-size:16px!important}
+}
+@media(max-width:480px){
+  .page{padding:70px 14px 36px;gap:14px}
+  #nav{height:52px;padding:0 14px}
+  .nav-logo img{height:28px}
+  .nav-back{padding:6px 12px;font-size:12px}
+  .s-img,.s-img-ph{height:160px}
+  .s-body{padding:14px 14px 16px}
+  .s-name{font-size:15px}
+  .s-lbl{font-size:11px}
+  .s-val{font-size:12px}
+  .s-total-val{font-size:22px;letter-spacing:-.5px}
+  .pay-card{padding:16px 14px}
+  .pesa-title{font-size:14px}
+  .pesa-sub{font-size:11px}
+  .fg input,.fg select,.ph-wrap input{font-size:16px!important}
+  .pay-btn{padding:13px;font-size:14px}
+  .lock-row{font-size:10px}
+  .box{padding:11px 12px;font-size:11px}
+  .a-steps li{font-size:12px}
+}
+@media(max-width:380px){
+  .nets{grid-template-columns:1fr}
+  .methods{grid-template-columns:1fr}
+  .m-tab{padding:10px 4px 8px}
+}
 
 .stock-ticker:hover ul {
   animation-play-state: paused;
@@ -226,10 +256,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
     <div id="sImgWrap" class="s-img-ph"><i class="fa-solid fa-image" style="font-size:38px;color:#ccc"></i></div>
     <div class="s-body">
       <div id="sTitle" class="s-name skel" style="height:22px;width:70%;margin-bottom:16px">&nbsp;</div>
-      <div class="s-row"><span class="s-lbl"><i class="fa-solid fa-calendar-check"></i>Check-in</span><span class="s-val" id="sIn">—</span></div>
-      <div class="s-row"><span class="s-lbl"><i class="fa-solid fa-calendar-xmark"></i>Check-out</span><span class="s-val" id="sOut">—</span></div>
+      <div class="s-row"><span class="s-lbl"><i class="fa-solid fa-calendar-check"></i><span id="sInLbl">Check-in</span></span><span class="s-val" id="sIn">—</span></div>
+      <div class="s-row"><span class="s-lbl"><i class="fa-solid fa-calendar-xmark"></i><span id="sOutLbl">Check-out</span></span><span class="s-val" id="sOut">—</span></div>
       <div class="s-row"><span class="s-lbl"><i class="fa-solid fa-moon"></i>Duration</span><span class="s-val" id="sNights">—</span></div>
-      <div class="s-row"><span class="s-lbl"><i class="fa-solid fa-tag"></i>Per night</span><span class="s-val" id="sRate">—</span></div>
+      <div class="s-row"><span class="s-lbl"><i class="fa-solid fa-tag"></i><span id="sRateLbl">Per night</span></span><span class="s-val" id="sRate">—</span></div>
       <hr class="s-divider">
       <div class="s-total-row">
         <span style="font-size:14px;font-weight:700">Total</span>
@@ -397,7 +427,9 @@ const E_DATE  = P.get('end_date')   || '';
 const NIGHTS  = parseInt(P.get('nights') || '1', 10);
 const PRICE   = Number(P.get('price')    || 0);
 const CUR     = P.get('currency')        || 'RWF';
-const TOTAL   = Number(P.get('total')    || 0);
+const TOTAL      = Number(P.get('total')    || 0);
+const CATEGORY   = P.get('category') || 'real_estate';
+const PRICE_ZONE = P.get('price_zone') || 'kigali';
 
 let METHOD  = 'card';
 let NETWORK = 'mtn';
@@ -439,10 +471,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const tEl = $('sTitle');
   if (tEl) { tEl.textContent = TITLE; tEl.classList.remove('skel'); }
+  const isVeh = CATEGORY === 'vehicle';
+  tx('sInLbl',  isVeh ? 'Pick-up'  : 'Check-in');
+  tx('sOutLbl', isVeh ? 'Return'   : 'Check-out');
+  tx('sRateLbl', isVeh ? 'Per day' : 'Per night');
   tx('sIn',     fmtDate(S_DATE));
   tx('sOut',    fmtDate(E_DATE));
-  tx('sNights', NIGHTS + (NIGHTS === 1 ? ' night' : ' nights'));
-  tx('sRate',   fmt(PRICE) + ' ' + CUR + '/night');
+  tx('sNights', NIGHTS + (NIGHTS === 1 ? (isVeh ? ' day' : ' night') : (isVeh ? ' days' : ' nights')));
+  tx('sRate',   fmt(PRICE) + ' ' + CUR + (isVeh ? '/day' : '/night'));
   tx('sTotal',  fmt(TOTAL));
   tx('sCur',    ' ' + CUR);
   refreshBtn();
@@ -501,7 +537,7 @@ function refreshBtn() {
     btn.classList.add('g');
     tx('payLabel', 'Reserve — Pay Cash on Arrival');
     $('payIcon').className = 'fa-solid fa-handshake';
-    tx('lockLabel', 'No payment taken now · Free to cancel 24h before check-in');
+    tx('lockLabel', 'No payment taken now · Free to cancel 24h before ' + (CATEGORY === 'vehicle' ? 'pick-up' : 'check-in'));
   }
 }
 
@@ -657,6 +693,9 @@ async function pay() {
         guest_phone:       form.phone,
         user_id:           user.id,
         payment_reference: iremboRef,
+        category_slug:     CATEGORY,
+        price_zone:        PRICE_ZONE,
+        price_per_unit:    PRICE,
       }),
     });
 
@@ -715,7 +754,7 @@ function showConfirmation(bookingId, isArrival = false, iremboRef = null) {
         ${iremboRef ? '<br>Irembo Pay ref: <strong style="color:#161616;font-size:13px">' + esc(iremboRef) + '</strong>' : ''}
       </div>
       <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-        <a href="/Profile?tab=bookings" style="display:inline-flex;align-items:center;gap:7px;padding:12px 22px;
+        <a href="/Dashboards/Profile/?tab=bookings" style="display:inline-flex;align-items:center;gap:7px;padding:12px 22px;
           background:#EB6753;color:#fff;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none">
           <i class="fa-solid fa-calendar-check"></i> My Bookings
         </a>

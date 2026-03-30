@@ -121,8 +121,9 @@
         localStorage.setItem('afriStay_firstName', firstName);
 
         showSuccess('Welcome back, ' + firstName + '! Redirecting...');
+        const dest = role === 'admin' ? '/Dashboards/Admin/' : role === 'owner' ? '/Dashboards/Owner/' : '/';
         setTimeout(() => {
-            window.location.href = '/';
+            window.location.href = dest;
         }, 1000);
     }
 

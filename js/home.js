@@ -138,7 +138,7 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
 
         const card = document.createElement('a');
         card.className = 'property-card';
-        card.href = '/Detail/?id=' + l.id;
+        card.href = '/Listings/Detail/?id=' + l.id;
 
         card.innerHTML =
             '<div class="card-image">' +
@@ -162,7 +162,7 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
                           '<span class="promo-badge">' + l.promo_discount + '% OFF</span>' +
                           '</div>'
                         : '<div class="card-price">' + price + ' <span>' + (l.currency || 'RWF') + unit + '</span></div>') +
-                    '<button class="details-btn" onclick="event.preventDefault();event.stopPropagation();window.location.href=\'/Detail/?id=' + l.id + '\'">View Details</button>' +
+                    '<button class="details-btn" onclick="event.preventDefault();event.stopPropagation();window.location.href=\'/Listings/Detail/?id=' + l.id + '\'">View Details</button>' +
                 '</div>' +
             '</div>';
 

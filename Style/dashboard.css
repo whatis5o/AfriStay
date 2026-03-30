@@ -274,8 +274,10 @@ body { background: var(--light-bg); color: var(--text-dark); display:flex; min-h
 
 
 /* buttons */
-.btn-small { padding:8px 12px; font-size:14px; border-radius:8px; cursor:pointer; border:none; display:inline-flex; align-items:center; justify-content:center; }
-.btn-danger { background:#ffebee; color:#e74c3c; }
+.btn-small { padding:7px 12px; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer; border:1px solid transparent; display:inline-flex; align-items:center; justify-content:center; gap:5px; font-family:'Inter',sans-serif; transition:filter .15s,transform .1s; }
+.btn-small:hover { filter:brightness(0.95); transform:translateY(-1px); }
+.btn-small:active { transform:translateY(0); filter:brightness(0.9); }
+.btn-danger { background:#fde8e8; color:#e74c3c; border-color:#f5c6c6; }
 .btn-primary { background:var(--primary); color:white; border:none; padding:10px 14px; border-radius:50px; cursor:pointer; }
 
 /* Modal: fixed to viewport and centered regardless of scrolling */

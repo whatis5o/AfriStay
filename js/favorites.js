@@ -29,10 +29,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Update nav
     const authBtn = document.getElementById('auth-btn');
     if (authBtn) {
+        const _role = localStorage.getItem('afriStay_role');
+        const _dashHref = _role === 'admin' ? '/Dashboards/Admin/' : _role === 'owner' ? '/Dashboards/Owner/' : '/Dashboards/Profile/';
         authBtn.outerHTML =
             '<div style="display:flex;align-items:center;gap:12px;">' +
-                '<a href="/Dashboard/" class="signin-btn" style="background:#EB6753;">Dashboard</a>' +
-                '<a href="/Profile" class="icon-link" title="Profile">' +
+                '<a href="' + _dashHref + '" class="signin-btn" style="background:#EB6753;">Dashboard</a>' +
+                '<a href="/Dashboards/Profile/" class="icon-link" title="Profile">' +
                     '<i class="fa-solid fa-circle-user" style="font-size:22px;color:#EB6753;"></i>' +
                 '</a>' +
             '</div>';
@@ -128,7 +130,7 @@ async function loadFavorites() {
         const loc     = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || l.address || 'Rwanda';
         const owner   = ownerMap[l.owner_id] || null;
         const savedAt = new Date(fav.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const detailUrl = '/Detail/?id=' + l.id;
+        const detailUrl = '/Listings/Detail/?id=' + l.id;
 
         const card = document.createElement('div');
         card.className = 'fav-card';

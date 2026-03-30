@@ -647,10 +647,11 @@
                 const authBtn = document.getElementById('auth-btn');
                 if (authBtn) {
                     const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).single();
+                    const _dashHref = profile?.role === 'admin' ? '/Dashboards/Admin/' : profile?.role === 'owner' ? '/Dashboards/Owner/' : '/Dashboards/Profile/';
                     authBtn.outerHTML =
                         '<div style="display:flex;align-items:center;gap:10px;">' +
-                            '<a href="/Dashboard/" class="signin-btn" style="background:#EB6753;">Dashboard</a>' +
-                            '<a href="/Profile" class="icon-link" title="Profile">' +
+                            '<a href="' + _dashHref + '" class="signin-btn" style="background:#EB6753;">Dashboard</a>' +
+                            '<a href="/Dashboards/Profile/" class="icon-link" title="Profile">' +
                                 '<i class="fa-solid fa-circle-user" style="font-size:22px;color:#EB6753;"></i>' +
                             '</a>' +
                         '</div>';
@@ -760,7 +761,7 @@
                 const price  = Number(l.price).toLocaleString();
     
                 const card = document.createElement('a');
-                card.href = '/Detail/?id=' + l.id;
+                card.href = '/Listings/Detail/?id=' + l.id;
                 card.className = 'property-card';
                 card.innerHTML =
                     '<div class="card-image">' +

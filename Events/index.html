@@ -653,7 +653,7 @@ async function loadEvents() {
 
         const a = document.createElement('a');
         a.className = 'ev-card';
-        a.href = '/Event/?id=' + ev.id;
+        a.href = '/Events/Event/?id=' + ev.id;
         a.innerHTML =
             '<div class="ev-img">' +
             (img ? `<img src="${esc(img)}" alt="${esc(ev.title)}" loading="lazy">` : '<div class="ev-no-img"><i class="fa-regular fa-calendar" style="font-size:40px;color:#ddd;"></i></div>') +
@@ -663,7 +663,7 @@ async function loadEvents() {
             `<h3 class="ev-title">${esc(ev.title)}</h3>` +
             (locStr ? `<p class="ev-loc"><i class="fa-solid fa-location-dot"></i>${esc(locStr)}</p>` : '') +
             (ev.description ? `<p class="ev-desc">${esc(ev.description)}</p>` : '') +
-            `<div class="ev-footer"><a class="ev-btn" href="/Event/?id=${ev.id}">View Event</a></div>` +
+            `<div class="ev-footer"><a class="ev-btn" href="/Events/Event/?id=${ev.id}">View Event</a></div>` +
             '</div>';
         grid.appendChild(a);
     });

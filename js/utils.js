@@ -33,4 +33,20 @@ const UTILS = {
     }
 };
 
+// Returns label set based on category slug
+function getListingLabels(categorySlug) {
+    const isVeh = categorySlug === 'vehicle';
+    return {
+        unit:       isVeh ? 'day'     : 'night',
+        unitPlural: isVeh ? 'days'    : 'nights',
+        action:     isVeh ? 'rental'  : 'stay',
+        startLabel: isVeh ? 'Pick-up' : 'Check-in',
+        endLabel:   isVeh ? 'Return'  : 'Check-out',
+        thing:      isVeh ? 'vehicle' : 'property',
+        verb:       isVeh ? 'rented'  : 'stayed at',
+        icon:       isVeh ? '🚗'      : '🏠',
+    };
+}
+window.getListingLabels = getListingLabels;
+
 console.log("✅ [UTILS] Utilities loaded");
