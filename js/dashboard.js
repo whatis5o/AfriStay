@@ -335,6 +335,7 @@ function bindUIInteractions() {
         openCreateListingBtn.addEventListener('click', () => {
             console.log("➕ [LISTING] Opening create listing modal");
             openModal('listingModal');
+            loadAmenityCheckboxes();
         });
     }
 
@@ -495,8 +496,133 @@ function bindUIInteractions() {
     // load filter selects initially (call after auth)
     loadFilterProvinces();
 
+    // ── Sidebar toggle (desktop collapse + mobile slide) ──
+    initSidebarToggle();
+
+    // ── Per-tab search bindings ──
+    function _bindSearch(inputId, fn) {
+        const el = document.getElementById(inputId);
+        if (!el) return;
+        let t;
+        el.addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => fn(e.target.value.trim()), 350); });
+        el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); fn(el.value.trim()); } });
+    }
+    _bindSearch('bookingSearchInput', q => loadBookingsTable(0, q));
+    _bindSearch('reqSearchInput',     q => loadListingRequests(q));
+    _bindSearch('finSearchInput',     q => loadFinancialData(0, q));
 
     console.log("✅ [ADMIN] All UI interactions bound");
+}
+
+/* ===========================
+   SIDEBAR TOGGLE
+   =========================== */
+function initSidebarToggle() {
+    const btn     = document.getElementById('mobileMenuBtn');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (!btn || !sidebar) return;
+
+    btn.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+            document.body.classList.toggle('sb-open');
+        } else {
+            document.body.classList.toggle('sb-collapsed');
+            // Update icon
+            const ic = btn.querySelector('i');
+            if (ic) {
+                ic.className = document.body.classList.contains('sb-collapsed')
+                    ? 'fa-solid fa-bars-staggered'
+                    : 'fa-solid fa-bars';
+            }
+        }
+    });
+
+    if (overlay) {
+        overlay.addEventListener('click', () => {
+            document.body.classList.remove('sb-open');
+        });
+    }
+
+    // Close mobile sidebar when a nav item is clicked
+    sidebar.querySelectorAll('.nav-btn[data-tab]').forEach(b => {
+        b.addEventListener('click', () => {
+            if (window.innerWidth <= 768) document.body.classList.remove('sb-open');
+        });
+    });
+}
+
+/* ===========================
+   ADMIN GLOBAL SEARCH
+   =========================== */
+function initAdminSearch() {
+    const input = document.getElementById('adminSearchInput');
+    if (!input) return;
+
+    const pills = document.querySelectorAll('.asf-pill');
+    let activeFilter = 'all';
+
+    pills.forEach(pill => {
+        pill.addEventListener('click', () => {
+            pills.forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            activeFilter = pill.dataset.asf;
+            const q = input.value.trim();
+            if (q) runAdminSearch(q, activeFilter);
+        });
+    });
+
+    let t;
+    input.addEventListener('input', e => {
+        clearTimeout(t);
+        t = setTimeout(() => runAdminSearch(e.target.value.trim(), activeFilter), 350);
+    });
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); runAdminSearch(input.value.trim(), activeFilter); }
+    });
+}
+
+function runAdminSearch(query, filter) {
+    if (!query) return;
+
+    // navigate to a panel and optionally call a load function
+    const navTo = (panelId, tabName) => {
+        document.querySelectorAll('.content-panel').forEach(p => p.classList.remove('active'));
+        const panel = document.getElementById(panelId);
+        if (panel) panel.classList.add('active');
+        document.querySelectorAll('.nav-btn[data-tab]').forEach(b => b.classList.remove('active'));
+        const btn = document.querySelector(`.nav-btn[data-tab="${tabName}"]`);
+        if (btn) btn.classList.add('active');
+        const pt = document.getElementById('panelTitle');
+        if (pt) pt.textContent = (typeof PTITLES !== 'undefined' ? PTITLES[panelId] : null) || tabName;
+    };
+
+    switch (filter) {
+        case 'listings':
+            navTo('listingsPanel', 'listings');
+            const si = document.getElementById('listingSearchInput');
+            if (si) { si.value = query; filterListings(); }
+            break;
+        case 'bookings':
+            navTo('bookingsPanel', 'bookings');
+            loadBookingsTable(0, query);
+            break;
+        case 'events':
+            navTo('eventsPanel', 'events');
+            loadEventsCards(0, query);
+            break;
+        case 'promotions':
+            navTo('promotionsPanel', 'promotions');
+            loadPromotionsCards(0, query);
+            break;
+        case 'payouts':
+            toast('Financial / Payouts tab coming soon.', 'info');
+            break;
+        default: // all — search listings as primary
+            navTo('listingsPanel', 'listings');
+            const si2 = document.getElementById('listingSearchInput');
+            if (si2) { si2.value = query; filterListings(); }
+    }
 }
 function updateFormLabels() {
     const cat = document.getElementById('listCategory')?.value;
@@ -535,6 +661,37 @@ function updateFormLabels() {
     }
 }
 window.updateFormLabels = updateFormLabels;
+
+// ── Stepper helper ──
+function stepField(id, delta) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cur = parseInt(el.value) || 0;
+    el.value = Math.max(0, cur + delta);
+}
+window.stepField = stepField;
+
+// ── Load amenity checkboxes from amenity_definitions ──
+async function loadAmenityCheckboxes() {
+    const container = document.getElementById('amenityCheckboxes');
+    if (!container) return;
+    const { data, error } = await _supabase
+        .from('amenity_definitions')
+        .select('slug, label, icon, category')
+        .order('category').order('label');
+    if (error || !data || !data.length) {
+        container.innerHTML = '<span style="color:#aaa;font-size:13px;">No amenities configured.</span>';
+        return;
+    }
+    container.innerHTML = data.map(a =>
+        `<label class="amenity-chip" onclick="this.classList.toggle('checked');this.querySelector('input').checked=!this.querySelector('input').checked">
+            <input type="checkbox" name="amenity" value="${a.slug}" style="display:none">
+            <i class="${a.icon || 'fa-solid fa-check'}"></i>
+            <span>${a.label}</span>
+        </label>`
+    ).join('');
+}
+window.loadAmenityCheckboxes = loadAmenityCheckboxes;
 
 // populate filterProvince (for toolbar)
 async function loadFilterProvinces() {
@@ -912,19 +1069,20 @@ async function filterListings() {
     });
 }
 // call this from filterListings() or loadListingsTable() when you want grid
-async function loadListingsGrid(filters = {}) {
+async function loadListingsGrid(filters = {}, page = 0) {
     const container = document.getElementById('listingsGrid');
     if (!container) return;
+    const PAGE_SIZE = 15;
+    const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
     container.style.display = 'grid';
     container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(280px, 1fr))';
     container.innerHTML = '<div style="padding:20px;grid-column:1/-1">Loading...</div>';
 
-    // Build query — no thumbnail_url column
     let q = _supabase
         .from('listings')
-        .select('id,title,price,currency,availability_status,status,owner_id,province_id,district_id,sector_id,category_slug,created_at')
+        .select('id,title,price,currency,availability_status,status,owner_id,province_id,district_id,sector_id,category_slug,created_at', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(200);
+        .range(start, end);
 
     if (filters.qtext) q = q.ilike('title', `%${filters.qtext}%`);
     if (filters.province) q = q.eq('province_id', filters.province);
@@ -932,10 +1090,9 @@ async function loadListingsGrid(filters = {}) {
     if (filters.sector) q = q.eq('sector_id', filters.sector);
     if (filters.category) q = q.eq('category_slug', filters.category);
 
-    // owner filter for role
     if (CURRENT_ROLE === 'owner') q = q.eq('owner_id', CURRENT_PROFILE.id);
 
-    const { data, error } = await q;
+    const { data, error, count } = await q;
     if (error) { container.innerHTML = `<div style="padding:20px;color:red">Error: ${error.message}</div>`; return; }
     if (!data || data.length === 0) { container.innerHTML = '<div style="padding:20px">No listings match.</div>'; return; }
 
@@ -991,6 +1148,15 @@ async function loadListingsGrid(filters = {}) {
             </div>
         `;
         container.appendChild(card);
+    }
+
+    // Pagination
+    if (window.renderPagination) {
+        const totalCount = count || data.length;
+        const pageCount = Math.ceil(totalCount / PAGE_SIZE);
+        renderPagination('dashListingsPagination', page, pageCount, totalCount, PAGE_SIZE, (newPage) => {
+            loadListingsGrid(filters, newPage);
+        });
     }
 }
 
@@ -1238,109 +1404,26 @@ async function loadSectors() {
 /* ===========================
    LISTINGS TABLE
    =========================== */
-async function loadListingsTable() {
-    console.log("📋 [LISTINGS] Loading listings table...");
-    
-    const tbody = $('#listingsTableBody');
-    if (!tbody) {
-        console.warn("⚠️ [LISTINGS] Table body not found");
-        return;
-    }
-    
-    tbody.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
-
-    try {
-        let q = _supabase.from('listings').select('id, title, price, currency, status, availability_status, owner_id, created_at');
-
-        if (CURRENT_ROLE === 'owner') {
-            console.log("  Filtering for owner listings only");
-            q = q.eq('owner_id', CURRENT_PROFILE.id);
-        } else if (CURRENT_ROLE === 'user') {
-            console.log("  User has no permission to manage listings");
-            tbody.innerHTML = '<tr><td colspan="7">You do not have permission to manage listings.</td></tr>';
-            return;
-        }
-
-        const { data, error } = await q.order('created_at', { ascending: false }).limit(200);
-        
-        if (error) {
-            console.error("❌ [LISTINGS] Error loading listings:", error);
-            tbody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
-            return;
-        }
-
-        if (!data || data.length === 0) {
-            console.log("  No listings found");
-            tbody.innerHTML = '<tr><td colspan="7">No listings found.</td></tr>';
-            return;
-        }
-
-        console.log(`  Found ${data.length} listings`);
-
-        // Fetch owner names
-        const ownerIds = Array.from(new Set(data.map(d => d.owner_id).filter(Boolean)));
-        const ownersMap = {};
-        
-        if (ownerIds.length) {
-            const { data: owners } = await _supabase
-                .from('profiles')
-                .select('id, full_name')
-                .in('id', ownerIds);
-            
-            (owners || []).forEach(o => ownersMap[o.id] = o.full_name);
-        }
-
-        tbody.innerHTML = '';
-        data.forEach((row, idx) => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${idx + 1}.</td>
-                <td><img src="/assets/img/placeholder.png" alt="" style="width:60px;height:40px;object-fit:cover;border-radius:6px;"></td>
-                <td>${escapeHtml(row.title)}</td>
-                <td>${row.price} ${row.currency}</td>
-                <td>${row.availability_status || 'available'}</td>
-                <td>${ownersMap[row.owner_id] || shortId(row.owner_id)}</td>
-                <td style="white-space:nowrap;">
-                    ${CURRENT_ROLE === 'admin' ? `
-                        ${row.availability_status === 'available'
-                            ? `<button class="btn-small" onclick="toggleListingAvailability('${row.id}','${row.availability_status}')" style="background:#fff3e0;color:#e67e22;border:1px solid #f5cba7;font-weight:600;margin-right:4px;gap:4px;"><i class="fa-solid fa-eye-slash"></i> Disable</button>`
-                            : `<button class="btn-small" onclick="toggleListingAvailability('${row.id}','${row.availability_status}')" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;margin-right:4px;gap:4px;"><i class="fa-solid fa-eye"></i> Enable</button>`}
-                        <button class="btn-small" onclick="deleteListing('${row.id}')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-trash"></i> Delete</button>
-                    ` : ''}
-                    ${CURRENT_ROLE === 'owner' && row.availability_status !== 'booked' ? `
-                        ${row.availability_status === 'available'
-                            ? `<button class="btn-small" onclick="toggleListingAvailability('${row.id}','${row.availability_status}')" style="background:#fff3e0;color:#e67e22;border:1px solid #f5cba7;font-weight:600;gap:4px;"><i class="fa-solid fa-eye-slash"></i> Set Unavailable</button>`
-                            : `<button class="btn-small" onclick="toggleListingAvailability('${row.id}','${row.availability_status}')" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:4px;"><i class="fa-solid fa-eye"></i> Set Available</button>`}
-                    ` : ''}
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        console.log("✅ [LISTINGS] Table populated");
-
-    } catch (err) {
-        console.error("❌ [LISTINGS] Exception:", err);
-        tbody.innerHTML = '<tr><td colspan="7">Failed to load listings</td></tr>';
-    }
+async function loadListingsTable(page = 0) {
+    await loadListingsGrid({}, page);
 }
 
 /* ===========================
    BOOKINGS TABLE
    =========================== */
-async function loadBookingsTable() {
+async function loadBookingsTable(page = 0, searchTerm = '') {
     console.log("📅 [BOOKINGS] Loading bookings table...");
-    
+
     const tbody = $('#allBookingsBody');
     if (!tbody) {
         console.warn("⚠️ [BOOKINGS] Table body not found");
         return;
     }
-    
+
     tbody.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
 
     try {
-        let q = _supabase.from('bookings').select('id, listing_id, start_date, end_date, total_amount, status, payment_status, payment_method, user_id, guest_name, guest_email, created_at, category_slug, price_zone');
+        let q = _supabase.from('bookings').select('id, listing_id, start_date, end_date, total_amount, status, payment_status, payment_method, user_id, guest_name, guest_email, created_at, category_slug, price_zone', { count: 'exact' });
 
         if (CURRENT_ROLE === 'owner') {
             console.log("  Filtering for owner's listing bookings");
@@ -1355,7 +1438,19 @@ async function loadBookingsTable() {
             q = q.eq('user_id', CURRENT_PROFILE.id);
         }
 
-        const { data, error } = await q.order('created_at', { ascending: false }).limit(200);
+        if (searchTerm) {
+            // Also search by listing title: fetch matching listing IDs first
+            const { data: matchedLst } = await _supabase
+                .from('listings').select('id').ilike('title', `%${searchTerm}%`);
+            const lstIds = (matchedLst || []).map(l => l.id);
+            let orParts = [`guest_name.ilike.%${searchTerm}%`, `guest_email.ilike.%${searchTerm}%`];
+            if (lstIds.length) orParts.push(`listing_id.in.(${lstIds.join(',')})`);
+            q = q.or(orParts.join(','));
+        }
+
+        const PAGE_SIZE = 15;
+        const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
+        const { data, error, count } = await q.order('created_at', { ascending: false }).range(start, end);
         
         if (error) {
             console.error("❌ [BOOKINGS] Error loading bookings:", error);
@@ -1447,6 +1542,11 @@ async function loadBookingsTable() {
 
         console.log("✅ [BOOKINGS] Table populated");
 
+        if (window.renderPagination) {
+            const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
+            renderPagination('dashBookingsPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadBookingsTable(p, searchTerm));
+        }
+
     } catch (err) {
         console.error("❌ [BOOKINGS] Exception:", err);
         tbody.innerHTML = '<tr><td colspan="7">Failed to load bookings</td></tr>';
@@ -1456,8 +1556,7 @@ async function loadBookingsTable() {
 /* ===========================
    USERS TABLE
    =========================== */
-// REPLACE existing loadUsersTable() with this
-async function loadUsersTable(searchTerm = '') {
+async function loadUsersTable(searchTerm = '', page = 0) {
     console.log("👥 [USERS] Loading users table (search:", searchTerm || 'none', ")");
 
     const tbody = $('#usersTableBody');
@@ -1471,60 +1570,67 @@ async function loadUsersTable(searchTerm = '') {
     tbody.innerHTML = '<tr><td colspan="8">Loading...</td></tr>';
 
     try {
+        const PAGE_SIZE = 15;
+        const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
+
         let q = _supabase
         .from('profiles')
-        .select('id, full_name, email, phone, role, banned')
+        .select('id, full_name, email, phone, role, banned', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(500);
+        .range(start, end);
 
         if (searchTerm && searchTerm.length > 0) {
-        // search both name and email
-        q = q.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+            q = q.or(`full_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
         }
 
-        const { data, error } = await q;
+        const { data, error, count } = await q;
         if (error) {
-        console.error('[USERS] error', error);
-        tbody.innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
-        return;
+            console.error('[USERS] error', error);
+            tbody.innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
+            return;
         }
         if (!data || !data.length) {
-        tbody.innerHTML = '<tr><td colspan="8">No users found.</td></tr>';
-        return;
+            tbody.innerHTML = '<tr><td colspan="8">No users found.</td></tr>';
+            return;
         }
 
         tbody.innerHTML = '';
         data.forEach((u, i) => {
-        const tr = document.createElement('tr');
+            const tr = document.createElement('tr');
+            const rowNum = page * PAGE_SIZE + i + 1;
 
-        // role dropdown and action dropdown html
-        const roleSelectHtml = `
-            <select class="status-select" onchange="updateUserRole('${u.id}', this.value)">
-            <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
-            <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>owner</option>
-            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
-            </select>
-        `;
+            const roleSelectHtml = `
+                <select class="status-select" onchange="updateUserRole('${u.id}', this.value)">
+                <option value="user" ${u.role === 'user' ? 'selected' : ''}>user</option>
+                <option value="owner" ${u.role === 'owner' ? 'selected' : ''}>owner</option>
+                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
+                </select>
+            `;
 
-        const isBanned = u.banned === true;
-        const actionSelectHtml = isBanned
-            ? `<button class="btn-small" onclick="toggleUserBan('${u.id}','active')" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:4px;"><i class="fa-solid fa-unlock"></i> Unban</button>`
-            : `<button class="btn-small" onclick="toggleUserBan('${u.id}','banned')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-ban"></i> Ban</button>`;
+            const isBanned = u.banned === true;
+            const actionSelectHtml = isBanned
+                ? `<button class="btn-small" onclick="toggleUserBan('${u.id}','active')" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:4px;"><i class="fa-solid fa-unlock"></i> Unban</button>`
+                : `<button class="btn-small" onclick="toggleUserBan('${u.id}','banned')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-ban"></i> Ban</button>`;
 
-        tr.innerHTML = `
-            <td>${i + 1}.</td>
-            <td>${escapeHtml(u.full_name || '')}</td>
-            <td>${escapeHtml(u.email || '')}</td>
-            <td>${escapeHtml(u.phone || '')}</td>
-            <td>${roleSelectHtml}</td>
-            <td>-</td>
-            <td>${actionSelectHtml}</td>
-            <td>
-            <button class="btn-small" onclick="deleteUser('${u.id}')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-trash"></i> Delete</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
+            tr.innerHTML = `
+                <td>${rowNum}.</td>
+                <td>${escapeHtml(u.full_name || '')}</td>
+                <td>${escapeHtml(u.email || '')}</td>
+                <td>${escapeHtml(u.phone || '')}</td>
+                <td>${roleSelectHtml}</td>
+                <td>-</td>
+                <td>${actionSelectHtml}</td>
+                <td>
+                <button class="btn-small" onclick="deleteUser('${u.id}')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-trash"></i> Delete</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
         });
+
+        if (window.renderPagination) {
+            const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
+            renderPagination('dashUsersPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadUsersTable(searchTerm, p));
+        }
 
         console.log("✅ [USERS] Table populated");
     } catch (err) {
@@ -1841,6 +1947,17 @@ async function handleCreateListing() {
     const sectorId   = $('#selSector')?.value || null;
     const address    = $('#listAddress')?.value?.trim() || '';
 
+    // Specs
+    const rooms     = parseInt($('#listRooms')?.value)     || null;
+    const bathrooms = parseInt($('#listBathrooms')?.value) || null;
+    const beds      = parseInt($('#listBeds')?.value)      || null;
+    const maxGuests = parseInt($('#listMaxGuests')?.value)  || null;
+    const floorArea = parseInt($('#listFloorArea')?.value)  || null;
+
+    // Amenities
+    const checkedAmenities = Array.from(document.querySelectorAll('#amenityCheckboxes input[type="checkbox"]:checked')).map(cb => cb.value);
+    const amenitiesData = checkedAmenities.length ? checkedAmenities : null;
+
     const statusEl  = document.getElementById('listingCreateStatus');
     const createBtn = document.getElementById('createBtn');
 
@@ -1889,6 +2006,12 @@ async function handleCreateListing() {
                 address,
                 category_slug: category,
                 price_outside_kigali: priceOutsideKigali,
+                rooms,
+                bathrooms,
+                beds,
+                max_guests: maxGuests,
+                floor_area: floorArea,
+                amenities_data: amenitiesData,
                 status: 'pending',
                 availability_status: 'available'
             }])
@@ -2027,7 +2150,7 @@ function escapeHtml(s) {
    ═══════════════════════════════════════════════ */
 const EVENTS_STORAGE = 'event-images';
 
-async function loadEventsCards() {
+async function loadEventsCards(page = 0, searchTerm = '') {
     console.log('📅 [EVENTS] Loading events cards...');
     let container = document.getElementById('eventsCardsContainer');
     if (!container) {
@@ -2038,23 +2161,41 @@ async function loadEventsCards() {
         const wrap = document.createElement('div');
         wrap.className = 'events-inner';
         wrap.innerHTML =
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">' +
             '<h3 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0;">Events</h3>' +
+            '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+            '<div style="display:flex;align-items:center;gap:8px;background:#f5f6fa;border:1.5px solid #ebebeb;border-radius:10px;padding:7px 12px;min-width:200px;" id="eventsSearchWrap">' +
+            '<i class="fa-solid fa-magnifying-glass" style="color:#bbb;font-size:13px;flex-shrink:0;"></i>' +
+            '<input id="eventsSearchInput" type="text" placeholder="Search events..." style="border:none;background:none;outline:none;font-size:13px;font-family:Inter,sans-serif;width:100%;color:#1a1a1a;">' +
+            '</div>' +
             (CURRENT_ROLE === 'admin'
                 ? '<button onclick="openCreateEventModal()" style="background:#EB6753;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;"><i class=\"fa-solid fa-plus\"></i> Add Event</button>'
                 : '') +
-            '</div>' +
-            '<div id="eventsCardsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;"></div>';
+            '</div></div>' +
+            '<div id="eventsCardsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;"></div>' +
+            '<div id="dashEventsPagination" style="margin-top:16px;"></div>';
         panel.prepend(wrap);
+        // wire search input
+        const evSI = document.getElementById('eventsSearchInput');
+        if (evSI) {
+            let evT; evSI.addEventListener('input', e => { clearTimeout(evT); evT = setTimeout(() => loadEventsCards(0, e.target.value.trim()), 350); });
+            evSI.addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); loadEventsCards(0, evSI.value.trim()); } });
+            const wrap2 = document.getElementById('eventsSearchWrap');
+            if (wrap2) { evSI.addEventListener('focus', ()=>wrap2.style.borderColor='var(--primary)'); evSI.addEventListener('blur', ()=>wrap2.style.borderColor='#ebebeb'); }
+        }
         container = document.getElementById('eventsCardsContainer');
     }
     container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#aaa;">Loading events...</div>';
+    const PAGE_SIZE = 15;
+    const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
     try {
-        const { data, error } = await _supabase
+        let evQ = _supabase
             .from('events')
-            .select('id,title,description,images,province_id,district_id,sector_id,location_label,landmark,start_date,end_date,created_at')
+            .select('id,title,description,images,province_id,district_id,sector_id,location_label,landmark,start_date,end_date,created_at', { count: 'exact' })
             .order('start_date', { ascending: true })
-            .limit(100);
+            .range(start, end);
+        if (searchTerm) evQ = evQ.ilike('title', `%${searchTerm}%`);
+        const { data, error, count } = await evQ;
         if (error) throw error;
         if (!data || !data.length) {
             container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:#ccc;">' +
@@ -2095,6 +2236,12 @@ async function loadEventsCards() {
                 '</div></div>';
             container.appendChild(card);
         });
+
+        if (window.renderPagination) {
+            const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
+            renderPagination('dashEventsPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadEventsCards(p, searchTerm));
+        }
+
         console.log('✅ [EVENTS] Cards rendered:', data.length);
     } catch (err) {
         console.error('❌ [EVENTS]', err);
@@ -2257,7 +2404,8 @@ window.deleteEvent = deleteEvent;
 /* ═══════════════════════════════════════════════════
    PROMOTIONS — card display (no promo code, listing required)
    ═══════════════════════════════════════════════════ */
-async function loadPromotionsCards() {
+async function loadPromotionsCards(page = 0, searchTerm = '') {
+    if (CURRENT_ROLE !== 'admin') return; // owner has its own promotions view (loadOwnerPromotions)
     console.log('🏷️ [PROMOS] Loading promotion cards...');
     let container = document.getElementById('promosCardsContainer');
     if (!container) {
@@ -2269,21 +2417,41 @@ async function loadPromotionsCards() {
         wrap.className = 'promos-inner';
         wrap.style.cssText = 'padding:20px;';
         wrap.innerHTML =
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;">' +
             '<h3 style="font-size:18px;font-weight:700;color:#1a1a1a;margin:0;">Active Promotions</h3>' +
+            '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+            '<div style="display:flex;align-items:center;gap:8px;background:#f5f6fa;border:1.5px solid #ebebeb;border-radius:10px;padding:7px 12px;min-width:200px;" id="promosSearchWrap">' +
+            '<i class="fa-solid fa-magnifying-glass" style="color:#bbb;font-size:13px;flex-shrink:0;"></i>' +
+            '<input id="promosSearchInput" type="text" placeholder="Search promotions..." style="border:none;background:none;outline:none;font-size:13px;font-family:Inter,sans-serif;width:100%;color:#1a1a1a;">' +
+            '</div>' +
             '<button onclick="openCreatePromoModal()" style="background:#EB6753;color:#fff;border:none;padding:10px 20px;border-radius:10px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;">' +
-            '<i class="fa-solid fa-plus"></i> Add Promotion</button></div>' +
-            '<div id="promosCardsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;"></div>';
+            '<i class="fa-solid fa-plus"></i> Add Promotion</button></div></div>' +
+            '<div id="promosCardsContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;"></div>' +
+            '<div id="dashPromosPagination" style="margin-top:16px;"></div>';
         panel.prepend(wrap);
+        // wire search input
+        const prSI = document.getElementById('promosSearchInput');
+        if (prSI) {
+            let prT; prSI.addEventListener('input', e => { clearTimeout(prT); prT = setTimeout(() => loadPromotionsCards(0, e.target.value.trim()), 350); });
+            prSI.addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); loadPromotionsCards(0, prSI.value.trim()); } });
+            const wrap2 = document.getElementById('promosSearchWrap');
+            if (wrap2) { prSI.addEventListener('focus', ()=>wrap2.style.borderColor='var(--primary)'); prSI.addEventListener('blur', ()=>wrap2.style.borderColor='#ebebeb'); }
+        }
         container = document.getElementById('promosCardsContainer');
     }
     container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#aaa;">Loading...</div>';
 
+    const PAGE_SIZE = 15;
+    const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
+
     try {
-        const { data, error } = await _supabase
+        let promoQ = _supabase
             .from('promotions')
-            .select('id,title,description,listing_id,discount,start_date,end_date,banner_url,created_at')
-            .order('created_at', { ascending: false });
+            .select('id,title,description,listing_id,discount,start_date,end_date,banner_url,created_at', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(start, end);
+        if (searchTerm) promoQ = promoQ.ilike('title', `%${searchTerm}%`);
+        const { data, error, count } = await promoQ;
         if (error) throw error;
 
         const lids = [...new Set((data || []).map(p => p.listing_id).filter(Boolean))];
@@ -2324,6 +2492,12 @@ async function loadPromotionsCards() {
                 '<p style="font-size:11px;color:#bbb;margin:4px 0 0;"><i class="fa-solid fa-pencil"></i> Click to edit</p></div>';
             container.appendChild(card);
         });
+
+        if (window.renderPagination) {
+            const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
+            renderPagination('dashPromosPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadPromotionsCards(p, searchTerm));
+        }
+
         console.log('✅ [PROMOS] Cards rendered:', data.length);
     } catch (err) {
         console.error('❌ [PROMOS]', err);
@@ -2604,7 +2778,7 @@ function injectListingRequestsTab() {
     }
 }
 
-async function loadListingRequests() {
+async function loadListingRequests(searchTerm = '') {
     console.log('📋 [REQUESTS] Loading pending listing requests...');
     let container = document.getElementById('listingRequestsContainer');
     if (!container) {
@@ -2615,11 +2789,13 @@ async function loadListingRequests() {
     container.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;">Loading requests...</div>';
 
     try {
-        const { data, error } = await _supabase
+        let rq = _supabase
             .from('listings')
             .select('id,title,price,currency,category_slug,province_id,district_id,owner_id,created_at,status')
             .in('status', ['pending'])
             .order('created_at', { ascending: false });
+        if (searchTerm) rq = rq.ilike('title', `%${searchTerm}%`);
+        const { data, error } = await rq;
         if (error) throw error;
 
         // Batch owner names
@@ -2657,7 +2833,7 @@ async function loadListingRequests() {
                 '<p style="font-size:13px;color:#555;margin:0;font-weight:600;">' + escapeHtml(owner.full_name||'Unknown') + '</p>' +
                 '<p style="font-size:12px;color:#aaa;margin:2px 0 0;">' + escapeHtml(owner.email||'') + '</p></div>' +
                 '<div style="display:flex;gap:8px;flex-shrink:0;">' +
-                '<button onclick="approveListingRequest(\'' + l.id + '\',this)" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:9px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;">' +
+                '<button onclick="openApprovalFeeDialog(\'' + l.id + '\',\'' + Number(l.price||0) + '\')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:9px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;">' +
                 '<i class="fa-solid fa-check"></i> Approve</button>' +
                 '<button onclick="rejectListingRequest(\'' + l.id + '\',this)" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:9px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;">' +
                 '<i class="fa-solid fa-xmark"></i> Reject</button></div>';
@@ -2671,23 +2847,187 @@ async function loadListingRequests() {
 }
 window.loadListingRequests = loadListingRequests;
 
-async function approveListingRequest(listingId, btn) {
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Approving...'; }
+function openApprovalFeeDialog(listingId, ownerPrice) {
+    // Remove any existing dialog
+    document.getElementById('approvalFeeDialog')?.remove();
+    const price = Number(ownerPrice) || 0;
+    const suggestedFee = Math.round(price * 0.05 / 1000) * 1000; // 5% rounded to nearest 1000
+    const dlg = document.createElement('div');
+    dlg.id = 'approvalFeeDialog';
+    dlg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    dlg.innerHTML =
+        '<div style="background:#fff;border-radius:20px;padding:32px;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.15);">' +
+        '<h3 style="font-size:18px;font-weight:800;color:#1a1a1a;margin:0 0 8px;">Set AfriStay Fee</h3>' +
+        '<p style="font-size:13px;color:#888;margin:0 0 20px;">Set the flat fee (RWF) added on top of the owner\'s price. Guest sees: owner price + this fee.</p>' +
+        '<label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:6px;">Owner Price: <span style="color:#EB6753;">' + price.toLocaleString('en-RW') + ' RWF</span></label>' +
+        '<div style="margin-bottom:16px;">' +
+        '<label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:6px;">AfriStay Fee (RWF) *</label>' +
+        '<input type="number" id="approvalFeeInput" value="' + suggestedFee + '" min="0" style="width:100%;padding:12px 14px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:15px;font-weight:700;font-family:Inter,sans-serif;box-sizing:border-box;" placeholder="e.g. 5000">' +
+        '<p style="font-size:12px;color:#aaa;margin:6px 0 0;">Guest will see: <strong id="approvalTotalPreview">' + (price + suggestedFee).toLocaleString('en-RW') + '</strong> RWF</p>' +
+        '</div>' +
+        '<div style="display:flex;gap:10px;">' +
+        '<button onclick="document.getElementById(\'approvalFeeDialog\').remove()" style="flex:1;padding:12px;border:1.5px solid #e0e0e0;border-radius:10px;background:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Cancel</button>' +
+        '<button onclick="confirmApproveWithFee(\'' + listingId + '\',' + price + ')" style="flex:1;padding:12px;background:#27ae60;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-check"></i> Approve</button>' +
+        '</div></div>';
+    // Live preview of total
+    dlg.querySelector('#approvalFeeInput').addEventListener('input', function() {
+        const fee = parseInt(this.value) || 0;
+        const total = document.getElementById('approvalTotalPreview');
+        if (total) total.textContent = (price + fee).toLocaleString('en-RW');
+    });
+    document.body.appendChild(dlg);
+}
+window.openApprovalFeeDialog = openApprovalFeeDialog;
+
+async function confirmApproveWithFee(listingId, ownerPrice) {
+    const feeInput = document.getElementById('approvalFeeInput');
+    const fee = parseInt(feeInput?.value) || 0;
+    document.getElementById('approvalFeeDialog')?.remove();
     try {
-        const { error } = await _supabase.from('listings').update({ status: 'approved' }).eq('id', listingId);
+        const priceDisplay = ownerPrice + fee;
+        const { error } = await _supabase.from('listings').update({
+            status: 'approved',
+            price_afristay_fee: fee,
+            price_display: priceDisplay,
+        }).eq('id', listingId);
         if (error) throw error;
-        toast('Listing approved — it is now live!', 'success');
+        toast('Listing approved — fee set to ' + fee.toLocaleString('en-RW') + ' RWF!', 'success');
         bustListingCache();
-        // Remove just this row from DOM instead of reloading entire list
-        const row = btn ? btn.closest('[data-req-id]') : document.querySelector('[data-req-id="' + listingId + '"]');
+        const row = document.querySelector('[data-req-id="' + listingId + '"]');
         if (row) { row.style.opacity = '0'; row.style.transition = 'opacity 0.3s'; setTimeout(() => row.remove(), 320); }
         loadDashPendingListings();
     } catch (err) {
         toast('Failed: ' + err.message, 'error');
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Approve'; }
     }
 }
+window.confirmApproveWithFee = confirmApproveWithFee;
+
+async function approveListingRequest(listingId, btn) {
+    // Legacy — now goes through openApprovalFeeDialog
+    openApprovalFeeDialog(listingId, 0);
+}
 window.approveListingRequest = approveListingRequest;
+
+async function loadOwnerApplications() {
+    const container = document.getElementById('ownerApplicationsContainer');
+    if (!container) return;
+    container.innerHTML = '<div style="padding:20px;color:#aaa;font-size:13px;">Loading…</div>';
+    try {
+        const { data, error } = await _supabase
+            .from('owner_applications')
+            .select('id, user_id, motivation, phone, property_type, status, created_at, profiles ( full_name, email )')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        if (!data || !data.length) {
+            container.innerHTML = '<div style="padding:30px;text-align:center;color:#aaa;font-size:14px;">No owner applications yet.</div>';
+            return;
+        }
+        container.innerHTML = '';
+        data.forEach(app => {
+            const profile = app.profiles || {};
+            const statusColors = { pending: '#fff8e1', approved: '#e8f8f0', rejected: '#fdecea' };
+            const statusTextColors = { pending: '#7c5c00', approved: '#1b7a3e', rejected: '#c0392b' };
+            const row = document.createElement('div');
+            row.style.cssText = 'background:#fff;border-radius:14px;padding:18px 20px;margin-bottom:12px;border:1px solid #f0f0f0;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;';
+            row.innerHTML =
+                '<div style="flex:1;min-width:200px;">' +
+                '<p style="font-weight:700;color:#1a1a1a;margin:0 0 3px;font-size:15px;">' + escapeHtml(profile.full_name || 'Unknown') + '</p>' +
+                '<p style="color:#aaa;font-size:12px;margin:0 0 8px;">' + escapeHtml(profile.email || '') + ' · ' + escapeHtml(app.phone || '') + '</p>' +
+                '<p style="color:#555;font-size:13px;margin:0;line-height:1.6;">' + escapeHtml(app.motivation || '') + '</p>' +
+                (app.property_type ? '<p style="font-size:12px;color:#888;margin:6px 0 0;"><i class="fa-solid fa-tag" style="color:#EB6753;margin-right:4px;"></i>' + escapeHtml(app.property_type) + '</p>' : '') +
+                '</div>' +
+                '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">' +
+                '<span style="padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;background:' + (statusColors[app.status] || '#f5f5f5') + ';color:' + (statusTextColors[app.status] || '#333') + ';">' + (app.status || 'pending') + '</span>' +
+                (app.status === 'pending'
+                    ? '<button onclick="handleOwnerApplication(\'' + app.id + '\',\'' + (app.user_id || '') + '\',\'approved\')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-check"></i> Approve</button>' +
+                      '<button onclick="handleOwnerApplication(\'' + app.id + '\',\'' + (app.user_id || '') + '\',\'rejected\')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-xmark"></i> Reject</button>'
+                    : '') +
+                '</div>';
+            container.appendChild(row);
+        });
+    } catch(err) {
+        container.innerHTML = '<div style="color:red;padding:20px;">' + err.message + '</div>';
+    }
+}
+window.loadOwnerApplications = loadOwnerApplications;
+
+async function handleOwnerApplication(appId, userId, newStatus) {
+    try {
+        // Update application status
+        const { error: appErr } = await _supabase.from('owner_applications').update({ status: newStatus }).eq('id', appId);
+        if (appErr) throw appErr;
+        // If approved, update user role to owner
+        if (newStatus === 'approved' && userId) {
+            const { error: profileErr } = await _supabase.from('profiles').update({ role: 'owner' }).eq('id', userId);
+            if (profileErr) console.warn('Profile role update:', profileErr.message);
+        }
+        toast(newStatus === 'approved' ? 'Applicant approved as owner!' : 'Application rejected.', newStatus === 'approved' ? 'success' : 'warning');
+        loadOwnerApplications();
+        loadAttentionItems();
+    } catch(err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+}
+window.handleOwnerApplication = handleOwnerApplication;
+
+async function loadAttentionItems() {
+    const container = document.getElementById('attentionContainer');
+    const badge = document.getElementById('attentionBadge');
+    if (!container) return;
+    container.innerHTML = '<div style="padding:20px;color:#aaa;font-size:13px;">Loading…</div>';
+    let items = [];
+    try {
+        // 1) Pending owner applications
+        const { data: pendingApps } = await _supabase
+            .from('owner_applications')
+            .select('id, profiles ( full_name, email )')
+            .eq('status', 'pending');
+        (pendingApps || []).forEach(a => {
+            items.push({ icon: 'fa-solid fa-user-plus', color: '#3b82f6', bg: '#eff6ff',
+                text: '<strong>' + escapeHtml(a.profiles?.full_name || 'A user') + '</strong> applied to become an owner.',
+                action: '<button onclick="document.querySelector(\'[data-tab=owner-applications]\')?.click();loadOwnerApplications()" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Review</button>' });
+        });
+
+        // 2) Owners with no phone number
+        const { data: noPhone } = await _supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('role', 'owner')
+            .or('phone.is.null,phone.eq.');
+        (noPhone || []).slice(0, 5).forEach(p => {
+            items.push({ icon: 'fa-solid fa-phone-slash', color: '#f59e0b', bg: '#fffbeb',
+                text: 'Owner <strong>' + escapeHtml(p.full_name || p.email || 'Unknown') + '</strong> has no phone number on file.',
+                action: '' });
+        });
+
+        // 3) Pending listing requests
+        const { count: pendingListings } = await _supabase
+            .from('listings').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+        if (pendingListings > 0) {
+            items.push({ icon: 'fa-solid fa-list-check', color: '#8b5cf6', bg: '#f5f3ff',
+                text: '<strong>' + pendingListings + ' listing' + (pendingListings > 1 ? 's' : '') + '</strong> awaiting approval.',
+                action: '<button onclick="document.querySelector(\'[data-tab=listing-requests]\')?.click();loadListingRequests()" style="background:#f5f3ff;color:#8b5cf6;border:1px solid #ddd6fe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Review</button>' });
+        }
+
+        if (badge) { badge.textContent = items.length; badge.style.display = items.length ? '' : 'none'; }
+
+        if (!items.length) {
+            container.innerHTML = '<div style="padding:40px;text-align:center;color:#aaa;font-size:14px;"><i class="fa-solid fa-circle-check" style="font-size:32px;color:#27ae60;display:block;margin-bottom:12px;"></i>All clear — nothing needs your attention right now.</div>';
+            return;
+        }
+        container.innerHTML = items.map(item =>
+            '<div style="display:flex;align-items:flex-start;gap:14px;background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:10px;border:1px solid #f0f0f0;">' +
+            '<div style="width:38px;height:38px;border-radius:10px;background:' + item.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+            '<i class="' + item.icon + '" style="color:' + item.color + ';font-size:16px;"></i></div>' +
+            '<div style="flex:1;font-size:13px;color:#444;line-height:1.7;">' + item.text + '</div>' +
+            (item.action ? '<div style="flex-shrink:0;">' + item.action + '</div>' : '') +
+            '</div>'
+        ).join('');
+    } catch(err) {
+        container.innerHTML = '<div style="color:red;padding:20px;">' + err.message + '</div>';
+    }
+}
+window.loadAttentionItems = loadAttentionItems;
 
 async function rejectListingRequest(listingId, btn) {
     if (!confirm('Reject and delete this listing request?')) return;
@@ -3446,5 +3786,365 @@ window.downloadReceipt = async function(bookingId) {
     } catch (err) {
         console.error('❌ [RECEIPT] Error:', err);
         toast('Failed to generate receipt: ' + err.message, 'error');
+    }
+};
+
+/* ═══════════════════════════════════════════════════
+   OWNER — PROMOTIONS TAB
+   ═══════════════════════════════════════════════════ */
+async function loadOwnerPromotions(page = 0) {
+    if (CURRENT_ROLE !== 'owner') return;
+    const container = document.getElementById('ownerPromosContainer');
+    if (!container) return;
+    container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#aaa;">Loading...</div>';
+
+    try {
+        const listingIds = await cOwnerIds();
+        if (!listingIds.length) {
+            container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#ccc;"><i class="fa-solid fa-tag" style="font-size:36px;display:block;margin-bottom:12px;"></i><p>You need at least one approved listing to create promotions.</p></div>';
+            return;
+        }
+
+        const PAGE_SIZE = 15;
+        const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
+
+        const { data, error, count } = await _supabase
+            .from('promotions')
+            .select('id,title,description,listing_id,discount,start_date,end_date,banner_url,created_at', { count: 'exact' })
+            .in('listing_id', listingIds)
+            .order('created_at', { ascending: false })
+            .range(start, end);
+        if (error) throw error;
+
+        // listing titles
+        const lstMap = {};
+        if (listingIds.length) {
+            const { data: ls } = await _supabase.from('listings').select('id,title').in('id', listingIds);
+            (ls || []).forEach(l => lstMap[l.id] = l.title);
+        }
+
+        if (!data || !data.length) {
+            container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:#ccc;"><i class="fa-solid fa-tag" style="font-size:36px;display:block;margin-bottom:12px;"></i><p>No promotions yet. Create your first one!</p></div>';
+            return;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        container.innerHTML = '';
+        data.forEach(p => {
+            const isActive = p.start_date <= today && p.end_date >= today;
+            const card = document.createElement('div');
+            card.style.cssText = 'background:#fff;border-radius:14px;padding:18px;box-shadow:0 3px 14px rgba(0,0,0,0.07);border-left:4px solid ' + (isActive ? '#2ecc71' : '#ddd') + ';';
+            card.innerHTML =
+                '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;">' +
+                '<div>' +
+                '<div style="font-size:15px;font-weight:800;color:#1a1a1a;">' + escapeHtml(p.title || '—') + '</div>' +
+                '<div style="font-size:12px;color:#EB6753;margin-top:3px;font-weight:600;"><i class="fa-solid fa-house"></i> ' + escapeHtml(lstMap[p.listing_id] || '—') + '</div>' +
+                '</div>' +
+                '<div style="background:#EB6753;color:#fff;padding:6px 14px;border-radius:20px;font-size:14px;font-weight:800;white-space:nowrap;">' + p.discount + '% OFF</div>' +
+                '</div>' +
+                (p.description ? '<p style="font-size:13px;color:#888;margin:0 0 10px;">' + escapeHtml(p.description) + '</p>' : '') +
+                '<div style="font-size:12px;color:#aaa;margin-bottom:10px;"><i class="fa-regular fa-calendar"></i> ' + (p.start_date || '—') + ' → ' + (p.end_date || '—') + '</div>' +
+                '<div style="display:flex;align-items:center;gap:8px;">' +
+                '<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:' + (isActive ? '#e8f5e9' : '#f5f5f5') + ';color:' + (isActive ? '#27ae60' : '#aaa') + ';">' + (isActive ? 'ACTIVE' : 'INACTIVE') + '</span>' +
+                '<button class="btn-s danger" style="margin-left:auto;" onclick="deleteOwnerPromo(\'' + p.id + '\')"><i class="fa-solid fa-trash"></i> Delete</button>' +
+                '</div>';
+            container.appendChild(card);
+        });
+
+        if (window.renderPagination) {
+            const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
+            renderPagination('ownerPromosPagination', page, pageCount, count || data.length, PAGE_SIZE, (pg) => loadOwnerPromotions(pg));
+        }
+
+    } catch (err) {
+        console.error('❌ [OWNER PROMOS]', err);
+        container.innerHTML = '<div style="grid-column:1/-1;color:red;padding:20px;">' + escapeHtml(err.message) + '</div>';
+    }
+}
+
+window.loadOwnerPromotions = loadOwnerPromotions;
+
+window.deleteOwnerPromo = async function(promoId) {
+    if (!confirm('Delete this promotion?')) return;
+    try {
+        const { error } = await _supabase.from('promotions').delete().eq('id', promoId);
+        if (error) throw error;
+        toast('Promotion deleted.', 'success');
+        loadOwnerPromotions();
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+};
+
+window.openOwnerCreatePromoModal = async function() {
+    let modal = document.getElementById('_ownerPromoModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = '_ownerPromoModal';
+        modal.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99999;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;';
+        modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+        document.body.appendChild(modal);
+    }
+
+    const listingIds = await cOwnerIds();
+    const lstOpts = listingIds.length
+        ? (await (async () => {
+            const { data } = await _supabase.from('listings').select('id,title').in('id', listingIds).eq('status','approved');
+            return (data || []).map(l => `<option value="${l.id}">${escapeHtml(l.title)}</option>`).join('');
+        })())
+        : '';
+
+    const IS = 'width:100%;padding:11px 14px;border:1.5px solid #ebebeb;border-radius:10px;font-size:14px;outline:none;font-family:Inter,sans-serif;box-sizing:border-box;background:#fff;';
+    modal.innerHTML =
+        '<div style="background:#fff;border-radius:20px;padding:32px;max-width:480px;width:100%;margin:auto;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.28);">' +
+        '<button onclick="document.getElementById(\'_ownerPromoModal\').style.display=\'none\'" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:24px;cursor:pointer;color:#aaa;">&times;</button>' +
+        '<h3 style="font-size:20px;font-weight:800;color:#1a1a1a;margin:0 0 20px;">New Promotion</h3>' +
+        '<div style="display:flex;flex-direction:column;gap:14px;">' +
+        '<div><label style="font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Listing *</label><select id="_opListing" style="' + IS + '"><option value="">Select listing</option>' + lstOpts + '</select></div>' +
+        '<div><label style="font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Promo Title *</label><input id="_opTitle" placeholder="Summer Special" style="' + IS + '"></div>' +
+        '<div><label style="font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Description</label><textarea id="_opDesc" placeholder="Short description..." style="' + IS + 'min-height:70px;resize:vertical;"></textarea></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">' +
+        '<div><label style="font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Discount %</label><input id="_opDiscount" type="number" min="1" max="99" placeholder="15" style="' + IS + '"></div>' +
+        '<div><label style="font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Start Date</label><input id="_opStart" type="date" style="' + IS + '"></div>' +
+        '<div><label style="font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">End Date</label><input id="_opEnd" type="date" style="' + IS + '"></div>' +
+        '</div>' +
+        '<button onclick="submitOwnerPromo()" style="background:#EB6753;color:#fff;border:none;padding:13px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;font-family:Inter,sans-serif;width:100%;margin-top:4px;">Create Promotion</button>' +
+        '</div></div>';
+    modal.style.display = 'flex';
+};
+
+window.submitOwnerPromo = async function() {
+    const listing_id = document.getElementById('_opListing')?.value;
+    const title = document.getElementById('_opTitle')?.value?.trim();
+    const description = document.getElementById('_opDesc')?.value?.trim();
+    const discount = parseInt(document.getElementById('_opDiscount')?.value);
+    const start_date = document.getElementById('_opStart')?.value;
+    const end_date = document.getElementById('_opEnd')?.value;
+
+    if (!listing_id || !title || !discount || !start_date || !end_date) {
+        toast('Please fill in all required fields.', 'warning');
+        return;
+    }
+    if (discount < 1 || discount > 99) { toast('Discount must be between 1 and 99.', 'warning'); return; }
+    if (start_date > end_date) { toast('End date must be after start date.', 'warning'); return; }
+
+    try {
+        const { error } = await _supabase.from('promotions').insert({ listing_id, title, description: description || null, discount, start_date, end_date });
+        if (error) throw error;
+        toast('Promotion created!', 'success');
+        document.getElementById('_ownerPromoModal').style.display = 'none';
+        loadOwnerPromotions();
+    } catch (err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+};
+
+/* ═══════════════════════════════════════════════════
+   FINANCIAL TAB
+   ═══════════════════════════════════════════════════ */
+let _finData = [];
+
+async function loadFinancialData(page = 0, searchTerm = '') {
+    if (CURRENT_ROLE !== 'admin') return;
+    const tbody = document.getElementById('finTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#aaa;">Loading...</td></tr>';
+
+    // use input field value if no arg passed
+    if (!searchTerm) searchTerm = (document.getElementById('finSearchInput')?.value || '').trim();
+
+    const range = document.getElementById('finDateRange')?.value || '30';
+    let fromDate = null;
+    if (range !== 'all') {
+        const d = new Date();
+        d.setDate(d.getDate() - parseInt(range));
+        fromDate = d.toISOString().split('T')[0];
+    }
+
+    const PAGE_SIZE = 15;
+    const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
+
+    try {
+        let q = _supabase
+            .from('bookings')
+            .select('id, listing_id, user_id, guest_name, guest_email, start_date, end_date, total_amount, status, payment_method, created_at', { count: 'exact' })
+            .in('status', ['confirmed', 'approved', 'completed'])
+            .order('created_at', { ascending: false })
+            .range(start, end);
+
+        if (fromDate) q = q.gte('created_at', fromDate);
+
+        if (searchTerm) {
+            const { data: matchedLst } = await _supabase.from('listings').select('id').ilike('title', `%${searchTerm}%`);
+            const lstIds = (matchedLst || []).map(l => l.id);
+            let orParts = [`guest_name.ilike.%${searchTerm}%`, `guest_email.ilike.%${searchTerm}%`];
+            if (lstIds.length) orParts.push(`listing_id.in.(${lstIds.join(',')})`);
+            q = q.or(orParts.join(','));
+        }
+
+        const { data, error, count } = await q;
+        if (error) throw error;
+
+        // Batch listing info
+        const lids = [...new Set((data || []).map(b => b.listing_id).filter(Boolean))];
+        const lstMap = {};
+        if (lids.length) {
+            const { data: ls } = await _supabase.from('listings').select('id,title,price_afristay_fee').in('id', lids);
+            (ls || []).forEach(l => lstMap[l.id] = l);
+        }
+
+        if (!data || !data.length) {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:#aaa;">No confirmed bookings found for this period.</td></tr>';
+            // clear stats
+            _renderFinStats(0, 0, 0, 0);
+            return;
+        }
+
+        // Store for export
+        _finData = data.map(b => {
+            const lst = lstMap[b.listing_id] || {};
+            const fee = lst.price_afristay_fee || 0;
+            const total = Number(b.total_amount || 0);
+            const nights = b.start_date && b.end_date
+                ? Math.max(1, Math.round((new Date(b.end_date) - new Date(b.start_date)) / 86400000))
+                : 1;
+            const afristayEarns = fee * nights;
+            const ownerEarns = total - afristayEarns;
+            return { ...b, lst_title: lst.title || '—', fee, nights, afristayEarns, ownerEarns, total };
+        });
+
+        // Stats
+        const totalRevenue = _finData.reduce((s, r) => s + r.total, 0);
+        const totalFees = _finData.reduce((s, r) => s + r.afristayEarns, 0);
+        const totalOwner = _finData.reduce((s, r) => s + r.ownerEarns, 0);
+        _renderFinStats(_finData.length, totalRevenue, totalFees, totalOwner);
+
+        tbody.innerHTML = '';
+        _finData.forEach((r, i) => {
+            const tr = document.createElement('tr');
+            const fmt = n => Number(n || 0).toLocaleString('en-RW');
+            tr.innerHTML = `
+                <td>${page * PAGE_SIZE + i + 1}.</td>
+                <td style="font-family:monospace;font-size:11px;">${shortId(r.id)}</td>
+                <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(r.lst_title)}">${escapeHtml(r.lst_title)}</td>
+                <td style="font-size:12px;">${escapeHtml(r.guest_name || '—')}<br><span style="color:#aaa;font-size:11px;">${escapeHtml(r.guest_email || '')}</span></td>
+                <td style="font-size:11px;color:#888;">${r.start_date} → ${r.end_date}</td>
+                <td style="font-weight:600;">${fmt(r.ownerEarns)} RWF</td>
+                <td style="color:#EB6753;font-weight:700;">${fmt(r.afristayEarns)} RWF</td>
+                <td style="font-weight:800;">${fmt(r.total)} RWF</td>
+                <td><span class="status-badge status-${r.status}">${r.status}</span></td>
+                <td style="font-size:11px;color:#aaa;">${(r.payment_method || '—').replace(/_/g,' ')}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        if (window.renderPagination) {
+            const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
+            renderPagination('finPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadFinancialData(p, searchTerm));
+        }
+
+    } catch (err) {
+        console.error('❌ [FINANCIAL]', err);
+        tbody.innerHTML = `<tr><td colspan="10" style="color:red;padding:20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
+    }
+}
+
+function _renderFinStats(bookings, revenue, fees, ownerPayout) {
+    const el = document.getElementById('finStatsRow');
+    if (!el) return;
+    const fmt = n => Number(n || 0).toLocaleString('en-RW');
+    const cards = [
+        { icon: 'fa-calendar-check', color: '#eff6ff', iconColor: '#3b82f6', label: 'Paid Bookings', value: bookings },
+        { icon: 'fa-coins', color: '#fff0ee', iconColor: '#EB6753', label: 'Total Revenue', value: fmt(revenue) + ' RWF' },
+        { icon: 'fa-building-columns', color: '#f0fdf4', iconColor: '#22c55e', label: 'AfriStay Earnings', value: fmt(fees) + ' RWF' },
+        { icon: 'fa-hand-holding-dollar', color: '#faf5ff', iconColor: '#a855f7', label: 'Owner Payouts', value: fmt(ownerPayout) + ' RWF' },
+    ];
+    el.innerHTML = cards.map(c =>
+        `<div style="background:#fff;border-radius:14px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,0.05);">
+            <div style="width:38px;height:38px;border-radius:10px;background:${c.color};color:${c.iconColor};display:flex;align-items:center;justify-content:center;margin-bottom:12px;font-size:16px;">
+                <i class="fa-solid ${c.icon}"></i>
+            </div>
+            <div style="font-size:18px;font-weight:800;color:#1a1a1a;line-height:1.2;">${c.value}</div>
+            <div style="font-size:11px;color:#aaa;margin-top:4px;">${c.label}</div>
+        </div>`
+    ).join('');
+}
+
+window.loadFinancialData = loadFinancialData;
+
+/* ── Export Financial Data ── */
+window.exportFinancial = function(format) {
+    if (!_finData.length) {
+        toast('No data to export. Load financial data first.', 'warning');
+        return;
+    }
+
+    if (format === 'csv') {
+        const headers = ['#', 'Booking ID', 'Listing', 'Guest', 'Email', 'Check-in', 'Check-out', 'Nights', 'Owner Earns (RWF)', 'AfriStay Fee (RWF)', 'Total (RWF)', 'Status', 'Payment Method'];
+        const rows = _finData.map((r, i) => [
+            i + 1,
+            r.id,
+            '"' + (r.lst_title || '').replace(/"/g, '""') + '"',
+            '"' + (r.guest_name || '').replace(/"/g, '""') + '"',
+            r.guest_email || '',
+            r.start_date || '',
+            r.end_date || '',
+            r.nights,
+            Math.round(r.ownerEarns),
+            Math.round(r.afristayEarns),
+            Math.round(r.total),
+            r.status,
+            (r.payment_method || '').replace(/_/g, ' ')
+        ]);
+        const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'AfriStay-Financial-' + new Date().toISOString().split('T')[0] + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('CSV exported!', 'success');
+
+    } else if (format === 'pdf') {
+        // Use jsPDF if loaded, otherwise fallback to print
+        if (typeof window.jspdf !== 'undefined' || typeof window.jsPDF !== 'undefined') {
+            const jsPDF = window.jsPDF || window.jspdf?.jsPDF;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const W = doc.internal.pageSize.width;
+            doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+            doc.text('AfriStay — Financial Report', 14, 16);
+            doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+            doc.text('Generated: ' + new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }), 14, 22);
+
+            const cols = ['#', 'Listing', 'Guest', 'Check-in', 'Check-out', 'Owner (RWF)', 'Fee (RWF)', 'Total (RWF)', 'Status'];
+            const rows = _finData.map((r, i) => [
+                i + 1,
+                (r.lst_title || '—').substring(0, 22),
+                (r.guest_name || '—').substring(0, 18),
+                r.start_date || '—',
+                r.end_date || '—',
+                Math.round(r.ownerEarns).toLocaleString(),
+                Math.round(r.afristayEarns).toLocaleString(),
+                Math.round(r.total).toLocaleString(),
+                r.status
+            ]);
+
+            doc.autoTable({ head: [cols], body: rows, startY: 28, styles: { fontSize: 8 }, headStyles: { fillColor: [235, 103, 83] } });
+            doc.save('AfriStay-Financial-' + new Date().toISOString().split('T')[0] + '.pdf');
+            toast('PDF exported!', 'success');
+        } else {
+            // fallback — open print dialog of the table
+            const html = `<html><head><title>AfriStay Financial Report</title>
+            <style>body{font-family:sans-serif;font-size:12px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;}th{background:#EB6753;color:#fff;}tr:nth-child(even){background:#f9f9f9;}h2{color:#EB6753;}</style></head>
+            <body><h2>AfriStay Financial Report</h2><p>Generated: ${new Date().toLocaleDateString()}</p>
+            <table><thead><tr><th>#</th><th>Listing</th><th>Guest</th><th>Check-in</th><th>Check-out</th><th>Owner Earns</th><th>AfriStay Fee</th><th>Total</th><th>Status</th></tr></thead><tbody>
+            ${_finData.map((r, i) => `<tr><td>${i+1}</td><td>${r.lst_title||'—'}</td><td>${r.guest_name||'—'}</td><td>${r.start_date||'—'}</td><td>${r.end_date||'—'}</td><td>${Math.round(r.ownerEarns).toLocaleString()} RWF</td><td>${Math.round(r.afristayEarns).toLocaleString()} RWF</td><td>${Math.round(r.total).toLocaleString()} RWF</td><td>${r.status}</td></tr>`).join('')}
+            </tbody></table></body></html>`;
+            const w = window.open('', '_blank');
+            w.document.write(html);
+            w.document.close();
+            w.print();
+        }
     }
 };

@@ -41,19 +41,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     showSkeletons(3);
-    await loadFavorites();
+    await loadFavorites(0);
 });
 
-/* ── LOAD FAVORITES ── */
-async function loadFavorites() {
-    console.log('❤️ [FAV] Fetching favorites...');
+const FAV_PAGE_SIZE = 15;
 
-    // 1. Get all favorite rows for this user
-    const { data: favRows, error: favErr } = await _sb
+/* ── LOAD FAVORITES ── */
+async function loadFavorites(page = 0) {
+    console.log('❤️ [FAV] Fetching favorites page', page);
+
+    const start = page * FAV_PAGE_SIZE, end = start + FAV_PAGE_SIZE - 1;
+
+    // 1. Get paginated favorite rows for this user
+    const { data: favRows, error: favErr, count: favCount } = await _sb
         .from('favorites')
-        .select('id, listing_id, created_at')
+        .select('id, listing_id, created_at', { count: 'exact' })
         .eq('user_id', _user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(start, end);
 
     if (favErr) {
         console.error('❌ [FAV] Error fetching favorites:', favErr.message);
@@ -72,7 +77,7 @@ async function loadFavorites() {
     // 2. Fetch listing details
     const { data: listings, error: listErr } = await _sb
         .from('listings')
-        .select('id, title, price, currency, availability_status, category_slug, address, province_id, district_id, owner_id')
+        .select('id, title, price, price_display, price_outside_kigali_display, currency, availability_status, category_slug, address, province_id, district_id, owner_id')
         .in('id', listingIds);
 
     if (listErr) { console.error('❌ [FAV] Listings error:', listErr.message); showError(listErr.message); return; }
@@ -110,7 +115,7 @@ async function loadFavorites() {
 
     // Update count badge
     const countEl = document.getElementById('favCount');
-    if (countEl) { countEl.textContent = favRows.length; countEl.style.display = 'inline'; }
+    if (countEl) { countEl.textContent = favCount || favRows.length; countEl.style.display = 'inline'; }
 
     // 7. Render — in the order favorites were saved
     const container = document.getElementById('favList');
@@ -126,7 +131,7 @@ async function loadFavorites() {
         const catLbl  = isVeh ? 'Vehicle' : 'Real Estate';
         const catIcon = isVeh ? 'fa-car' : 'fa-house';
         const unit    = isVeh ? '/day' : '/night';
-        const price   = Number(l.price).toLocaleString('en-RW');
+        const price   = Number(l.price_display || l.price).toLocaleString('en-RW');
         const loc     = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || l.address || 'Rwanda';
         const owner   = ownerMap[l.owner_id] || null;
         const savedAt = new Date(fav.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -198,6 +203,11 @@ async function loadFavorites() {
 
         container.appendChild(card);
     });
+
+    if (window.renderPagination && favCount) {
+        const pageCount = Math.ceil(favCount / FAV_PAGE_SIZE);
+        renderPagination('favPagination', page, pageCount, favCount, FAV_PAGE_SIZE, (p) => loadFavorites(p));
+    }
 
     console.log('✅ [FAV] Favorites rendered:', favRows.length);
 }

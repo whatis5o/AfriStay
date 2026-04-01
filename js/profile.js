@@ -87,15 +87,16 @@ function updateSidebar() {
    TAB SWITCHING
    ══════════════════════════════════════════════ */
 const TAB_LOADERS = {
-    overview:  loadOverview,
-    bookings:  loadActiveBookings,
-    history:   loadHistory,
-    favorites: loadFavorites,
+    overview:       loadOverview,
+    bookings:       loadActiveBookings,
+    history:        loadHistory,
+    favorites:      loadFavorites,
+    'become-owner': loadOwnerApplicationStatus,
 };
 
 let loadedTabs = new Set(['overview']);
 
-const TAB_TITLES = { overview: 'Overview', profile: 'Edit Profile', bookings: 'My Bookings', history: 'History', favorites: 'Favorites', settings: 'Security' };
+const TAB_TITLES = { overview: 'Overview', profile: 'Edit Profile', bookings: 'My Bookings', history: 'History', favorites: 'Favorites', settings: 'Security', 'become-owner': 'Become an Owner' };
 
 window.switchTab = function(name) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -767,3 +768,71 @@ window.cancelBooking = async function(bookingId, btn) {
     toast('Booking cancelled.', 'success');
     console.log('✅ [CANCEL] Booking cancelled:', bookingId);
 };
+/* ══════════════════════════════════════════════
+   OWNER APPLICATION
+   ══════════════════════════════════════════════ */
+async function loadOwnerApplicationStatus() {
+    const statusEl = document.getElementById('ownerAppStatus');
+    const form = document.getElementById('ownerApplicationForm');
+    if (!statusEl || !_user) return;
+
+    // Check existing application
+    const { data: existing } = await _sb
+        .from('owner_applications')
+        .select('id, status, created_at, motivation')
+        .eq('user_id', _user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (existing) {
+        const statusColors = { pending: '#fff8e1', approved: '#e8f8f0', rejected: '#fdecea' };
+        const statusTextColors = { pending: '#7c5c00', approved: '#1b7a3e', rejected: '#c0392b' };
+        const statusLabels = { pending: 'Pending Review', approved: 'Approved', rejected: 'Rejected' };
+        statusEl.innerHTML =
+            '<div style="background:' + (statusColors[existing.status] || '#f5f5f5') + ';border-radius:12px;padding:16px 20px;margin-bottom:20px;border:1px solid rgba(0,0,0,0.08);">' +
+            '<p style="font-weight:700;color:' + (statusTextColors[existing.status] || '#333') + ';margin:0 0 4px;font-size:15px;"><i class="fa-solid fa-circle-info" style="margin-right:6px;"></i>Application Status: ' + (statusLabels[existing.status] || existing.status) + '</p>' +
+            '<p style="color:#888;font-size:13px;margin:0;">Submitted on ' + new Date(existing.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) + '</p>' +
+            (existing.status === 'approved' ? '<p style="color:#27ae60;font-size:13px;margin:8px 0 0;font-weight:600;">Your account has been upgraded to Owner. Visit <a href="/Dashboards/Owner/">your Owner Dashboard</a>.</p>' : '') +
+            '</div>';
+        if (existing.status !== 'rejected') {
+            if (form) form.style.display = 'none';
+            return;
+        }
+    }
+
+    // Wire up form
+    if (form && !form._wired) {
+        form._wired = true;
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('ownerAppBtn');
+            const motivation = document.getElementById('appMotivation')?.value.trim();
+            const phone = document.getElementById('appPhone')?.value.trim();
+            const propertyType = document.getElementById('appPropertyType')?.value;
+
+            if (!motivation) { alert('Please tell us why you want to list on AfriStay.'); return; }
+            if (!phone || phone.length < 8) { alert('Please enter a valid phone number.'); return; }
+
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Submitting…'; }
+
+            const { error } = await _sb.from('owner_applications').insert([{
+                user_id: _user.id,
+                motivation,
+                phone: '+250' + phone,
+                property_type: propertyType || null,
+                status: 'pending',
+            }]);
+
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Application'; }
+
+            if (error) {
+                statusEl.innerHTML = '<div style="background:#fdecea;border-radius:10px;padding:12px 16px;color:#c0392b;font-size:13px;font-weight:600;margin-bottom:16px;">Failed: ' + error.message + '</div>';
+            } else {
+                form.style.display = 'none';
+                statusEl.innerHTML = '<div style="background:#e8f8f0;border-radius:12px;padding:16px 20px;margin-bottom:20px;border:1px solid #b8e6ce;"><p style="font-weight:700;color:#1b7a3e;margin:0 0 4px;">Application Submitted!</p><p style="color:#888;font-size:13px;margin:0;">We\'ll review your application and get back to you within 2–3 business days.</p></div>';
+                loadedTabs.delete('become-owner'); // allow reload
+            }
+        });
+    }
+}

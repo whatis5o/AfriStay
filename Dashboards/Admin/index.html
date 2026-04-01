@@ -36,7 +36,10 @@
         .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:100vh;}
         .topbar{background:#fff;padding:14px 28px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:16px;}
         .topbar h1{font-size:20px;font-weight:800;color:#1a1a1a;margin:0;}
-        #mobileMenuBtn{display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#555;padding:4px;}
+        #mobileMenuBtn{display:block;background:none;border:none;cursor:pointer;font-size:20px;color:#555;padding:4px;}
+        .main-area{transition:margin-left .3s;}
+        body.sb-collapsed #sidebar{transform:translateX(-100%);}
+        body.sb-collapsed .main-area{margin-left:0;}
         .content-area{padding:24px 28px;flex:1;}
         .content-panel{display:none;}
         .content-panel.active{display:block;}
@@ -111,11 +114,10 @@
         @media(max-width:1100px){.stats-grid{grid-template-columns:1fr 1fr;}}
         @media(max-width:768px){
             #sidebar{transform:translateX(-100%);}
-            #sidebar.active{transform:translateX(0);}
+            body.sb-open #sidebar{transform:translateX(0);}
             .main-area{margin-left:0;}
-            #mobileMenuBtn{display:block;}
             #sidebarOverlay{display:block;opacity:0;pointer-events:none;transition:opacity .3s;}
-            #sidebarOverlay.active{opacity:1;pointer-events:all;}
+            body.sb-open #sidebarOverlay{opacity:1;pointer-events:all;}
             .content-area{padding:16px;}
             .chat-list{width:220px;}
             .fi{font-size:16px!important;}
@@ -137,6 +139,11 @@
             .modal-box{padding:20px 16px;}
             .modal-box h2{font-size:17px;}
         }
+        .tab-search-wrap{display:flex;align-items:center;gap:8px;background:#f5f6fa;border:1.5px solid #ebebeb;border-radius:10px;padding:7px 12px;min-width:200px;max-width:340px;}
+        .tab-search-wrap i{color:#bbb;font-size:13px;flex-shrink:0;}
+        .tab-search-wrap input{border:none;background:none;outline:none;font-size:13px;font-family:'Inter',sans-serif;width:100%;color:#1a1a1a;}
+        .tab-search-wrap input::placeholder{color:#bbb;}
+        .tab-search-wrap:focus-within{border-color:var(--primary);}
     </style>
     <!-- Immediate role guard — runs before anything renders -->
     <script>
@@ -164,6 +171,10 @@
         <button class="nav-btn" data-tab="listings"><i class="fa-solid fa-house"></i> Listings</button>
         <button class="nav-btn" data-tab="bookings"><i class="fa-solid fa-calendar-check"></i> Bookings</button>
         <button class="nav-btn" data-tab="listing-requests"><i class="fa-solid fa-list-check"></i> Listing Requests</button>
+        <button class="nav-btn" data-tab="attention" id="attentionNavBtn"><i class="fa-solid fa-bell"></i> Attention <span class="nav-badge" id="attentionBadge" style="display:none;">0</span></button>
+        <button class="nav-btn" data-tab="owner-applications"><i class="fa-solid fa-user-plus"></i> Owner Applications</button>
+        <div class="nav-sec">Finance</div>
+        <button class="nav-btn" data-tab="financial"><i class="fa-solid fa-chart-line"></i> Financial</button>
         <div class="nav-sec">Content</div>
         <button class="nav-btn" data-tab="events"><i class="fa-solid fa-calendar-star"></i> Events</button>
         <button class="nav-btn" data-tab="promotions"><i class="fa-solid fa-tag"></i> Promotions</button>
@@ -224,6 +235,7 @@
                             <tbody id="usersTableBody"><tr><td colspan="8" style="text-align:center;padding:30px;color:#aaa;">Click Refresh to load users</td></tr></tbody>
                         </table>
                     </div>
+                    <div id="dashUsersPagination" style="margin-top:8px;"></div>
                 </div>
             </div>
         </div>
@@ -239,6 +251,7 @@
                 <button class="btn-s" id="resetFiltersBtn">Reset</button>
             </div>
             <div id="listingsGrid"></div>
+            <div id="dashListingsPagination" style="margin-top:16px;"></div>
         </div>
 
         <!-- BOOKINGS -->
@@ -246,7 +259,13 @@
             <div class="data-section">
                 <div class="sec-head">
                     <h2>All Bookings</h2>
-                    <button class="btn-s" onclick="loadBookingsTable()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <div class="tab-search-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="bookingSearchInput" placeholder="Guest name, email, listing...">
+                        </div>
+                        <button class="btn-s" onclick="loadBookingsTable(0)"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    </div>
                 </div>
                 <div style="overflow-x:auto;">
                     <table class="dt">
@@ -254,6 +273,7 @@
                         <tbody id="allBookingsBody"><tr><td colspan="7" style="text-align:center;padding:30px;color:#aaa;">Loading...</td></tr></tbody>
                     </table>
                 </div>
+                <div id="dashBookingsPagination" style="margin-top:8px;"></div>
             </div>
         </div>
 
@@ -262,11 +282,45 @@
             <div class="data-section">
                 <div class="sec-head">
                     <h2><i class="fa-solid fa-list-check" style="color:var(--primary);margin-right:8px;"></i>Listing Requests</h2>
-                    <button class="btn-s" onclick="loadListingRequests()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <div class="tab-search-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="reqSearchInput" placeholder="Search by listing title...">
+                        </div>
+                        <button class="btn-s" onclick="loadListingRequests()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    </div>
                 </div>
                 <div class="sec-body">
                     <p style="font-size:13px;color:#aaa;margin:0 0 16px;">Review and approve owner-submitted listings before they go live</p>
                     <div id="listingRequestsContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ATTENTION -->
+        <div class="content-panel" id="attentionPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-bell" style="color:var(--primary);margin-right:8px;"></i>Attention Required</h2>
+                    <button class="btn-s" onclick="loadAttentionItems()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                </div>
+                <div class="sec-body">
+                    <p style="font-size:13px;color:#aaa;margin:0 0 16px;">Owners missing phone numbers, pending applications, and other items needing action.</p>
+                    <div id="attentionContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- OWNER APPLICATIONS -->
+        <div class="content-panel" id="owner-applicationsPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-user-plus" style="color:var(--primary);margin-right:8px;"></i>Owner Applications</h2>
+                    <button class="btn-s" onclick="loadOwnerApplications()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                </div>
+                <div class="sec-body">
+                    <p style="font-size:13px;color:#aaa;margin:0 0 16px;">Users who want to become property owners on AfriStay.</p>
+                    <div id="ownerApplicationsContainer"></div>
                 </div>
             </div>
         </div>
@@ -279,6 +333,55 @@
         <!-- PROMOTIONS -->
         <div class="content-panel" id="promotionsPanel">
             <!-- Populated dynamically by loadPromotionsCards() -->
+        </div>
+
+        <!-- FINANCIAL -->
+        <div class="content-panel" id="financialPanel">
+            <div class="data-section" style="margin-bottom:20px;">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-chart-line" style="color:var(--primary);margin-right:8px;"></i>Financial Overview</h2>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <div class="tab-search-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="finSearchInput" placeholder="Guest name, listing...">
+                        </div>
+                        <select id="finDateRange" class="fi" style="width:auto;padding:7px 12px;font-size:13px;">
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="365">Last year</option>
+                            <option value="all">All time</option>
+                        </select>
+                        <button class="btn-s" onclick="loadFinancialData()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                        <button class="btn-s" onclick="exportFinancial('csv')"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                        <button class="btn-s" onclick="exportFinancial('pdf')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    </div>
+                </div>
+                <div class="sec-body">
+                    <div id="finStatsRow" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:24px;"></div>
+                    <div style="overflow-x:auto;">
+                        <table class="dt" id="finTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Booking ID</th>
+                                    <th>Listing</th>
+                                    <th>Guest</th>
+                                    <th>Dates</th>
+                                    <th>Owner Earns</th>
+                                    <th>AfriStay Fee</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody id="finTableBody">
+                                <tr><td colspan="10" style="text-align:center;padding:30px;color:#aaa;">Click Refresh to load</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="finPagination" style="margin-top:8px;"></div>
+                </div>
+            </div>
         </div>
 
         <!-- MESSAGES -->
@@ -387,11 +490,35 @@
                 <input type="text" class="fi" id="listAddress" placeholder="Street address or landmark (optional)">
             </div>
             <div class="fg"><label>Description *</label><textarea class="fi" id="listDesc" required></textarea></div>
+
+            <!-- Listing Specs -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:10px;">Property Specs <span style="color:#aaa;font-weight:400;font-size:12px;">(optional)</span></label>
+                <div class="g3">
+                    <div class="fg" style="margin-bottom:0;"><label>Bedrooms</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listRooms',-1)">−</button><input type="number" class="fi step-inp" id="listRooms" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listRooms',1)">+</button></div></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Bathrooms</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listBathrooms',-1)">−</button><input type="number" class="fi step-inp" id="listBathrooms" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listBathrooms',1)">+</button></div></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Beds</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listBeds',-1)">−</button><input type="number" class="fi step-inp" id="listBeds" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listBeds',1)">+</button></div></div>
+                </div>
+                <div class="g2" style="margin-top:10px;">
+                    <div class="fg" style="margin-bottom:0;"><label>Max Guests</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listMaxGuests',-1)">−</button><input type="number" class="fi step-inp" id="listMaxGuests" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listMaxGuests',1)">+</button></div></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Floor Area (m²)</label><input type="number" class="fi" id="listFloorArea" min="0" placeholder="e.g. 75"></div>
+                </div>
+            </div>
+
+            <!-- Amenities -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:10px;">Amenities <span style="color:#aaa;font-weight:400;font-size:12px;">(optional)</span></label>
+                <div id="amenityCheckboxes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+                    <span style="color:#aaa;font-size:13px;">Loading amenities…</span>
+                </div>
+            </div>
+
             <div class="g2">
                 <div class="fg"><label>Images (max 10)</label><input type="file" class="fi" id="listImageFiles" accept="image/*" multiple style="padding:8px;border-style:dashed;"></div>
                 <div class="fg"><label>Videos (max 3)</label><input type="file" class="fi" id="listVideoFiles" accept="video/*" multiple style="padding:8px;border-style:dashed;"></div>
             </div>
-            <button type="submit" class="btn-p" style="width:100%;justify-content:center;padding:14px;font-size:15px;border-radius:12px;margin-top:8px;">
+            <div id="listingCreateStatus" style="display:none;padding:12px 16px;border-radius:10px;font-size:13px;margin-top:10px;"></div>
+            <button type="submit" class="btn-p" id="createBtn" style="width:100%;justify-content:center;padding:14px;font-size:15px;border-radius:12px;margin-top:8px;">
                 <i class="fa-solid fa-plus"></i> Create Listing (Auto-Approved)
             </button>
         </form>
@@ -399,13 +526,17 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="/js/config.js"></script>
+<script src="/js/utils.js"></script>
 <script src="/js/dashboard.js"></script>
 <script>
 const PTITLES={
     dashboardPanel:'Dashboard',usersPanel:'Users',listingsPanel:'Listings',
     bookingsPanel:'Bookings','listing-requestsPanel':'Listing Requests',
-    eventsPanel:'Events',promotionsPanel:'Promotions',messagesPanel:'Messages',settingsPanel:'Settings'
+    attentionPanel:'Attention',  'owner-applicationsPanel':'Owner Applications',
+    financialPanel:'Financial',eventsPanel:'Events',promotionsPanel:'Promotions',messagesPanel:'Messages',settingsPanel:'Settings'
 };
 
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
@@ -415,6 +546,7 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
         const el=document.getElementById('panelTitle');
         if(el)el.textContent=PTITLES[tab+'Panel']||PTITLES[tab]||tab;
         if(tab==='settings')setTimeout(prefillAdminProfile,200);
+        if(tab==='financial')setTimeout(loadFinancialData,100);
     });
 });
 
@@ -460,14 +592,7 @@ window.handleCreateListing=async function(){
     if(data&&data[0]){await _s.from('listings').update({status:'approved'}).eq('id',data[0].id);}
 };
 
-document.getElementById('mobileMenuBtn')?.addEventListener('click',()=>{
-    document.getElementById('sidebar').classList.toggle('active');
-    document.getElementById('sidebarOverlay').classList.toggle('active');
-});
-document.getElementById('sidebarOverlay')?.addEventListener('click',()=>{
-    document.getElementById('sidebar').classList.remove('active');
-    document.getElementById('sidebarOverlay').classList.remove('active');
-});
+// Sidebar toggle handled by initSidebarToggle() in dashboard.js
 </script>
 </body>
 </html>

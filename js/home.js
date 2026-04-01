@@ -70,7 +70,7 @@ async function loadFeaturedListings() {
 
     const { data: listings, error } = await sb
         .from('listings')
-        .select('id, title, price, currency, availability_status, category_slug, province_id, district_id, created_at')
+        .select('id, title, price, price_display, price_outside_kigali_display, currency, availability_status, category_slug, province_id, district_id, created_at')
         .eq('featured', true)
         .eq('status', 'approved')
         .eq('availability_status', 'available')
@@ -104,8 +104,9 @@ async function loadFeaturedListings() {
     (promoRes.data || []).forEach(p => { promoMap[p.listing_id] = p.discount; });
     listings.forEach(l => {
         const disc = promoMap[l.id];
+        const dp   = l.price_display || l.price;
         l.promo_discount = disc || null;
-        l.promo_price    = disc ? Math.round(l.price * (1 - disc / 100)) : null;
+        l.promo_price    = disc ? Math.round(dp * (1 - disc / 100)) : null;
     });
 
     renderCards(listings, imgMap, dtMap, pvMap);
@@ -124,7 +125,8 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
         const catLbl  = isVeh ? 'Vehicle' : 'Real Estate';
         const catIcon = isVeh ? 'fa-car' : 'fa-house';
         const unit        = isVeh ? '/day' : '/night';
-        const price       = Number(l.price).toLocaleString();
+        const dp          = l.price_display || l.price;
+        const price       = Number(dp).toLocaleString();
         const promoPrice  = l.promo_discount ? Number(l.promo_price).toLocaleString() : null;
         const loc         = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
 

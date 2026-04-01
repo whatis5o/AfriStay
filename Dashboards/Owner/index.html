@@ -41,7 +41,10 @@
         .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:100vh;}
         .topbar{background:#fff;padding:16px 28px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:16px;}
         .topbar h1{font-size:20px;font-weight:800;color:#1a1a1a;margin:0;}
-        #mobileMenuBtn{display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#555;padding:4px;}
+        #mobileMenuBtn{display:block;background:none;border:none;cursor:pointer;font-size:20px;color:#555;padding:4px;}
+        .main-area{transition:margin-left .3s;}
+        body.sb-collapsed #sidebar{transform:translateX(-100%);}
+        body.sb-collapsed .main-area{margin-left:0;}
         .content-area{padding:24px 28px;flex:1;}
         .content-panel{display:none;}
         .content-panel.active{display:block;}
@@ -106,11 +109,10 @@
         @media(max-width:900px){.stats-grid{grid-template-columns:1fr 1fr;}}
         @media(max-width:768px){
             #sidebar{transform:translateX(-100%);}
-            #sidebar.active{transform:translateX(0);}
+            body.sb-open #sidebar{transform:translateX(0);}
             .main-area{margin-left:0;}
-            #mobileMenuBtn{display:block;}
             #sidebarOverlay{display:block;opacity:0;pointer-events:none;transition:opacity .3s;}
-            #sidebarOverlay.active{opacity:1;pointer-events:all;}
+            body.sb-open #sidebarOverlay{opacity:1;pointer-events:all;}
             .content-area{padding:16px;}
             .fi{font-size:16px!important;}
         }
@@ -141,6 +143,7 @@
         <button class="nav-btn active" data-tab="dashboard"><i class="fa-solid fa-gauge-high"></i> Dashboard</button>
         <button class="nav-btn" data-tab="listings"><i class="fa-solid fa-house"></i> My Listings</button>
         <button class="nav-btn" data-tab="bookings"><i class="fa-solid fa-calendar-check"></i> Bookings</button>
+        <button class="nav-btn" data-tab="promotions"><i class="fa-solid fa-tag"></i> Promotions</button>
         <div class="nav-sep"></div>
         <button class="nav-btn" data-tab="settings"><i class="fa-solid fa-gear"></i> Settings</button>
         <div class="nav-sep"></div>
@@ -155,9 +158,11 @@
             <button id="mobileMenuBtn"><i class="fa-solid fa-bars"></i></button>
             <h1 id="panelTitle">Dashboard</h1>
         </div>
-        <button class="btn-p" id="openCreateListingBtn" onclick="openModal('listingModal')">
-            <i class="fa-solid fa-plus"></i> New Listing
-        </button>
+        <div style="display:flex;gap:10px;align-items:center;">
+<button class="btn-p" id="openCreateListingBtn" onclick="openModal('listingModal')">
+                <i class="fa-solid fa-plus"></i> New Listing
+            </button>
+        </div>
     </header>
 
     <div class="content-area">
@@ -213,6 +218,21 @@
                         <thead><tr><th>#</th><th>ID</th><th>Listing</th><th>Guest</th><th>Dates</th><th>Amount</th><th>Status / Actions</th></tr></thead>
                         <tbody id="allBookingsBody"><tr><td colspan="7" style="text-align:center;padding:30px;color:#aaa;">Loading...</td></tr></tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PROMOTIONS -->
+        <div class="content-panel" id="promotionsPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-tag" style="color:var(--primary);margin-right:8px;"></i>Promotions</h2>
+                    <button class="btn-p" onclick="openOwnerCreatePromoModal()"><i class="fa-solid fa-plus"></i> New Promotion</button>
+                </div>
+                <div class="sec-body">
+                    <p style="font-size:13px;color:#aaa;margin:0 0 16px;">Create discount promotions for your listings to attract more guests.</p>
+                    <div id="ownerPromosContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;"></div>
+                    <div id="ownerPromosPagination" style="margin-top:12px;"></div>
                 </div>
             </div>
         </div>
@@ -317,11 +337,35 @@
                 <input type="text" class="fi" id="listAddress" placeholder="Street address or landmark">
             </div>
             <div class="fg"><label>Description *</label><textarea class="fi" id="listDesc" style="min-height:80px;resize:vertical;" required></textarea></div>
+
+            <!-- Listing Specs -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:10px;">Property Specs <span style="color:#aaa;font-weight:400;font-size:12px;">(optional)</span></label>
+                <div class="g3">
+                    <div class="fg" style="margin-bottom:0;"><label>Bedrooms</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listRooms',-1)">−</button><input type="number" class="fi step-inp" id="listRooms" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listRooms',1)">+</button></div></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Bathrooms</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listBathrooms',-1)">−</button><input type="number" class="fi step-inp" id="listBathrooms" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listBathrooms',1)">+</button></div></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Beds</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listBeds',-1)">−</button><input type="number" class="fi step-inp" id="listBeds" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listBeds',1)">+</button></div></div>
+                </div>
+                <div class="g2" style="margin-top:10px;">
+                    <div class="fg" style="margin-bottom:0;"><label>Max Guests</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listMaxGuests',-1)">−</button><input type="number" class="fi step-inp" id="listMaxGuests" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listMaxGuests',1)">+</button></div></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Floor Area (m²)</label><input type="number" class="fi" id="listFloorArea" min="0" placeholder="e.g. 75"></div>
+                </div>
+            </div>
+
+            <!-- Amenities -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:10px;">Amenities <span style="color:#aaa;font-weight:400;font-size:12px;">(optional)</span></label>
+                <div id="amenityCheckboxes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;">
+                    <span style="color:#aaa;font-size:13px;">Loading amenities…</span>
+                </div>
+            </div>
+
             <div class="g2">
                 <div class="fg"><label>Images (max 10)</label><input type="file" class="fi" id="listImageFiles" accept="image/*" multiple style="padding:8px;border-style:dashed;"></div>
                 <div class="fg"><label>Videos (max 3)</label><input type="file" class="fi" id="listVideoFiles" accept="video/*" multiple style="padding:8px;border-style:dashed;"></div>
             </div>
-            <button type="submit" class="btn-p" style="width:100%;justify-content:center;padding:14px;font-size:15px;border-radius:12px;margin-top:8px;">
+            <div id="listingCreateStatus" style="display:none;padding:12px 16px;border-radius:10px;font-size:13px;margin-top:10px;"></div>
+            <button type="submit" class="btn-p" id="createBtn" style="width:100%;justify-content:center;padding:14px;font-size:15px;border-radius:12px;margin-top:8px;">
                 <i class="fa-solid fa-plus"></i> Submit for Approval
             </button>
         </form>
@@ -330,9 +374,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>
+<script src="/js/utils.js"></script>
 <script src="/js/dashboard.js"></script>
 <script>
-const PTITLES={dashboardPanel:'Dashboard',listingsPanel:'My Listings',bookingsPanel:'Bookings',settingsPanel:'Settings'};
+const PTITLES={dashboardPanel:'Dashboard',listingsPanel:'My Listings',bookingsPanel:'Bookings',promotionsPanel:'Promotions',settingsPanel:'Settings'};
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
     btn.addEventListener('click',function(){
         const tab=this.getAttribute('data-tab');
@@ -346,6 +391,7 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
                 prefillOwnerProfile();
             },150);
         }
+        if(tab==='promotions') setTimeout(()=>{ if(typeof loadOwnerPromotions==='function')loadOwnerPromotions(); },100);
     });
 });
 
@@ -421,14 +467,7 @@ async function ownerDeleteAccount(){
     }catch(err){window.toast('Failed: '+err.message,'error');}
 }
 
-document.getElementById('mobileMenuBtn')?.addEventListener('click',()=>{
-    document.getElementById('sidebar').classList.toggle('active');
-    document.getElementById('sidebarOverlay').classList.toggle('active');
-});
-document.getElementById('sidebarOverlay')?.addEventListener('click',()=>{
-    document.getElementById('sidebar').classList.remove('active');
-    document.getElementById('sidebarOverlay').classList.remove('active');
-});
+// Sidebar toggle handled by initSidebarToggle() in dashboard.js
 </script>
 </body>
 </html>

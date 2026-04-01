@@ -49,7 +49,8 @@ function generateListingCard(listing, locationName) {
     const catLbl   = isVeh ? 'Vehicle' : 'Real Estate';
     const catIcon  = isVeh ? 'fa-car' : 'fa-house';
     const unit     = isVeh ? '/day' : '/night';
-    const price    = Number(listing.price).toLocaleString();
+    const dp       = listing.price_display || listing.price;
+    const price    = Number(dp).toLocaleString();
     const currency = listing.currency || 'RWF';
 
     function esc(s) {
@@ -130,8 +131,9 @@ async function applyActivePromos(sb, listings) {
     listings.forEach(l => {
         const disc = promoMap[l.id];
         if (disc) {
+            const dp = l.price_display || l.price;
             l.promo_discount = disc;
-            l.promo_price    = Math.round(l.price * (1 - disc / 100));
+            l.promo_price    = Math.round(dp * (1 - disc / 100));
         }
     });
 }
@@ -142,12 +144,21 @@ window.fetchAndRenderSharedListings = async function(options) {
     const container = document.getElementById(options.containerId);
     if (!container) return;
 
+    // Show loading state immediately
+    if (window.showAfriLoading) showAfriLoading(container);
+    else container.innerHTML = '<div class="afri-loading"><div class="afri-loading-logo">Loading</div></div>';
+
+    const PAGE_SIZE = options.pageSize || 15;
+    const page      = options.page || 0;
+    const start     = page * PAGE_SIZE;
+    const end       = start + PAGE_SIZE - 1;
+
     let q = sb.from('listings')
-        .select(`id, title, price, currency, availability_status, status,
-                 category_slug, province_id, district_id, created_at,
-                 listing_images ( image_url )`)
+        .select(`id, title, price, price_display, price_outside_kigali_display, currency, availability_status, status,
+                 category_slug, province_id, district_id, created_at, avg_rating, reviews_count,
+                 listing_images ( image_url )`, { count: 'exact' })
         .eq('status', 'approved')
-        .eq('availability_status', 'available'); // only bookable listings on public pages
+        .eq('availability_status', 'available');
 
     if (options.featuredOnly) q = q.eq('featured', true);
     if (options.qtext)        q = q.ilike('title', `%${options.qtext}%`);
@@ -155,16 +166,25 @@ window.fetchAndRenderSharedListings = async function(options) {
     if (options.district)     q = q.eq('district_id', options.district);
     if (options.sector)       q = q.eq('sector_id', options.sector);
     if (options.category)     q = q.eq('category_slug', options.category);
+    if (options.amenity)      q = q.contains('amenities_data', [options.amenity]);
     q = q.order('created_at', { ascending: false });
-    if (options.limit) q = q.limit(options.limit);
 
-    const { data: listings, error } = await q;
+    if (!options.featuredOnly && !options.limit) {
+        q = q.range(start, end);
+    } else if (options.limit) {
+        q = q.limit(options.limit);
+    }
+
+    const { data: listings, error, count } = await q;
 
     if (error || !listings || !listings.length) {
-        container.innerHTML = `<div style="width:100%;text-align:center;padding:40px;color:#999;font-family:'Inter',sans-serif;">
-            <i class="fa-solid fa-house-circle-xmark" style="font-size:40px;color:#EB6753;margin-bottom:12px;display:block;"></i>
-            <p>${error ? error.message : 'No properties found.'}</p>
-        </div>`;
+        if (window.showEmptyResults) {
+            showEmptyResults(container,
+                error ? 'Could not load listings' : 'No listings found',
+                error ? error.message : 'Try different filters or search terms.');
+        } else {
+            container.innerHTML = '<div class="empty-results"><i class="fa-solid fa-magnifying-glass"></i><h4>No listings found</h4><p>Try different filters or search terms.</p></div>';
+        }
         if (options.onComplete) options.onComplete(0);
         return;
     }
@@ -189,6 +209,17 @@ window.fetchAndRenderSharedListings = async function(options) {
         const locName = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
         container.innerHTML += generateListingCard(l, locName);
     });
+
+    // Pagination (for listings page only, not featured carousel)
+    if (!options.featuredOnly && !options.limit && options.paginationId && window.renderPagination) {
+        const total = count || listings.length;
+        const pageCount = Math.ceil(total / PAGE_SIZE);
+        renderPagination(options.paginationId, page, pageCount, total, PAGE_SIZE, (newPage) => {
+            fetchAndRenderSharedListings({ ...options, page: newPage });
+            const grid = document.getElementById(options.containerId);
+            if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    }
 
     if (options.onComplete) options.onComplete(listings.length);
     // Refresh hearts after cards are in the DOM

@@ -60,10 +60,11 @@ async function loadListingDetails(today) {
         _supabase
             .from('listings')
             .select(`
-                id, title, description, price, price_outside_kigali, currency, address,
+                id, title, description, price, price_display, price_outside_kigali, price_outside_kigali_display, currency, address,
                 availability_status, status, avg_rating, reviews_count,
                 category_slug, landmark_description,
                 province_id, district_id, sector_id, owner_id,
+                rooms, bathrooms, beds, max_guests, floor_area, amenities_data,
                 provinces ( name ),
                 districts ( name ),
                 sectors ( name ),
@@ -129,20 +130,22 @@ async function loadListingDetails(today) {
     setEl('listingLocation', locationStr);
 
     const currency  = listing.currency || 'RWF';
-    const price     = Number(listing.price).toLocaleString('en-RW');
+    const dp        = listing.price_display || listing.price;
+    const price     = Number(dp).toLocaleString('en-RW');
     const priceUnit = listing.category_slug === 'vehicle' ? '/ day' : '/ night';
     const isVehDual = listing.category_slug === 'vehicle' && listing.price_outside_kigali;
     const priceEl   = document.getElementById('listingPrice');
     if (priceEl) {
         if (isVehDual) {
-            const oStr = Number(listing.price_outside_kigali).toLocaleString('en-RW');
+            const oDP  = listing.price_outside_kigali_display || listing.price_outside_kigali;
+            const oStr = Number(oDP).toLocaleString('en-RW');
             priceEl.innerHTML =
                 '<div style="font-size:13px;line-height:2.2;">' +
                 '🏙️ Kigali: <strong>' + price + ' <small>' + currency + '</small><span style="font-size:12px;color:#bbb;font-weight:400;"> /day</span></strong><br>' +
                 '🌍 Outside Kigali: <strong>' + oStr + ' <small>' + currency + '</small><span style="font-size:12px;color:#bbb;font-weight:400;"> /day</span></strong>' +
                 '</div>';
         } else if (promoData && promoData.discount) {
-            const discounted = Math.round(listing.price * (1 - promoData.discount / 100));
+            const discounted = Math.round(dp * (1 - promoData.discount / 100));
             const discStr    = Number(discounted).toLocaleString('en-RW');
             const endFmt     = new Date(promoData.end_date).toLocaleDateString('en-RW', { month: 'short', day: 'numeric' });
             priceEl.innerHTML =
@@ -184,6 +187,9 @@ async function loadListingDetails(today) {
     document.getElementById('contentEl').style.display = 'grid';
     console.log('✅ [DETAIL] Page rendered');
 
+    renderListingSpecs(listing);
+    renderListingAmenities(listing);
+
     // ── Pending notice: hide booking form if not approved ──
     if (listing.status !== 'approved') {
         const bf = document.getElementById('bookingForm');
@@ -196,46 +202,102 @@ async function loadListingDetails(today) {
             '</div>';
     }
 
-    // ── Fetch and render owner contact info ──
-// ── Fetch and render owner contact info ──
+    // ── Fetch and render owner info (public — no phone/email) ──
     if (listing.owner_id) {
         _supabase
-            .from('profiles')
-            .select('full_name, email, phone')
+            .from('v_owner_public')
+            .select('full_name, bio, member_since')
             .eq('id', listing.owner_id)
-            .maybeSingle() /* Changed from .single() */
-            .then(({ data: owner, error }) => { 
+            .maybeSingle()
+            .then(({ data: owner, error }) => {
                 if (error) console.warn("Could not fetch owner:", error);
-                if (owner) renderOwnerContact(owner); 
+                if (owner) renderOwnerContact(owner);
             });
     }
 }
 
 function renderOwnerContact(owner) {
-    // Inject contact card before the reviews section
     const anchor = document.getElementById('reviewsSection');
     if (!anchor || document.getElementById('ownerContactCard')) return;
     const el = document.createElement('div');
     el.id = 'ownerContactCard';
+    const since = owner.member_since ? new Date(owner.member_since).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : null;
     el.innerHTML =
         '<div style="background:#fff;border-radius:16px;padding:22px 24px;margin-bottom:24px;border:1px solid #f0f0f0;box-shadow:0 2px 12px rgba(0,0,0,0.05);">' +
         '<h3 style="font-size:16px;font-weight:700;color:#1a1a1a;margin:0 0 16px;padding-bottom:10px;border-bottom:2px solid #f5f5f5;">' +
-        '<i class="fa-solid fa-user-tie" style="color:#EB6753;margin-right:8px;"></i>Contact Host</h3>' +
+        '<i class="fa-solid fa-user-tie" style="color:#EB6753;margin-right:8px;"></i>Your Host</h3>' +
         '<div style="display:flex;align-items:center;gap:14px;">' +
-        '<div style="width:50px;height:50px;border-radius:50%;background:#EB6753;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0;">' +
-        escHtml((owner.full_name||'H').charAt(0).toUpperCase()) + '</div>' +
+        '<div style="width:52px;height:52px;border-radius:50%;background:#EB6753;color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0;">' +
+        escHtml((owner.full_name || 'H').charAt(0).toUpperCase()) + '</div>' +
         '<div style="flex:1;">' +
-        '<p style="font-size:15px;font-weight:700;color:#1a1a1a;margin:0 0 6px;">' + escHtml(owner.full_name||'Host') + '</p>' +
-        (owner.email
-            ? '<a href="mailto:' + escHtml(owner.email) + '" style="display:flex;align-items:center;gap:7px;color:#555;font-size:13px;text-decoration:none;margin-bottom:5px;transition:color 0.2s;" onmouseover="this.style.color=\'#EB6753\'" onmouseout="this.style.color=\'#555\'">' +
-              '<i class="fa-solid fa-envelope" style="color:#EB6753;font-size:12px;width:14px;text-align:center;"></i>' + escHtml(owner.email) + '</a>'
-            : '') +
-        (owner.phone
-            ? '<a href="tel:' + escHtml(owner.phone) + '" style="display:flex;align-items:center;gap:7px;color:#555;font-size:13px;text-decoration:none;transition:color 0.2s;" onmouseover="this.style.color=\'#EB6753\'" onmouseout="this.style.color=\'#555\'">' +
-              '<i class="fa-solid fa-phone" style="color:#EB6753;font-size:12px;width:14px;text-align:center;"></i>' + escHtml(owner.phone) + '</a>'
-            : '<p style="font-size:12px;color:#ccc;margin:0;font-style:italic;">No phone number listed</p>') +
+        '<p style="font-size:15px;font-weight:700;color:#1a1a1a;margin:0 0 3px;">' + escHtml(owner.full_name || 'Host') + '</p>' +
+        (since ? '<p style="font-size:12px;color:#aaa;margin:0 0 6px;"><i class="fa-regular fa-calendar" style="margin-right:5px;"></i>Host since ' + since + '</p>' : '') +
+        (owner.bio ? '<p style="font-size:13px;color:#555;margin:0;line-height:1.6;">' + escHtml(owner.bio) + '</p>' : '') +
         '</div></div></div>';
     anchor.before(el);
+}
+function renderListingSpecs(listing) {
+    // Insert specs chips after the description
+    const descEl = document.getElementById('listingDescription');
+    if (!descEl || document.getElementById('listingSpecsEl')) return;
+
+    const specs = [];
+    if (listing.rooms)      specs.push({ icon: 'fa-solid fa-door-open',    label: listing.rooms + ' Bedroom' + (listing.rooms > 1 ? 's' : '') });
+    if (listing.bathrooms)  specs.push({ icon: 'fa-solid fa-bath',          label: listing.bathrooms + ' Bathroom' + (listing.bathrooms > 1 ? 's' : '') });
+    if (listing.beds)       specs.push({ icon: 'fa-solid fa-bed',           label: listing.beds + ' Bed' + (listing.beds > 1 ? 's' : '') });
+    if (listing.max_guests) specs.push({ icon: 'fa-solid fa-users',         label: listing.max_guests + ' Guest' + (listing.max_guests > 1 ? 's' : '') });
+    if (listing.floor_area) specs.push({ icon: 'fa-solid fa-ruler-combined', label: listing.floor_area + ' m²' });
+
+    if (!specs.length) return;
+
+    const el = document.createElement('div');
+    el.id = 'listingSpecsEl';
+    el.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 24px;';
+    el.innerHTML = specs.map(s =>
+        '<div style="display:flex;align-items:center;gap:8px;padding:10px 16px;background:#f7f7f7;border-radius:10px;font-size:13px;font-weight:600;color:#333;">' +
+        '<i class="' + s.icon + '" style="color:#EB6753;font-size:14px;"></i>' + s.label + '</div>'
+    ).join('');
+    descEl.after(el);
+}
+
+async function renderListingAmenities(listing) {
+    const reviewsEl = document.getElementById('reviewsSection');
+    if (!reviewsEl || document.getElementById('amenitiesSection')) return;
+
+    const slugs = listing.amenities_data;
+    if (!slugs || !slugs.length) return;
+
+    // Fetch definitions for these slugs
+    const { data, error } = await _supabase
+        .from('amenity_definitions')
+        .select('slug, label, icon, category')
+        .in('slug', slugs);
+    if (error || !data || !data.length) return;
+
+    // Group by category
+    const groups = {};
+    data.forEach(a => {
+        if (!groups[a.category]) groups[a.category] = [];
+        groups[a.category].push(a);
+    });
+
+    const el = document.createElement('div');
+    el.id = 'amenitiesSection';
+    let html = '<div style="font-size:18px;font-weight:800;color:#1a1a1a;margin:0 0 16px;padding-bottom:12px;border-bottom:2px solid #f0f0f0;">Amenities</div>';
+    Object.keys(groups).forEach(cat => {
+        html += '<div style="margin-bottom:20px;">';
+        if (cat && cat !== 'null') html += '<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#aaa;margin-bottom:10px;">' + escHtml(cat) + '</div>';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;">';
+        groups[cat].forEach(a => {
+            html += '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid #f0f0f0;border-radius:12px;font-size:13px;font-weight:600;color:#333;background:#fafafa;">' +
+                '<i class="' + (a.icon || 'fa-solid fa-check') + '" style="color:#EB6753;font-size:15px;width:18px;text-align:center;flex-shrink:0;"></i>' +
+                escHtml(a.label) + '</div>';
+        });
+        html += '</div></div>';
+    });
+    el.innerHTML = html;
+    el.style.cssText = 'background:#fff;border-radius:16px;padding:22px 24px;margin-bottom:24px;border:1px solid #f0f0f0;box-shadow:0 2px 12px rgba(0,0,0,0.05);';
+    reviewsEl.before(el);
 }
 
 function renderMediaSlider(title) {
@@ -519,8 +581,8 @@ function initBookingForm() {
         const unit = isVeh ? 'day' : 'night';
         const selectedZone = document.querySelector('input[name="zone"]:checked')?.value || 'kigali';
         const price = isVeh && selectedZone === 'outside_kigali' && CURRENT_LISTING?.price_outside_kigali
-            ? CURRENT_LISTING.price_outside_kigali
-            : (CURRENT_LISTING?.price || 0);
+            ? (CURRENT_LISTING.price_outside_kigali_display || CURRENT_LISTING.price_outside_kigali)
+            : (CURRENT_LISTING?.price_display || CURRENT_LISTING?.price || 0);
         const currency = CURRENT_LISTING?.currency || 'RWF';
         totalEl.innerHTML = days + ' ' + unit + (days > 1 ? 's' : '') + ' × ' + Number(price).toLocaleString('en-RW') + ' ' + currency + ' = <span style="color:#EB6753;font-weight:700;">' + Number(days * price).toLocaleString('en-RW') + ' ' + currency + '</span>';
     }
@@ -537,10 +599,10 @@ function initBookingForm() {
             '<p style="font-weight:700;color:#555;margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;">Zone</p>' +
             '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:7px;">' +
             '<input type="radio" name="zone" value="kigali" checked> ' +
-            '🏙️ Within Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price).toLocaleString('en-RW') + ' RWF/day</span></label>' +
+            '🏙️ Within Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price_display || CURRENT_LISTING.price).toLocaleString('en-RW') + ' RWF/day</span></label>' +
             '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
             '<input type="radio" name="zone" value="outside_kigali"> ' +
-            '🌍 Outside Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price_outside_kigali).toLocaleString('en-RW') + ' RWF/day</span></label>';
+            '🌍 Outside Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price_outside_kigali_display || CURRENT_LISTING.price_outside_kigali).toLocaleString('en-RW') + ' RWF/day</span></label>';
         const totalEl2 = document.getElementById('bookingTotal');
         if (totalEl2) totalEl2.before(zoneEl);
         zoneEl.querySelectorAll('input[name="zone"]').forEach(r => r.addEventListener('change', calcTotal));
@@ -558,13 +620,13 @@ function goToCheckout() {
     if (days <= 0) { if (statusEl) { statusEl.style.color = '#e74c3c'; statusEl.textContent = isVeh ? 'Return must be after pick-up.' : 'Check-out must be after check-in.'; } return; }
     const selectedZone = document.querySelector('input[name="zone"]:checked')?.value || 'kigali';
     const selectedPrice = isVeh && selectedZone === 'outside_kigali' && CURRENT_LISTING?.price_outside_kigali
-        ? CURRENT_LISTING.price_outside_kigali
-        : (CURRENT_LISTING?.price || 0);
+        ? (CURRENT_LISTING.price_outside_kigali_display || CURRENT_LISTING.price_outside_kigali)
+        : (CURRENT_LISTING?.price_display || CURRENT_LISTING?.price || 0);
     const totalAmount = days * selectedPrice;
     const currency = CURRENT_LISTING?.currency || 'RWF';
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Redirecting...'; }
     const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: selectedPrice, currency, total: totalAmount, category: CURRENT_LISTING?.category_slug || 'property', price_zone: selectedZone });
-    window.location.href = '/Checkout/?' + params.toString();
+    window.location.href = '/Listings/Checkout/?' + params.toString();
 }
 
 function setEl(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }

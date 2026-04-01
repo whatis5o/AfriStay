@@ -1,4 +1,84 @@
 /* --- style.css --- */
+
+/* ─── Global Loading Animation ─── */
+.afri-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    gap: 16px;
+}
+.afri-loading-logo {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--primary, #EB6753);
+    animation: afri-pulse 1.5s ease-in-out infinite;
+    letter-spacing: 0.5px;
+}
+.afri-loading-logo::after {
+    content: '';
+    animation: afri-dots 1.5s steps(4, end) infinite;
+}
+@keyframes afri-dots {
+    0%   { content: ''; }
+    25%  { content: '.'; }
+    50%  { content: '..'; }
+    75%  { content: '...'; }
+    100% { content: ''; }
+}
+@keyframes afri-pulse {
+    0%, 100% { opacity: 0.4; }
+    50%       { opacity: 1; }
+}
+
+/* Empty/no-results state */
+.empty-results {
+    text-align: center;
+    padding: 60px 20px;
+    color: #bbb;
+}
+.empty-results i { font-size: 40px; margin-bottom: 12px; display: block; }
+.empty-results h4 { font-size: 16px; font-weight: 700; color: #999; margin-bottom: 6px; }
+.empty-results p  { font-size: 13px; }
+
+/* Pagination */
+.afri-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px 0 8px;
+    font-family: 'Inter', sans-serif;
+}
+.afri-pagination button {
+    padding: 8px 18px;
+    border: 1.5px solid var(--border, #e8e8e8);
+    border-radius: 8px;
+    background: var(--card-bg, #fff);
+    color: var(--text, #333);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .18s;
+    font-family: 'Inter', sans-serif;
+}
+.afri-pagination button:hover:not(:disabled) {
+    background: var(--primary, #EB6753);
+    color: #fff;
+    border-color: var(--primary, #EB6753);
+}
+.afri-pagination button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.afri-pagination .page-info {
+    font-size: 13px;
+    color: var(--text-muted, #888);
+    min-width: 80px;
+    text-align: center;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;

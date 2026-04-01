@@ -80,11 +80,36 @@
             padding: 0 24px; position: relative; z-index: 10;
         }
         .filter-bar {
-            background: #fff; border-radius: 20px;
+            background: #fff; border-radius: 20px 20px 0 0;
             padding: 18px 24px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.1);
             display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
         }
+
+        /* ── AMENITY CHIPS ── */
+        .amenity-chips-bar {
+            background: #fff; border-radius: 0 0 20px 20px;
+            padding: 10px 20px 14px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.07);
+            border-top: 1px solid #f5f5f5;
+        }
+        .amenity-chips {
+            display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+        }
+        .amenity-chips::-webkit-scrollbar { display: none; }
+        .am-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 14px; border: 1.5px solid #ebebeb;
+            border-radius: 20px; background: #fff;
+            font-size: 12px; font-weight: 600; color: #666;
+            cursor: pointer; font-family: 'Inter', sans-serif;
+            white-space: nowrap; transition: all .18s; flex-shrink: 0;
+        }
+        .am-chip i { color: #bbb; font-size: 11px; transition: color .18s; }
+        .am-chip:hover { border-color: var(--primary); color: var(--primary); }
+        .am-chip:hover i { color: var(--primary); }
+        .am-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .am-chip.active i { color: #fff; }
         .cat-toggle { display: flex; background: #f2f2f2; border-radius: 50px; padding: 4px; gap: 0; }
         .cat-btn {
             padding: 9px 20px; border-radius: 50px;
@@ -494,6 +519,22 @@
             </select>
             <span class="results-count" id="resultsCount"></span>
         </div>
+        <div class="amenity-chips-bar">
+            <div class="amenity-chips" id="amenityChips">
+                <button class="am-chip" data-am="wifi"><i class="fa-solid fa-wifi"></i> WiFi</button>
+                <button class="am-chip" data-am="pool"><i class="fa-solid fa-water-ladder"></i> Pool</button>
+                <button class="am-chip" data-am="parking"><i class="fa-solid fa-square-parking"></i> Parking</button>
+                <button class="am-chip" data-am="air_conditioning"><i class="fa-solid fa-snowflake"></i> A/C</button>
+                <button class="am-chip" data-am="kitchen"><i class="fa-solid fa-kitchen-set"></i> Kitchen</button>
+                <button class="am-chip" data-am="generator"><i class="fa-solid fa-bolt"></i> Generator</button>
+                <button class="am-chip" data-am="tv"><i class="fa-solid fa-tv"></i> TV</button>
+                <button class="am-chip" data-am="gym"><i class="fa-solid fa-dumbbell"></i> Gym</button>
+                <button class="am-chip" data-am="laundry"><i class="fa-solid fa-jug-detergent"></i> Laundry</button>
+                <button class="am-chip" data-am="balcony"><i class="fa-solid fa-person-shelter"></i> Balcony</button>
+                <button class="am-chip" data-am="security"><i class="fa-solid fa-shield-halved"></i> Security</button>
+                <button class="am-chip" data-am="breakfast"><i class="fa-solid fa-mug-hot"></i> Breakfast</button>
+            </div>
+        </div>
     </div>
 
 <!-- GRID -->
@@ -504,6 +545,7 @@
                 <p>Find your perfect stay across Rwanda's most beautiful locations</p>
             </div>
             <div class="properties-grid" id="propertiesGrid"></div>
+            <div id="listingsPagination" style="margin-top:24px;"></div>
         </div>
     </section>
 
@@ -583,6 +625,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/js/config.js"></script>
+    <script src="/js/utils.js"></script>
     <script src="/js/script.js"></script>
     <script>
     (async () => {
@@ -704,39 +747,63 @@
     
         document.getElementById('heroSearch').addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
     
+        let _lastFilters = {};
+        const PAGE_SIZE = 15;
+
+        // ── Amenity chip toggle ──
+        let _activeAmenities = [];
+        document.querySelectorAll('.am-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const am = chip.dataset.am;
+                chip.classList.toggle('active');
+                if (chip.classList.contains('active')) {
+                    if (!_activeAmenities.includes(am)) _activeAmenities.push(am);
+                } else {
+                    _activeAmenities = _activeAmenities.filter(a => a !== am);
+                }
+                applyFilters();
+            });
+        });
+
         window.applyFilters = async () => {
             const qtext    = document.getElementById('heroSearch').value.trim();
             const province = document.getElementById('flProvince').value;
             const district = document.getElementById('flDistrict').value;
             const sector   = document.getElementById('flSector').value;
-            await loadListings({ qtext, province, district, sector, category: activeCat });
+            _lastFilters = { qtext, province, district, sector, category: activeCat, amenities: _activeAmenities };
+            await loadListings({ ..._lastFilters, page: 0 });
         };
-    
-        async function loadListings({ qtext='', province='', district='', sector='', category='' } = {}) {
+
+        async function loadListings({ qtext='', province='', district='', sector='', category='', amenities=[], page=0 } = {}) {
             showSkeletons(6);
+            document.getElementById('listingsPagination').innerHTML = '';
+            const start = page * PAGE_SIZE;
+            const end   = start + PAGE_SIZE - 1;
 
             let q = sb.from('listings')
-                .select('id,title,price,currency,availability_status,status,category_slug,province_id,district_id,created_at')
+                .select('id,title,price,price_display,currency,availability_status,status,category_slug,province_id,district_id,created_at,avg_rating,reviews_count', { count: 'exact' })
                 .eq('status', 'approved')
                 .eq('availability_status', 'available')
                 .order('created_at', { ascending: false })
-                .limit(100);
+                .range(start, end);
 
-            console.log('🔍 [LISTINGS] Fetching approved + available listings...');
+            console.log('🔍 [LISTINGS] Fetching page', page, 'listings...');
 
             if (qtext)    q = q.ilike('title', `%${qtext}%`);
             if (province) q = q.eq('province_id', province);
             if (district) q = q.eq('district_id', district);
             if (sector)   q = q.eq('sector_id', sector);
             if (category) q = q.eq('category_slug', category);
-    
-            const { data, error } = await q;
+            if (amenities && amenities.length) q = q.contains('amenities_data', amenities);
+
+            const { data, error, count } = await q;
             if (error) { grid.innerHTML = `<div class="state-box"><i class="fa-solid fa-triangle-exclamation"></i><p>${esc(error.message)}</p></div>`; return; }
-    
-            console.log('📋 [LISTINGS] Fetched', data?.length || 0, 'listings');
+
+            console.log('📋 [LISTINGS] Fetched', data?.length || 0, '/', count, 'listings');
             if (!data || !data.length) { grid.innerHTML = '<div class="state-box"><i class="fa-solid fa-house-circle-xmark"></i><p>No listings found. Try different filters.</p></div>'; countEl.textContent = '0 results'; return; }
 
-            countEl.textContent = data.length + ' result' + (data.length !== 1 ? 's' : '');
+            const total = count || data.length;
+            countEl.textContent = total + ' result' + (total !== 1 ? 's' : '');
     
             // batch images — table first, then storage fallback
             const ids = data.map(l => l.id);
@@ -784,6 +851,16 @@
                     '</div>';
                 grid.appendChild(card);
             });
+
+            // Pagination
+            if (window.renderPagination) {
+                const totalCount = count || data.length;
+                const pageCount = Math.ceil(totalCount / PAGE_SIZE);
+                renderPagination('listingsPagination', page, pageCount, totalCount, PAGE_SIZE, (newPage) => {
+                    loadListings({ ...(_lastFilters || {}), page: newPage });
+                    grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            }
         }
     
         showSkeletons(6);

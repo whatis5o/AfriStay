@@ -8,7 +8,7 @@
 <meta property="og:title" content="Checkout — AfriStay">
 <meta property="og:description" content="Complete your AfriStay booking securely with Irembo Pay.">
 <meta property="og:image" content="https://afristay.rw/Pictures/light-afri1.png">
-<meta property="og:url" content="https://afristay.rw/Checkout/">
+<meta property="og:url" content="https://afristay.rw/Listings/Checkout/">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -285,10 +285,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
         <i class="fa-solid fa-mobile-screen-button"></i>
         <span class="m-tab-lbl">Mobile<br>Money</span>
       </div>
-      <div class="m-tab" id="tab-arrival" onclick="switchTab('arrival')">
-        <i class="fa-solid fa-handshake"></i>
-        <span class="m-tab-lbl">On<br>Arrival</span>
-      </div>
     </div>
 
     <div class="err" id="errBox"><i class="fa-solid fa-triangle-exclamation"></i><span id="errMsg"></span></div>
@@ -347,22 +343,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
         <i class="fa-solid fa-circle-info" style="color:#f59e0b"></i>
         <div>Once the host approves, <strong>Irembo Pay will send a USSD push to this number</strong>. Enter your MoMo PIN to confirm. Make sure you have enough balance.</div>
       </div>
-    </div>
-
-    <!-- ═══ ARRIVAL ═══ -->
-    <div class="panel" id="panel-arrival">
-      <div class="box box-green" style="flex-direction:column;gap:0">
-        <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--green);margin-bottom:10px">
-          <i class="fa-solid fa-handshake"></i> Pay on Arrival
-        </div>
-        <ul class="a-steps">
-          <li><span class="sn">1</span>Booking reserved now — no charge today</li>
-          <li><span class="sn">2</span>Host confirms within 12 hours</li>
-          <li><span class="sn">3</span>Pay the host directly in cash on check-in</li>
-          <li><span class="sn">4</span>Free cancellation up to 24h before check-in</li>
-        </ul>
-      </div>
-      <p style="font-size:12px;color:var(--muted);line-height:1.6">⚠️ Online payment secures your spot — hosts may prioritise paid bookings.</p>
     </div>
 
     <hr class="sep">
@@ -508,7 +488,7 @@ function disablePayBtn() {
 
 function switchTab(m) {
   METHOD = m;
-  ['card','momo','arrival'].forEach(x => {
+  ['card','momo'].forEach(x => {
     $('tab-'+x)?.classList.toggle('on', x===m);
     $('panel-'+x)?.classList.toggle('on', x===m);
   });
@@ -533,11 +513,6 @@ function refreshBtn() {
     tx('payLabel', 'Request Booking — Pay ' + t + ' via MoMo');
     $('payIcon').className = 'fa-solid fa-mobile-screen-button';
     tx('lockLabel', 'Irembo Pay USSD push sent to your phone after host approves');
-  } else {
-    btn.classList.add('g');
-    tx('payLabel', 'Reserve — Pay Cash on Arrival');
-    $('payIcon').className = 'fa-solid fa-handshake';
-    tx('lockLabel', 'No payment taken now · Free to cancel 24h before ' + (CATEGORY === 'vehicle' ? 'pick-up' : 'check-in'));
   }
 }
 
@@ -550,7 +525,7 @@ function validate() {
   if (!email.includes('@')){ showErr('Please enter a valid email address.'); return null; }
   if (phone.length < 8)    { showErr('Please enter your phone number (digits only, without +250).'); return null; }
   if (!LISTING)            { showErr('Session expired — please go back.'); return null; }
-  if (METHOD !== 'arrival' && TOTAL <= 0) {
+  if (TOTAL <= 0) {
     showErr('Invalid booking amount — go back and re-select your dates.'); return null;
   }
 
@@ -574,7 +549,7 @@ function validate() {
     return { ...base, momoPhone: '+250' + momoPhone };
   }
 
-  return base; // arrival
+  return base;
 }
 
 async function pay() {
@@ -618,16 +593,14 @@ async function pay() {
     const { data: { session } } = await sb.auth.getSession();
     const token   = session?.access_token || CONFIG.SUPABASE_KEY;
     const fnBase  = (CONFIG?.FUNCTIONS_BASE || '').replace(/\/$/, '');
-    const pmMethod = METHOD === 'arrival' ? 'pay_on_arrival'
-                   : METHOD === 'momo'    ? 'momo_' + NETWORK
-                   : 'card_irembo';
+    const pmMethod = METHOD === 'momo' ? 'momo_' + NETWORK : 'card_irembo';
 
     let iremboRef       = null;
     let iremboTxId      = null;
     let iremboPayStatus = null;
 
-    // ── Step 1: Send to Irembo Pay (card & momo only) ──
-    if (METHOD !== 'arrival') {
+    // ── Step 1: Send to Irembo Pay ──
+    {
       setBusy(true, METHOD === 'card' ? 'Sending card details to Irembo Pay…' : 'Sending MoMo request to Irembo Pay…');
 
       const iBody = {
@@ -670,8 +643,6 @@ async function pay() {
       iremboTxId      = iData.transaction_id || null;
       iremboPayStatus = iData.status || 'initiated';
       setBusy(true, 'Saving your booking…');
-    } else {
-      setBusy(true, 'Submitting reservation…');
     }
 
     // ── Step 2: Store booking via edge function ──
@@ -713,7 +684,7 @@ async function pay() {
       throw new Error(data.error || data.message || 'Booking failed (HTTP ' + res.status + ')');
     }
 
-    showConfirmation(data.booking_id || data.id, METHOD === 'arrival', iremboRef);
+    showConfirmation(data.booking_id || data.id, iremboRef);
 
   } catch(err) {
     console.error('❌ [CHECKOUT]', err.message);
@@ -722,15 +693,11 @@ async function pay() {
   }
 }
 
-function showConfirmation(bookingId, isArrival = false, iremboRef = null) {
+function showConfirmation(bookingId, iremboRef = null) {
   $('mainPage').style.display = 'none';
-  let msg = '';
-  if (isArrival)
-    msg = 'Host will confirm within <strong>12 hours</strong>. Pay the host directly in cash on arrival.';
-  else if (METHOD === 'momo')
-    msg = 'Irembo Pay received your MoMo request. Once the host approves, <strong>a USSD push will be sent to your phone</strong>. Enter your PIN to confirm.';
-  else
-    msg = 'Irembo Pay received your card details. Once the host approves, <strong>payment will be processed automatically</strong>. You\'ll receive a confirmation by email.';
+  const msg = METHOD === 'momo'
+    ? 'Irembo Pay received your MoMo request. Once the host approves, <strong>a USSD push will be sent to your phone</strong>. Enter your PIN to confirm.'
+    : 'Irembo Pay received your card details. Once the host approves, <strong>payment will be processed automatically</strong>. You\'ll receive a confirmation by email.';
 
   document.body.insertAdjacentHTML('beforeend', `
     <div style="max-width:540px;margin:100px auto 60px;text-align:center;background:#fff;
@@ -740,7 +707,7 @@ function showConfirmation(bookingId, isArrival = false, iremboRef = null) {
         <i class="fa-solid fa-hourglass-half" style="font-size:30px;color:#EB6753"></i>
       </div>
       <h2 style="font-family:'Playfair Display',serif;font-size:24px;color:#161616;margin-bottom:10px">
-        ${isArrival ? 'Reservation Sent!' : 'Booking Request Sent!'}
+        Booking Request Sent!
       </h2>
       <p style="font-size:14px;color:#888;margin-bottom:20px;line-height:1.8">${msg}</p>
       <div style="background:#fff8f3;border:1.5px solid #fdd5c4;border-radius:12px;padding:14px 18px;

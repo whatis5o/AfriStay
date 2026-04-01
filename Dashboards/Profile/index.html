@@ -40,7 +40,10 @@
         .main-area{margin-left:var(--sw);flex:1;display:flex;flex-direction:column;min-height:100vh;}
         .topbar{background:#fff;padding:14px 28px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-shrink:0;}
         .topbar h1{font-size:20px;font-weight:800;color:#1a1a1a;margin:0;}
-        #mobileMenuBtn{display:none;background:none;border:none;cursor:pointer;font-size:20px;color:#555;padding:4px;}
+        #mobileMenuBtn{display:block;background:none;border:none;cursor:pointer;font-size:20px;color:#555;padding:4px;}
+        .main-area{transition:margin-left .3s;}
+        body.sb-collapsed #sidebar{transform:translateX(-100%);}
+        body.sb-collapsed .main-area{margin-left:0;}
         .content-area{padding:24px 28px;flex:1;}
 
         /* ── TAB PANELS ── */
@@ -148,11 +151,10 @@
         @media(max-width:900px){.stats-row{grid-template-columns:1fr 1fr;}}
         @media(max-width:768px){
             #sidebar{transform:translateX(-100%);}
-            #sidebar.active{transform:translateX(0);}
+            body.sb-open #sidebar{transform:translateX(0);}
             .main-area{margin-left:0;}
-            #mobileMenuBtn{display:block;}
             #sidebarOverlay{display:block;opacity:0;pointer-events:none;transition:opacity .3s;}
-            #sidebarOverlay.active{opacity:1;pointer-events:all;}
+            body.sb-open #sidebarOverlay{opacity:1;pointer-events:all;}
             .content-area{padding:16px;}
             .fav-grid{grid-template-columns:1fr;}
             input,select,textarea{font-size:16px!important;}
@@ -196,6 +198,7 @@
         </button>
         <button class="nav-btn" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
         <button class="nav-btn" data-tab="favorites"><i class="fa-solid fa-heart"></i> Favorites</button>
+        <button class="nav-btn" data-tab="become-owner" id="becomeOwnerNavBtn"><i class="fa-solid fa-house-flag"></i> Become an Owner</button>
         <div class="nav-sep"></div>
         <button class="nav-btn" data-tab="settings"><i class="fa-solid fa-lock"></i> Security</button>
         <div class="nav-sep"></div>
@@ -210,7 +213,9 @@
             <button id="mobileMenuBtn" onclick="toggleMobileMenu()"><i class="fa-solid fa-bars"></i></button>
             <h1 id="panelTitle">Overview</h1>
         </div>
-        <a href="/Listings" class="btn-p"><i class="fa-solid fa-magnifying-glass"></i> Browse</a>
+        <div style="display:flex;gap:10px;align-items:center;">
+<a href="/Listings" class="btn-p"><i class="fa-solid fa-magnifying-glass"></i> Browse</a>
+        </div>
     </header>
 
     <div class="content-area">
@@ -388,6 +393,47 @@
             </div>
         </div>
 
+        <!-- BECOME AN OWNER -->
+        <div class="tab-panel" id="tab-become-owner">
+            <div class="section-card">
+                <div class="section-header">
+                    <h2>Become an Owner</h2>
+                    <p>List your property or vehicle on AfriStay and start earning</p>
+                </div>
+                <div class="section-body">
+                    <div id="ownerAppStatus"></div>
+                    <form id="ownerApplicationForm" style="max-width:520px;">
+                        <div class="form-group">
+                            <label>Why do you want to list on AfriStay? *</label>
+                            <textarea id="appMotivation" class="form-input" style="min-height:100px;resize:vertical;" placeholder="Tell us about your property, what makes it special, and why you want to join AfriStay..." required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Phone Number *</label>
+                            <div style="display:flex;align-items:center;border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+                                <span style="padding:0 12px;font-size:13px;color:#555;background:#f5f5f5;height:44px;display:flex;align-items:center;border-right:1px solid #e0e0e0;flex-shrink:0;">🇷🇼 +250</span>
+                                <input type="tel" id="appPhone" class="form-input" style="border:none!important;border-radius:0!important;flex:1;padding-left:12px;" placeholder="78X XXX XXX" maxlength="9" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Property / Vehicle Type</label>
+                            <select id="appPropertyType" class="form-input" style="padding:12px 14px;">
+                                <option value="">Select type (optional)</option>
+                                <option value="apartment">Apartment</option>
+                                <option value="house">House / Villa</option>
+                                <option value="hotel">Hotel / Lodge</option>
+                                <option value="room">Room</option>
+                                <option value="vehicle">Vehicle</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="save-btn" id="ownerAppBtn">
+                            <i class="fa-solid fa-paper-plane"></i> Submit Application
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
     </div><!-- end content-area -->
 </div><!-- end main-area -->
 
@@ -395,14 +441,23 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>
+<script src="/js/utils.js"></script>
 <script src="/js/script.js"></script>
 <script src="/js/profile.js"></script>
 
 <script>
 function toggleMobileMenu() {
-    document.getElementById('sidebar').classList.toggle('active');
-    document.getElementById('sidebarOverlay').classList.toggle('active');
+    if (window.innerWidth <= 768) {
+        document.body.classList.toggle('sb-open');
+    } else {
+        document.body.classList.toggle('sb-collapsed');
+        const ic = document.querySelector('#mobileMenuBtn i');
+        if (ic) ic.className = document.body.classList.contains('sb-collapsed') ? 'fa-solid fa-bars-staggered' : 'fa-solid fa-bars';
+    }
 }
+document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+    document.body.classList.remove('sb-open');
+});
 // Wire up nav-btn[data-tab] clicks after JS files are loaded
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {

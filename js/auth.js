@@ -47,6 +47,9 @@
         toggleSignin.classList.remove('active');
         toggleSignup.classList.remove('active');
 
+        const termsNote = document.getElementById('termsNote');
+        if (termsNote) termsNote.style.display = (mode === 'signup') ? 'block' : 'none';
+
         if (mode === 'signup') {
             toggleSignup.classList.add('active');
             signupGroup.classList.remove('hidden');
@@ -121,9 +124,8 @@
         localStorage.setItem('afriStay_firstName', firstName);
 
         showSuccess('Welcome back, ' + firstName + '! Redirecting...');
-        const dest = role === 'admin' ? '/Dashboards/Admin/' : role === 'owner' ? '/Dashboards/Owner/' : '/';
         setTimeout(() => {
-            window.location.href = dest;
+            window.location.href = '/';
         }, 1000);
     }
 

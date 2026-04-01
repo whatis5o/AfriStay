@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome, Owner — AfriStay</title>
+    <link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Oleo+Script+Swash+Caps:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/Style/style.css">
+    <style>
+        :root { --primary: #EB6753; }
+        body { background: #f5f5f5; min-height: 100vh; }
+
+        .ob-page {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 110px 24px 80px;
+        }
+
+        /* ── HERO ── */
+        .ob-hero {
+            background: linear-gradient(135deg, #EB6753 0%, #c0392b 100%);
+            border-radius: 24px;
+            padding: 56px 48px;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+        .ob-hero::before, .ob-hero::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.07);
+        }
+        .ob-hero::before { width: 260px; height: 260px; top: -80px; right: -60px; }
+        .ob-hero::after  { width: 160px; height: 160px; bottom: -50px; left: -40px; }
+        .ob-hero .wave-icon {
+            font-size: 52px;
+            margin-bottom: 16px;
+            display: block;
+        }
+        .ob-hero h1 {
+            font-size: 34px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            line-height: 1.2;
+        }
+        .ob-hero p {
+            font-size: 16px;
+            opacity: 0.9;
+            max-width: 520px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        .ob-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 18px;
+        }
+        .ob-status i { font-size: 12px; }
+
+        /* ── STEPS ── */
+        .ob-steps {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        @media (max-width: 680px) { .ob-steps { grid-template-columns: 1fr; } }
+
+        .ob-step {
+            background: #fff;
+            border-radius: 18px;
+            padding: 28px 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .ob-step:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 28px rgba(0,0,0,0.1);
+        }
+        .ob-step-num {
+            width: 36px;
+            height: 36px;
+            background: var(--primary);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+        .ob-step-icon {
+            font-size: 28px;
+            color: var(--primary);
+            margin-bottom: 12px;
+        }
+        .ob-step h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        .ob-step p {
+            font-size: 13px;
+            color: #777;
+            line-height: 1.6;
+        }
+
+        /* ── INFO CARDS ── */
+        .ob-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        @media (max-width: 580px) { .ob-cards { grid-template-columns: 1fr; } }
+
+        .ob-card {
+            background: #fff;
+            border-radius: 18px;
+            padding: 24px 28px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        }
+        .ob-card-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 14px;
+        }
+        .ob-card-title i {
+            width: 32px;
+            height: 32px;
+            background: #fff5f3;
+            color: var(--primary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .ob-card ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .ob-card ul li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 13px;
+            color: #555;
+            padding: 6px 0;
+            border-bottom: 1px solid #f5f5f5;
+            line-height: 1.5;
+        }
+        .ob-card ul li:last-child { border-bottom: none; }
+        .ob-card ul li i {
+            color: #2ecc71;
+            font-size: 13px;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        /* ── PAYOUT BOX ── */
+        .ob-payout {
+            background: #fff;
+            border-radius: 18px;
+            padding: 28px 32px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+            margin-bottom: 32px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .ob-payout-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            color: #16a34a;
+            flex-shrink: 0;
+        }
+        .ob-payout-text h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 6px;
+        }
+        .ob-payout-text p {
+            font-size: 13px;
+            color: #777;
+            line-height: 1.6;
+        }
+
+        /* ── CTA ── */
+        .ob-cta {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 20px;
+            padding: 40px 40px;
+            text-align: center;
+            color: #fff;
+        }
+        .ob-cta h2 {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+        .ob-cta p {
+            font-size: 14px;
+            opacity: 0.75;
+            margin-bottom: 28px;
+        }
+        .ob-cta-btns {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .ob-cta-btns a {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 30px;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .ob-cta-btns a.main-btn {
+            background: var(--primary);
+            color: #fff;
+        }
+        .ob-cta-btns a.main-btn:hover { opacity: 0.88; transform: translateY(-2px); }
+        .ob-cta-btns a.sec-btn {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .ob-cta-btns a.sec-btn:hover { background: rgba(255,255,255,0.18); }
+
+        /* ── SUPPORT ── */
+        .ob-support {
+            text-align: center;
+            margin-top: 28px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .ob-support a { color: var(--primary); text-decoration: none; font-weight: 600; }
+        .ob-support a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <nav id="navbar">
+        <div class="logo-area">
+            <a href="/"><img src="/Pictures/light-afri1.png" alt="AfriStay" class="full-logo"></a>
+        </div>
+        <div class="nav-wrapper" id="navWrapper">
+            <i class="fa-solid fa-xmark menu-close" onclick="toggleMenu()"></i>
+            <div class="nav-center">
+                <ul class="nav-links">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/Listings">Listings</a></li>
+                    <li><a href="/Events/">Events</a></li>
+                    <li><a href="/About">About</a></li>
+                    <li><a href="/Contact">Contact</a></li>
+                </ul>
+            </div>
+            <div class="nav-right">
+                <a href="/Favorites" class="icon-link"><i class="fa-solid fa-heart"></i></a>
+                <a href="/Dashboards/Owner/" id="auth-btn" class="signin-btn" style="background:#EB6753;">Dashboard</a>
+            </div>
+        </div>
+        <i class="fa-solid fa-bars menu-open" onclick="toggleMenu()"></i>
+    </nav>
+
+    <div class="ob-page">
+
+        <!-- Hero -->
+        <div class="ob-hero">
+            <span class="wave-icon">&#127881;</span>
+            <h1>Welcome to AfriStay,<br><span id="ownerName">Owner</span>!</h1>
+            <p>Your application has been approved. Here's everything you need to know to start listing and earning on AfriStay.</p>
+            <div class="ob-status">
+                <i class="fa-solid fa-circle-check"></i>
+                Owner Account Approved
+            </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="ob-steps">
+            <div class="ob-step">
+                <div class="ob-step-num">1</div>
+                <div class="ob-step-icon"><i class="fa-solid fa-house-circle-check"></i></div>
+                <h3>Create Your First Listing</h3>
+                <p>Head to your dashboard and click "Add Listing". Fill in the details, upload photos, and set your price.</p>
+            </div>
+            <div class="ob-step">
+                <div class="ob-step-num">2</div>
+                <div class="ob-step-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+                <h3>Get Reviewed by Admin</h3>
+                <p>Every new listing is reviewed by the AfriStay team to ensure quality. This usually takes less than 24 hours.</p>
+            </div>
+            <div class="ob-step">
+                <div class="ob-step-num">3</div>
+                <div class="ob-step-icon"><i class="fa-solid fa-money-bill-trend-up"></i></div>
+                <h3>Start Earning</h3>
+                <p>Once approved, guests can discover and book your listing. You'll be notified of each booking via email.</p>
+            </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="ob-cards">
+            <div class="ob-card">
+                <div class="ob-card-title">
+                    <i class="fa-solid fa-list-check"></i>
+                    Listing Requirements
+                </div>
+                <ul>
+                    <li><i class="fa-solid fa-circle-check"></i> Accurate address and property description</li>
+                    <li><i class="fa-solid fa-circle-check"></i> At least 3 clear, well-lit photos</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Correct pricing in RWF</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Accurate availability calendar</li>
+                    <li><i class="fa-solid fa-circle-check"></i> No misleading or false claims</li>
+                </ul>
+            </div>
+            <div class="ob-card">
+                <div class="ob-card-title">
+                    <i class="fa-solid fa-star"></i>
+                    Tips for Success
+                </div>
+                <ul>
+                    <li><i class="fa-solid fa-circle-check"></i> Respond to booking inquiries within 12 hours</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Keep your availability up to date</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Upload high-quality, natural-light photos</li>
+                    <li><i class="fa-solid fa-circle-check"></i> List all amenities accurately</li>
+                    <li><i class="fa-solid fa-circle-check"></i> Competitive pricing gets more bookings</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Payout info -->
+        <div class="ob-payout">
+            <div class="ob-payout-icon">
+                <i class="fa-solid fa-sack-dollar"></i>
+            </div>
+            <div class="ob-payout-text">
+                <h3>How Payouts Work</h3>
+                <p>AfriStay charges a small platform service fee per confirmed booking. You earn the booking total minus this fee. Payouts are processed after a guest's check-in and coordinated through the AfriStay team. Contact <a href="mailto:info@afristay.rw" style="color:var(--primary);text-decoration:none;font-weight:600;">info@afristay.rw</a> for payout details specific to your account.</p>
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="ob-cta">
+            <h2>Ready to add your first listing?</h2>
+            <p>Your dashboard is live. Go ahead and create a listing — it only takes a few minutes.</p>
+            <div class="ob-cta-btns">
+                <a href="/Dashboards/Owner/" class="main-btn">
+                    <i class="fa-solid fa-gauge"></i> Go to Dashboard
+                </a>
+                <a href="/Contact" class="sec-btn">
+                    <i class="fa-solid fa-headset"></i> Contact Support
+                </a>
+            </div>
+        </div>
+
+        <p class="ob-support">
+            Need help? Email us at <a href="mailto:info@afristay.rw">info@afristay.rw</a> or visit our <a href="/Contact">Contact page</a>.
+            &nbsp;&bull;&nbsp;
+            <a href="/Terms/">Terms of Service</a>
+            &nbsp;&bull;&nbsp;
+            <a href="/Privacy/">Privacy Policy</a>
+        </p>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/js/config.js"></script>
+    <script src="/js/script.js"></script>
+    <script>
+    (async function () {
+        const sb = window.supabaseClient;
+        if (!sb) return;
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user) { window.location.href = '/Auth'; return; }
+        // Fill owner name
+        const { data: profile } = await sb.from('profiles').select('full_name').eq('id', user.id).single();
+        const nameEl = document.getElementById('ownerName');
+        if (nameEl && profile && profile.full_name) nameEl.textContent = profile.full_name.split(' ')[0];
+    })();
+    </script>
+</body>
+</html>

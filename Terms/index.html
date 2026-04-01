@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service - AfriStay</title>
+    <link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Oleo+Script+Swash+Caps:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/Style/style.css">
+    <style>
+        :root { --primary: #EB6753; }
+        body { background: #f5f5f5; min-height: 100vh; }
+
+        .legal-page {
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 110px 24px 80px;
+        }
+
+        .legal-hero {
+            background: linear-gradient(135deg, #EB6753 0%, #c0392b 100%);
+            border-radius: 20px;
+            padding: 48px 40px;
+            color: #fff;
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+        .legal-hero::before {
+            content: '';
+            position: absolute;
+            top: -40px; right: -40px;
+            width: 200px; height: 200px;
+            background: rgba(255,255,255,0.07);
+            border-radius: 50%;
+        }
+        .legal-hero h1 {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .legal-hero p {
+            font-size: 14px;
+            opacity: 0.85;
+        }
+        .legal-hero i {
+            font-size: 48px;
+            opacity: 0.3;
+            position: absolute;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .legal-body {
+            background: #fff;
+            border-radius: 20px;
+            padding: 40px 48px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            line-height: 1.8;
+            color: #444;
+            font-size: 15px;
+        }
+
+        .legal-body h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin: 32px 0 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f5f5f5;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .legal-body h2:first-of-type { margin-top: 0; }
+        .legal-body h2 i { color: var(--primary); font-size: 16px; }
+
+        .legal-body p { margin-bottom: 14px; }
+        .legal-body ul {
+            margin: 0 0 14px 20px;
+            list-style: disc;
+        }
+        .legal-body ul li { margin-bottom: 6px; }
+
+        .legal-body a { color: var(--primary); text-decoration: none; }
+        .legal-body a:hover { text-decoration: underline; }
+
+        .legal-updated {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 32px;
+            padding-top: 20px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .legal-nav {
+            display: flex;
+            gap: 12px;
+            margin-top: 32px;
+            flex-wrap: wrap;
+        }
+        .legal-nav a {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 22px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .legal-nav a.primary {
+            background: var(--primary);
+            color: #fff;
+        }
+        .legal-nav a.primary:hover { opacity: 0.88; }
+        .legal-nav a.secondary {
+            background: #f0f0f0;
+            color: #555;
+        }
+        .legal-nav a.secondary:hover { background: #e8e8e8; }
+
+        @media (max-width: 600px) {
+            .legal-body { padding: 28px 20px; }
+            .legal-hero { padding: 32px 24px; }
+            .legal-hero i { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav id="navbar">
+        <div class="logo-area">
+            <a href="/"><img src="/Pictures/light-afri1.png" alt="AfriStay" class="full-logo"></a>
+        </div>
+        <div class="nav-wrapper" id="navWrapper">
+            <i class="fa-solid fa-xmark menu-close" onclick="toggleMenu()"></i>
+            <div class="nav-center">
+                <ul class="nav-links">
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/Listings">Listings</a></li>
+                    <li><a href="/Events/">Events</a></li>
+                    <li><a href="/About">About</a></li>
+                    <li><a href="/Contact">Contact</a></li>
+                </ul>
+            </div>
+            <div class="nav-right">
+                <a href="/Favorites" class="icon-link"><i class="fa-solid fa-heart"></i></a>
+                <a href="/Auth" id="auth-btn" class="signin-btn">Sign In</a>
+            </div>
+        </div>
+        <i class="fa-solid fa-bars menu-open" onclick="toggleMenu()"></i>
+    </nav>
+
+    <div class="legal-page">
+
+        <div class="legal-hero">
+            <h1>Terms of Service</h1>
+            <p>Please read these terms carefully before using AfriStay.</p>
+            <i class="fa-solid fa-file-contract"></i>
+        </div>
+
+        <div class="legal-body">
+
+            <h2><i class="fa-solid fa-circle-info"></i> 1. About AfriStay</h2>
+            <p>AfriStay is an online marketplace operated by King Technologies that connects travelers with property owners and vehicle hirers across Rwanda. By accessing or using our platform, you agree to be bound by these Terms of Service.</p>
+
+            <h2><i class="fa-solid fa-user-check"></i> 2. Eligibility</h2>
+            <p>You must be at least 18 years old to create an account or make a booking on AfriStay. By using the platform you confirm that you meet this requirement and that the information you provide is accurate and up to date.</p>
+
+            <h2><i class="fa-solid fa-user"></i> 3. User Accounts</h2>
+            <p>When you create an account you are responsible for:</p>
+            <ul>
+                <li>Keeping your login credentials confidential</li>
+                <li>All activity that occurs under your account</li>
+                <li>Notifying us immediately if you suspect unauthorised access</li>
+            </ul>
+            <p>We reserve the right to suspend or terminate accounts that violate these terms.</p>
+
+            <h2><i class="fa-solid fa-house"></i> 4. Listings & Bookings</h2>
+            <p>Property owners ("Owners") list their properties or vehicles on AfriStay. All listings must be accurate, legal, and comply with Rwandan law. AfriStay is not a party to the rental agreement between a guest and an owner — we facilitate the booking only.</p>
+            <p>Guests are responsible for reviewing listing details, availability, and house rules before booking. All confirmed bookings are subject to the cancellation policy displayed at the time of booking.</p>
+
+            <h2><i class="fa-solid fa-money-bill-wave"></i> 5. Payments & Fees</h2>
+            <p>All payments are processed through our payment partners. AfriStay charges a platform service fee per booking. This fee is disclosed before you confirm payment. Owners receive their payout minus the AfriStay service fee within the agreed payout schedule.</p>
+            <p>Prices are displayed in Rwandan Francs (RWF) unless otherwise stated. We are not responsible for currency conversion fees charged by your bank or payment provider.</p>
+
+            <h2><i class="fa-solid fa-ban"></i> 6. Prohibited Conduct</h2>
+            <p>You agree not to:</p>
+            <ul>
+                <li>List or book properties for illegal purposes</li>
+                <li>Provide false, misleading, or fraudulent information</li>
+                <li>Harass, threaten, or discriminate against other users</li>
+                <li>Attempt to circumvent the platform to conduct transactions off-platform</li>
+                <li>Reverse-engineer, scrape, or interfere with the platform's operation</li>
+            </ul>
+
+            <h2><i class="fa-solid fa-star"></i> 7. Reviews & Content</h2>
+            <p>Guests and owners may leave reviews after a completed stay or rental. Reviews must be honest and based on genuine experience. AfriStay reserves the right to remove content that is abusive, defamatory, or violates our policies. By submitting content you grant AfriStay a non-exclusive, royalty-free licence to display it on the platform.</p>
+
+            <h2><i class="fa-solid fa-triangle-exclamation"></i> 8. Limitation of Liability</h2>
+            <p>AfriStay provides the platform on an "as is" basis. We do not guarantee the accuracy of listings, the conduct of users, or the quality of properties. To the maximum extent permitted by law, AfriStay shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform.</p>
+
+            <h2><i class="fa-solid fa-gavel"></i> 9. Governing Law</h2>
+            <p>These Terms are governed by the laws of the Republic of Rwanda. Any disputes shall be subject to the exclusive jurisdiction of the courts of Rwanda.</p>
+
+            <h2><i class="fa-solid fa-pen-to-square"></i> 10. Changes to These Terms</h2>
+            <p>We may update these Terms from time to time. We will notify registered users of material changes by email. Continued use of the platform after changes take effect constitutes acceptance of the revised Terms.</p>
+
+            <h2><i class="fa-solid fa-envelope"></i> 11. Contact Us</h2>
+            <p>If you have any questions about these Terms, please contact us at <a href="mailto:info@afristay.rw">info@afristay.rw</a> or through our <a href="/Contact">Contact page</a>.</p>
+
+            <p class="legal-updated"><i class="fa-regular fa-clock"></i> Last updated: April 2026</p>
+
+            <div class="legal-nav">
+                <a href="/" class="primary"><i class="fa-solid fa-house"></i> Back to Home</a>
+                <a href="/Privacy/" class="secondary"><i class="fa-solid fa-shield-halved"></i> Privacy Policy</a>
+                <a href="/Contact" class="secondary"><i class="fa-solid fa-envelope"></i> Contact Us</a>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/js/config.js"></script>
+    <script src="/js/script.js"></script>
+</body>
+</html>
