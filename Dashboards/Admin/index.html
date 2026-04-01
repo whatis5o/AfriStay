@@ -144,6 +144,13 @@
         .tab-search-wrap input{border:none;background:none;outline:none;font-size:13px;font-family:'Inter',sans-serif;width:100%;color:#1a1a1a;}
         .tab-search-wrap input::placeholder{color:#bbb;}
         .tab-search-wrap:focus-within{border-color:var(--primary);}
+        .archive-filter-btn.active{background:var(--primary);color:#fff;}
+        .archive-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #f5f5f5;}
+        .archive-row:last-child{border-bottom:none;}
+        .archive-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+        .arc-user{background:#fff0ee;color:var(--primary);}
+        .arc-booking{background:#fef9ee;color:#c47f2a;}
+        .arc-listing{background:#f0fdf4;color:#16a34a;}
     </style>
     <!-- Immediate role guard — runs before anything renders -->
     <script>
@@ -179,6 +186,7 @@
         <button class="nav-btn" data-tab="events"><i class="fa-solid fa-calendar-star"></i> Events</button>
         <button class="nav-btn" data-tab="promotions"><i class="fa-solid fa-tag"></i> Promotions</button>
         <button class="nav-btn" data-tab="messages"><i class="fa-solid fa-envelope"></i> Messages <span class="nav-badge" id="badge-messages" style="display:none;"></span></button>
+        <button class="nav-btn" data-tab="archive"><i class="fa-solid fa-box-archive"></i> Archive / Trash</button>
         <div class="nav-sec">Account</div>
         <button class="nav-btn" data-tab="settings"><i class="fa-solid fa-gear"></i> Settings</button>
         <a href="/Dashboards/Profile/" class="nav-btn" style="text-decoration:none;"><i class="fa-solid fa-user"></i> My Profile</a>
@@ -406,6 +414,30 @@
             </div>
         </div>
 
+        <!-- ARCHIVE / TRASH -->
+        <div class="content-panel" id="archivePanel">
+            <div class="data-section">
+                <div class="sec-head" style="flex-wrap:wrap;gap:12px;">
+                    <h2><i class="fa-solid fa-box-archive" style="color:var(--primary);margin-right:8px;"></i>Archive / Trash</h2>
+                    <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:240px;">
+                        <input type="text" id="archiveSearchInput" placeholder="Search by name, email, ID..."
+                            style="flex:1;padding:9px 14px;border:1.5px solid #ebebeb;border-radius:10px;font-size:13px;font-family:'Inter',sans-serif;outline:none;">
+                        <button class="btn-s" onclick="loadArchiveTab()"><i class="fa-solid fa-rotate-right"></i></button>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;padding:0 24px 16px;flex-wrap:wrap;">
+                    <button class="btn-s archive-filter-btn active" data-filter="all"    onclick="setArchiveFilter('all')">All</button>
+                    <button class="btn-s archive-filter-btn"        data-filter="user"   onclick="setArchiveFilter('user')"><i class="fa-solid fa-user"></i> Deleted Accounts</button>
+                    <button class="btn-s archive-filter-btn"        data-filter="booking" onclick="setArchiveFilter('booking')"><i class="fa-solid fa-calendar-xmark"></i> Cancelled Bookings</button>
+                    <button class="btn-s archive-filter-btn"        data-filter="listing" onclick="setArchiveFilter('listing')"><i class="fa-solid fa-house-circle-xmark"></i> Deleted Listings</button>
+                </div>
+                <div class="sec-body" id="archiveContainer">
+                    <p style="color:#bbb;text-align:center;padding:30px;">Click a filter or search to load archived records.</p>
+                </div>
+                <div id="archivePagination" style="padding:12px 24px;display:flex;gap:8px;justify-content:center;"></div>
+            </div>
+        </div>
+
         <!-- SETTINGS -->
         <div class="content-panel" id="settingsPanel">
             <div style="max-width:580px;">
@@ -536,7 +568,7 @@ const PTITLES={
     dashboardPanel:'Dashboard',usersPanel:'Users',listingsPanel:'Listings',
     bookingsPanel:'Bookings','listing-requestsPanel':'Listing Requests',
     attentionPanel:'Attention',  'owner-applicationsPanel':'Owner Applications',
-    financialPanel:'Financial',eventsPanel:'Events',promotionsPanel:'Promotions',messagesPanel:'Messages',settingsPanel:'Settings'
+    financialPanel:'Financial',eventsPanel:'Events',promotionsPanel:'Promotions',messagesPanel:'Messages',archivePanel:'Archive / Trash',settingsPanel:'Settings'
 };
 
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{

@@ -480,10 +480,10 @@ window.deleteAccount = async function() {
     const confirmed = prompt('This will permanently delete your account. Type DELETE to confirm:');
     if (confirmed !== 'DELETE') { toast('Cancelled.', 'info'); return; }
 
-    toast('Deleting account...', 'info');
+    toast('Archiving and deleting account...', 'info');
     try {
-        // Delete profile row (cascade should handle the rest via FK)
-        await _sb.from('profiles').delete().eq('id', _user.id);
+        // Archive profile data + soft-delete (anonymise) — keeps bookings/reviews intact
+        await _sb.rpc('archive_deleted_account', { p_user_id: _user.id, p_reason: 'self_deleted' });
         await _sb.auth.signOut();
         toast('Account deleted.', 'success');
         setTimeout(() => window.location.href = '/', 1800);

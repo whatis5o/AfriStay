@@ -458,9 +458,10 @@ async function ownerChangePassword(){
 }
 async function ownerDeleteAccount(){
     if(prompt('Type DELETE to permanently delete your account:')!=='DELETE'){window.toast('Cancelled.','info');return;}
-    window.toast('Deleting...','info');
+    window.toast('Archiving and deleting account...','info');
     try{
-        await window.supabaseClient.from('profiles').delete().eq('id',window.CURRENT_USER.id);
+        // Archive + soft-delete profile; keeps listings/bookings/reviews intact
+        await window.supabaseClient.rpc('archive_deleted_account',{p_user_id:window.CURRENT_USER.id,p_reason:'self_deleted'});
         await window.supabaseClient.auth.signOut();
         window.toast('Account deleted.','success');
         setTimeout(()=>window.location.href='/',1800);

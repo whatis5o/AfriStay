@@ -113,6 +113,13 @@ async function loadListingDetails(today) {
     setEl('listingTitle', listing.title);
     setEl('breadTitle', listing.title);
     document.title = listing.title + ' - AfriStay';
+    // Dynamic OG / meta updates for social sharing
+    const _ogImg = listing.listing_images?.[0]?.image_url || 'https://afristay.rw/Pictures/Rwanda.jpg';
+    const _ogUrl = 'https://afristay.rw/Listings/Detail/?id=' + LISTING_ID;
+    [['og:title', listing.title + ' — AfriStay Rwanda'],
+     ['og:description', (listing.description || 'Book this listing on AfriStay').slice(0, 160)],
+     ['og:image', _ogImg], ['og:url', _ogUrl]
+    ].forEach(([p, v]) => { const m = document.querySelector('meta[property="' + p + '"]'); if (m) m.setAttribute('content', v); });
     setEl('listingDescription', listing.description || 'No description provided.');
     setEl('listingCategory', listing.real_estate_types?.name || listing.category_slug || 'Listing');
 
@@ -187,6 +194,8 @@ async function loadListingDetails(today) {
     document.getElementById('contentEl').style.display = 'grid';
     console.log('✅ [DETAIL] Page rendered');
 
+    _injectShareButton(LISTING_ID, listing.title);
+    loadSimilarListings(listing.province_id, listing.category_slug);
     renderListingSpecs(listing);
     renderListingAmenities(listing);
 
@@ -545,7 +554,7 @@ window.submitReview = async () => {
     resetStars();
 };
 
-function initBookingForm() {
+async function initBookingForm() {
     const bookingForm = document.getElementById('bookingForm');
     if (!bookingForm) return;
 
@@ -566,17 +575,63 @@ function initBookingForm() {
         bookingForm.innerHTML = '<p style="color:#c0392b;text-align:center;font-weight:600;background:#fde8e8;padding:14px;border-radius:10px;margin:0;"><i class="fa-solid fa-circle-xmark"></i> ' + msg + '</p>';
         return;
     }
+
+    // ── Fetch already-booked date ranges ──
+    let BOOKED_RANGES = [];
+    try {
+        const { data: taken } = await _supabase
+            .from('bookings')
+            .select('start_date, end_date')
+            .eq('listing_id', LISTING_ID)
+            .in('status', ['pending', 'awaiting_approval', 'approved', 'confirmed']);
+        BOOKED_RANGES = (taken || []).map(b => ({
+            s: new Date(b.start_date + 'T00:00:00'),
+            e: new Date(b.end_date   + 'T00:00:00')
+        }));
+    } catch(e) { console.warn('[BOOKING] Could not fetch booked ranges:', e.message); }
+
+    function datesOverlap(s, e) {
+        const start = new Date(s + 'T00:00:00'), end = new Date(e + 'T00:00:00');
+        return BOOKED_RANGES.some(r => start < r.e && end > r.s);
+    }
+
     const startDate = document.getElementById('bookingStartDate');
-    const endDate = document.getElementById('bookingEndDate');
-    const today = new Date().toISOString().split('T')[0];
+    const endDate   = document.getElementById('bookingEndDate');
+    const today     = new Date().toISOString().split('T')[0];
     if (startDate) startDate.min = today;
-    if (endDate) endDate.min = today;
+    if (endDate)   endDate.min   = today;
+
+    // ── Inject guest count field ──
+    if (!document.getElementById('bookingGuestCount')) {
+        const maxG = CURRENT_LISTING?.max_guests || 20;
+        const isVeh = CURRENT_LISTING?.category_slug === 'vehicle';
+        const gcDiv = document.createElement('div');
+        gcDiv.style.cssText = 'margin-bottom:14px;';
+        gcDiv.innerHTML = '<label style="font-size:13px;color:#666;font-weight:600;display:block;margin-bottom:6px;">' +
+            (isVeh ? 'Passengers' : 'Guests') + (maxG ? ' <span style="color:#bbb;font-weight:400;">(max ' + maxG + ')</span>' : '') + '</label>' +
+            '<input type="number" id="bookingGuestCount" min="1" max="' + maxG + '" value="1" ' +
+            'style="width:100%;padding:11px 14px;border:1px solid #ddd;border-radius:8px;font-family:\'Inter\',sans-serif;font-size:14px;">';
+        // Insert before the total div
+        const totalEl = document.getElementById('bookingTotal');
+        if (totalEl) totalEl.before(gcDiv);
+    }
 
     function calcTotal() {
-        const s = startDate?.value, e = endDate?.value, totalEl = document.getElementById('bookingTotal');
+        const s = startDate?.value, e = endDate?.value;
+        const totalEl = document.getElementById('bookingTotal');
+        const statusEl = document.getElementById('bookingStatus');
         if (!s || !e || !totalEl) return;
         const days = Math.round((new Date(e) - new Date(s)) / 86400000);
         if (days <= 0) { totalEl.textContent = ''; return; }
+        // Overlap check
+        if (datesOverlap(s, e)) {
+            totalEl.textContent = '';
+            if (statusEl) { statusEl.style.color = '#e74c3c'; statusEl.innerHTML = '<i class="fa-solid fa-calendar-xmark"></i> These dates are already booked. Please choose different dates.'; }
+            document.getElementById('bookingBtn').disabled = true;
+            return;
+        }
+        if (statusEl) { statusEl.style.color = ''; statusEl.textContent = ''; }
+        document.getElementById('bookingBtn').disabled = false;
         const isVeh = CURRENT_LISTING?.category_slug === 'vehicle';
         const unit = isVeh ? 'day' : 'night';
         const selectedZone = document.querySelector('input[name="zone"]:checked')?.value || 'kigali';
@@ -624,8 +679,9 @@ function goToCheckout() {
         : (CURRENT_LISTING?.price_display || CURRENT_LISTING?.price || 0);
     const totalAmount = days * selectedPrice;
     const currency = CURRENT_LISTING?.currency || 'RWF';
+    const guests = parseInt(document.getElementById('bookingGuestCount')?.value) || 1;
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Redirecting...'; }
-    const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: selectedPrice, currency, total: totalAmount, category: CURRENT_LISTING?.category_slug || 'property', price_zone: selectedZone });
+    const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: selectedPrice, currency, total: totalAmount, category: CURRENT_LISTING?.category_slug || 'property', price_zone: selectedZone, guests });
     window.location.href = '/Listings/Checkout/?' + params.toString();
 }
 

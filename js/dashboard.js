@@ -141,6 +141,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
     
+    // Step 0.5: Fire-and-forget — expire stale bookings before loading UI
+    fetch(CONFIG.FUNCTIONS_BASE + '/expire-bookings', { method: 'POST' }).catch(() => {});
+
     // Step 1: Re-parent modals and quick actions to body
     reparentModalsAndQuickActions();
     
@@ -153,6 +156,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Step 4: Load data based on role
     await loadAllCountsAndTables();
     loadNotificationBadges();
+
+    // Step 4.5: Realtime — refresh badges instantly when a new notification arrives
+    _supabase.channel('notif-live')
+        .on('postgres_changes', {
+            event: 'INSERT', schema: 'public', table: 'notifications',
+            filter: 'user_id=eq.' + CURRENT_PROFILE.id
+        }, () => loadNotificationBadges())
+        .subscribe();
     
     // Step 5: Make quick actions visible
     const qa = $('.quick-actions');
@@ -954,9 +965,16 @@ async function initAuthAndRole() {
 async function deleteListing(listingId) {
     if (!confirm('Delete this listing permanently? This also removes media.')) return;
     try {
+        // Archive snapshot before deletion
+        await _supabase.rpc('archive_deleted_listing', {
+            p_listing_id:   listingId,
+            p_deleter_id:   CURRENT_PROFILE?.id   || null,
+            p_deleter_name: CURRENT_PROFILE?.full_name || CURRENT_ROLE,
+            p_reason:       'deleted_by_' + CURRENT_ROLE,
+        });
         const { error } = await _supabase.from('listings').delete().eq('id', listingId);
         if (error) throw error;
-        toast('Listing deleted successfully.', 'success');
+        toast('Listing deleted and archived.', 'success');
         await filterListings();
         await loadCounts();
     } catch (err) {
@@ -3122,6 +3140,7 @@ async function rejectListingRequest(listingId, btn) {
     if (!confirm('Reject and delete this listing request?')) return;
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Rejecting...'; }
     try {
+        await _supabase.rpc('archive_deleted_listing', { p_listing_id: listingId, p_deleter_id: CURRENT_PROFILE?.id || null, p_deleter_name: CURRENT_PROFILE?.full_name || 'admin', p_reason: 'request_rejected' });
         const { error } = await _supabase.from('listings').delete().eq('id', listingId);
         if (error) throw error;
         toast('Listing request rejected.', 'warning');
@@ -3361,6 +3380,7 @@ async function dashReject(id, btn) {
     if (!confirm('Reject and permanently delete this listing request?')) return;
     if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'; }
     try {
+        await _supabase.rpc('archive_deleted_listing', { p_listing_id: id, p_deleter_id: CURRENT_PROFILE?.id || null, p_deleter_name: CURRENT_PROFILE?.full_name || 'admin', p_reason: 'request_rejected' });
         const { error } = await _supabase.from('listings').delete().eq('id', id);
         if (error) throw error;
         toast('Listing rejected and removed.', 'warning');
@@ -3417,6 +3437,113 @@ async function handleUrlActions() {
         console.log('[URL-ACTION] Auto-rejecting booking from email link:', bookingId);
         await rejectBooking(bookingId);
     }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ARCHIVE / TRASH TAB  (admin only)
+   ═══════════════════════════════════════════════════════════════ */
+let _archiveFilter = 'all';
+let _archivePage   = 0;
+const _ARCHIVE_PAGE_SIZE = 20;
+
+window.setArchiveFilter = function(filter) {
+    _archiveFilter = filter;
+    _archivePage   = 0;
+    document.querySelectorAll('.archive-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === filter));
+    loadArchiveTab();
+};
+
+async function loadArchiveTab(page = 0) {
+    if (CURRENT_ROLE !== 'admin') return;
+    _archivePage = page;
+    const container  = document.getElementById('archiveContainer');
+    const pagination = document.getElementById('archivePagination');
+    if (!container) return;
+
+    container.innerHTML = '<p style="color:#bbb;text-align:center;padding:30px;"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>';
+
+    const search = (document.getElementById('archiveSearchInput')?.value || '').trim().toLowerCase();
+    const from   = page * _ARCHIVE_PAGE_SIZE;
+    const to     = from + _ARCHIVE_PAGE_SIZE - 1;
+
+    try {
+        let q = _supabase.from('archive').select('*', { count: 'exact' }).order('deleted_at', { ascending: false }).range(from, to);
+        if (_archiveFilter !== 'all') q = q.eq('entity_type', _archiveFilter);
+        if (search) q = q.or('entity_id.ilike.%' + search + '%,deleted_by_name.ilike.%' + search + '%,reason.ilike.%' + search + '%,data::text.ilike.%' + search + '%');
+
+        const { data, error, count } = await q;
+        if (error) throw error;
+        if (!data || !data.length) {
+            container.innerHTML = '<p style="color:#bbb;text-align:center;padding:40px;"><i class="fa-solid fa-box-archive" style="font-size:32px;display:block;margin-bottom:12px;"></i>No archived records found.</p>';
+            if (pagination) pagination.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = data.map(r => {
+            const d = r.data || {};
+            const iconClass = r.entity_type === 'user' ? 'arc-user fa-user' : r.entity_type === 'booking' ? 'arc-booking fa-calendar-xmark' : 'arc-listing fa-house-circle-xmark';
+            const typeColor = r.entity_type === 'user' ? 'var(--primary)' : r.entity_type === 'booking' ? '#c47f2a' : '#16a34a';
+            const when = new Date(r.deleted_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+            let title = '', sub = '';
+            if (r.entity_type === 'user') {
+                title = d.full_name || 'Unknown User';
+                sub   = [d.email, d.phone, 'Role: ' + (d.role || '—')].filter(Boolean).join(' · ');
+            } else if (r.entity_type === 'booking') {
+                title = 'Booking #' + (d.booking_reference || r.entity_id.slice(0,8));
+                sub   = ['Guest: ' + (d.guest_name || d.user_id || '—'), 'Status: ' + (d.status || r.reason || '—'), d.start_date ? d.start_date + ' → ' + d.end_date : ''].filter(Boolean).join(' · ');
+            } else {
+                title = d.title || 'Listing #' + r.entity_id.slice(0,8);
+                sub   = ['By: ' + (r.deleted_by_name || '—'), 'Reason: ' + (r.reason || '—'), d.province_id ? 'Province ID ' + d.province_id : ''].filter(Boolean).join(' · ');
+            }
+
+            return '<div class="archive-row">' +
+                '<div class="archive-icon arc-' + r.entity_type + '"><i class="fa-solid ' + iconClass.split(' ')[1] + '"></i></div>' +
+                '<div>' +
+                    '<div style="font-size:14px;font-weight:700;color:#1a1a1a;">' + escHtml(title) + '</div>' +
+                    '<div style="font-size:12px;color:#888;margin-top:3px;line-height:1.5;">' + escHtml(sub) + '</div>' +
+                '</div>' +
+                '<div style="text-align:right;flex-shrink:0;">' +
+                    '<span style="font-size:11px;font-weight:700;color:' + typeColor + ';background:' + (r.entity_type==='user'?'var(--ps)':r.entity_type==='booking'?'#fef9ee':'#f0fdf4') + ';padding:3px 10px;border-radius:20px;">' + r.entity_type.toUpperCase() + '</span>' +
+                    '<div style="font-size:11px;color:#bbb;margin-top:5px;">' + when + '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+
+        // Pagination
+        if (pagination) {
+            const totalPages = Math.ceil((count || 0) / _ARCHIVE_PAGE_SIZE);
+            pagination.innerHTML = totalPages <= 1 ? '' :
+                Array.from({ length: totalPages }, (_, i) =>
+                    '<button class="btn-s" ' + (i === page ? 'style="background:var(--primary);color:#fff;"' : '') +
+                    ' onclick="loadArchiveTab(' + i + ')">' + (i + 1) + '</button>'
+                ).join('');
+        }
+    } catch(err) {
+        container.innerHTML = '<p style="color:#e74c3c;padding:20px;">' + err.message + '</p>';
+    }
+}
+window.loadArchiveTab = loadArchiveTab;
+
+// Wire archive search with debounce
+setTimeout(() => {
+    const archInput = document.getElementById('archiveSearchInput');
+    if (archInput) {
+        let _archT;
+        archInput.addEventListener('input', () => { clearTimeout(_archT); _archT = setTimeout(() => loadArchiveTab(0), 350); });
+    }
+}, 2000);
+
+// Auto-load archive when tab is clicked
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.nav-btn[data-tab="archive"]').forEach(b =>
+        b.addEventListener('click', () => { if (!document.getElementById('archiveContainer')?.textContent?.includes('records')) loadArchiveTab(); })
+    );
+});
+
+function escHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
 // Run after page init
