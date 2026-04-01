@@ -152,6 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Step 4: Load data based on role
     await loadAllCountsAndTables();
+    loadNotificationBadges();
     
     // Step 5: Make quick actions visible
     const qa = $('.quick-actions');
@@ -264,7 +265,11 @@ function bindUIInteractions() {
             if (tabName === 'messages')         { loadMessagesPreview(); }
             if (tabName === 'listing-requests') { loadListingRequests(); }
             if (tabName === 'bookings')         { loadBookingsTable(); }
-            
+
+            // Mark relevant notifications as read and hide the badge
+            const typesToClear = _TAB_NOTIF_CLEAR[tabName];
+            if (typesToClear) markNotificationsRead(typesToClear);
+
             // Update active states
             navButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
@@ -551,6 +556,90 @@ function initSidebarToggle() {
         });
     });
 }
+
+/* ══════════════════════════════════════════════════════════
+   NOTIFICATION BADGES  (Instagram-style tab counts)
+   ══════════════════════════════════════════════════════════ */
+
+// type → badge element id mapping per role
+const _NOTIF_BADGE_MAP = {
+    admin: {
+        'new_booking':        'badge-bookings',
+        'listing_request':    'badge-listing-requests',
+        'owner_application':  'badge-owner-applications',
+        'new_message':        'badge-messages',
+    },
+    owner: {
+        'new_booking':        'badge-bookings',
+        'listing_approved':   'badge-listings',
+    }
+};
+
+function _setBadge(id, count) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (count > 0) {
+        el.textContent = count > 99 ? '99+' : count;
+        el.style.display = 'flex';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+async function loadNotificationBadges() {
+    if (!_supabase || !CURRENT_PROFILE) return;
+    const role = CURRENT_ROLE;
+    const map  = _NOTIF_BADGE_MAP[role];
+    if (!map) return;   // 'user' role — no dashboard badges
+
+    try {
+        const { data, error } = await _supabase
+            .from('notifications')
+            .select('type')
+            .eq('user_id', CURRENT_PROFILE.id)
+            .eq('read', false);
+        if (error || !data) return;
+
+        // Count by type
+        const counts = {};
+        data.forEach(n => { counts[n.type] = (counts[n.type] || 0) + 1; });
+
+        // Map to badge elements
+        Object.entries(map).forEach(([type, badgeId]) => {
+            _setBadge(badgeId, counts[type] || 0);
+        });
+
+        // Merge owner-applications + listing-request into attentionBadge for admin
+        if (role === 'admin') {
+            const attn = (counts['owner_application'] || 0) + (counts['listing_request'] || 0);
+            _setBadge('attentionBadge', attn);
+        }
+    } catch(e) {
+        console.warn('[NOTIF]', e.message);
+    }
+}
+
+async function markNotificationsRead(types) {
+    if (!_supabase || !CURRENT_PROFILE || !types.length) return;
+    await _supabase
+        .from('notifications')
+        .update({ read: true })
+        .eq('user_id', CURRENT_PROFILE.id)
+        .eq('read', false)
+        .in('type', types);
+    // Refresh badges after marking read
+    loadNotificationBadges();
+}
+
+// Which tab click clears which notification types
+const _TAB_NOTIF_CLEAR = {
+    'bookings':           ['new_booking'],
+    'listing-requests':   ['listing_request'],
+    'owner-applications': ['owner_application'],
+    'messages':           ['new_message'],
+    'listings':           ['listing_approved'],
+    'attention':          ['owner_application', 'listing_request'],
+};
 
 /* ===========================
    ADMIN GLOBAL SEARCH
