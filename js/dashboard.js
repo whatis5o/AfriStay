@@ -908,11 +908,28 @@ async function loadAmenityCheckboxes() {
             _amenityCache = data || [];
         }
 
+        // Known vehicle-specific slugs — fallback if DB category is null/empty
+        const VEHICLE_SLUGS = new Set([
+            'four_by_four','four_wd','awd','gps','gps_navigation','sunroof','leather_seats',
+            'cruise_control','reverse_camera','backup_camera','dashcam','child_seat',
+            'roof_rack','spare_tire','towing','bluetooth_audio','bluetooth','usb_charger',
+            'entertainment_system','android_auto','apple_carplay','heated_seats',
+        ]);
+
         // Filter by category: vehicle listings get vehicle + general, others get non-vehicle
+        // Falls back to slug-based detection when DB category is empty/null
         const list = _amenityCache.filter(a => {
             const c = (a.category || '').toLowerCase();
-            if (isVehicle) return c === 'vehicle' || c === 'general' || c === '';
-            return c !== 'vehicle';
+            const slugIsVehicle = VEHICLE_SLUGS.has(a.slug) || VEHICLE_SLUGS.has((a.slug || '').toLowerCase());
+            // If DB category is set, trust it; otherwise use slug-based fallback
+            if (c === 'vehicle' || (c === '' && slugIsVehicle)) {
+                return isVehicle; // vehicle amenity → only show for vehicle listings
+            }
+            if (c === 'real_estate' || (c === '' && !slugIsVehicle)) {
+                return !isVehicle; // property amenity → only show for non-vehicle listings
+            }
+            // 'general' or unrecognised — show for both
+            return true;
         });
 
         if (!list.length) {
@@ -2082,6 +2099,7 @@ async function approveListing(listingId) {
         logAudit({ action: 'listing_approved', entityType: 'listing', entityId: listingId, description: 'Listing approved by admin' });
         toast('Listing approved successfully!', 'success');
         await filterListings();
+        loadAttentionItems();
     } catch (err) {
         logAudit({ action: 'listing_approved_failed', entityType: 'listing', entityId: listingId, description: 'Failed to approve listing: ' + err.message, isError: true });
         console.error("❌ [ACTION] Error approving listing:", err);
@@ -3236,6 +3254,7 @@ async function confirmApproveWithFee(listingId, ownerPrice) {
         const row = document.querySelector('[data-req-id="' + listingId + '"]');
         if (row) { row.style.opacity = '0'; row.style.transition = 'opacity 0.3s'; setTimeout(() => row.remove(), 320); }
         loadDashPendingListings();
+        loadAttentionItems();
     } catch (err) {
         toast('Failed: ' + err.message, 'error');
     }
@@ -3412,6 +3431,7 @@ async function rejectListingRequest(listingId, btn) {
         const row = btn ? btn.closest('[data-req-id]') : document.querySelector('[data-req-id="' + listingId + '"]');
         if (row) { row.style.opacity = '0'; row.style.transition = 'opacity 0.3s'; setTimeout(() => row.remove(), 320); }
         loadDashPendingListings();
+        loadAttentionItems();
     } catch (err) {
         logAudit({ action: 'listing_request_rejected_failed', entityType: 'listing', entityId: listingId, description: 'Failed to reject listing request: ' + err.message, isError: true });
         toast('Failed: ' + err.message, 'error');
@@ -3437,7 +3457,7 @@ async function loadNewBookings() {
         }
         const { data, error } = await _supabase
             .from('bookings')
-            .select('id,listing_id,user_id,start_date,end_date,total_amount,created_at,category_slug')
+            .select('id,listing_id,user_id,guest_name,guest_email,guest_phone,start_date,end_date,total_amount,payment_method,created_at,category_slug')
             .in('listing_id', listingIds)
             .in('status', ['awaiting_approval', 'approved', 'pending'])
             .order('created_at', { ascending: false });
@@ -3448,28 +3468,30 @@ async function loadNewBookings() {
             return;
         }
 
-        // Batch listing titles + user info
+        // Batch listing titles
         const lids = [...new Set(data.map(b=>b.listing_id))];
-        const uids = [...new Set(data.map(b=>b.user_id))];
-        const lstM = {}, usrM = {};
+        const lstM = {};
         if (lids.length) { const {data:ls} = await _supabase.from('listings').select('id,title').in('id',lids); (ls||[]).forEach(l=>lstM[l.id]=l.title); }
-        if (uids.length) { const {data:us} = await _supabase.from('profiles').select('id,full_name,email').in('id',uids); (us||[]).forEach(u=>usrM[u.id]=u); }
 
         container.innerHTML = '';
         data.forEach(b => {
-            const user = usrM[b.user_id] || {};
             const dur = b.start_date && b.end_date ? Math.max(1, Math.round((new Date(b.end_date)-new Date(b.start_date))/86400000)) : '?';
             const isVehNb = b.category_slug === 'vehicle';
             const nights = dur + (dur === '?' ? '' : (isVehNb ? (dur === 1 ? ' day' : ' days') : (dur === 1 ? ' night' : ' nights')));
+            const pmLabel = (b.payment_method || '').replace(/_/g,' ').replace(/\b\w/g, c=>c.toUpperCase()) || 'Pay on Arrival';
             const row = document.createElement('div');
             row.style.cssText = 'background:#fff;border-radius:14px;padding:18px 20px;margin-bottom:12px;display:flex;align-items:center;gap:16px;box-shadow:0 3px 12px rgba(0,0,0,0.07);flex-wrap:wrap;border-left:4px solid #f39c12;';
             row.innerHTML =
                 '<div style="flex:1;min-width:160px;">' +
                 '<p style="font-size:14px;font-weight:700;color:#1a1a1a;margin:0 0 3px;">' + escapeHtml(lstM[b.listing_id]||'Unknown listing') + '</p>' +
-                '<p style="font-size:12px;color:#888;margin:0;"><i class="fa-regular fa-calendar" style="color:#EB6753;"></i> ' + (b.start_date||'') + ' → ' + (b.end_date||'') + ' (' + nights + ')</p></div>' +
+                '<p style="font-size:12px;color:#888;margin:0;"><i class="fa-regular fa-calendar" style="color:#EB6753;"></i> ' + (b.start_date||'') + ' → ' + (b.end_date||'') + ' (' + nights + ')</p>' +
+                '<p style="font-size:11px;color:#bbb;margin:4px 0 0;"><i class="fa-solid fa-credit-card" style="margin-right:4px;"></i>' + escapeHtml(pmLabel) + '</p>' +
+                '</div>' +
                 '<div style="min-width:160px;">' +
-                '<p style="font-size:13px;font-weight:600;color:#555;margin:0;">' + escapeHtml(user.full_name||'Guest') + '</p>' +
-                '<p style="font-size:12px;color:#aaa;margin:2px 0 0;">' + escapeHtml(user.email||'') + '</p></div>' +
+                '<p style="font-size:13px;font-weight:600;color:#1a1a1a;margin:0;">' + escapeHtml(b.guest_name||'Guest') + '</p>' +
+                (b.guest_email ? '<a href="mailto:' + escapeHtml(b.guest_email) + '" onclick="event.stopPropagation()" style="font-size:12px;color:#EB6753;text-decoration:none;margin:2px 0 0;display:block;">' + escapeHtml(b.guest_email) + '</a>' : '') +
+                (b.guest_phone ? '<p style="font-size:12px;color:#aaa;margin:2px 0 0;">' + escapeHtml(b.guest_phone) + '</p>' : '') +
+                '</div>' +
                 '<p style="font-size:16px;font-weight:800;color:#EB6753;margin:0;min-width:100px;">' + Number(b.total_amount||0).toLocaleString('en-RW') + ' RWF</p>' +
                 '<div style="display:flex;gap:8px;">' +
                 '<button onclick="approveBooking(\'' + b.id + '\')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-check"></i> Approve</button>' +

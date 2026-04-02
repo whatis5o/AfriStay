@@ -11,6 +11,7 @@ const CONFIG = {
     CURRENCY: "RWF",
     MOBILE_BREAKPOINT: 900,
     ANIMATION_SPEED: 300,
+    SITE_URL: "https://afristay.rw",
 
     // === REPLACE THESE with values from Supabase Settings -> API ===
     SUPABASE_URL: "https://xuxzeinufjpplxkerlsd.supabase.co", // Your project URL

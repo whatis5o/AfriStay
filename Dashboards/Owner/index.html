@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Owner Dashboard — AfriStay</title>
+    <meta property="og:title" content="Owner Dashboard — AfriStay">
+    <meta property="og:description" content="Manage your AfriStay listings, bookings, earnings, and property settings.">
+    <meta property="og:image" content="https://afristay.rw/Pictures/light-afri1.png">
+    <meta property="og:url" content="https://afristay.rw/Dashboards/Owner/">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
     <script>
       (function(){
         var r = localStorage.getItem('afriStay_role');
@@ -12,6 +18,7 @@
       })();
     </script>
     <link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+    <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/Style/style.css">
@@ -447,7 +454,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>
 <script src="/js/utils.js"></script>
-<script src="/js/dashboard.js?v=3"></script>
+<script src="/js/dashboard.js?v=4"></script>
 <script>
 const PTITLES={dashboardPanel:'Dashboard',listingsPanel:'My Listings',bookingsPanel:'Bookings',promotionsPanel:'Promotions',earningsPanel:'Earnings',settingsPanel:'Settings'};
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
@@ -627,60 +634,96 @@ setTimeout(() => { if (window.CURRENT_PROFILE) renderCalHeatmap(); }, 2000);
 
 async function loadEarnings() {
     const _s = window.supabaseClient;
-    if (!_s || !window.CURRENT_PROFILE) return;
-    const ownerId = window.CURRENT_PROFILE.id;
-    const fmtMoney = n => Number(n||0).toLocaleString('en-RW');
-
-    // Fetch wallet + payouts + completed booking count in parallel
-    const [
-        { data: wallet },
-        { data: payouts },
-        { count: completedCount },
-    ] = await Promise.all([
-        _s.from('owner_wallets').select('balance, verified, payout_method, momo_phone, bank_name').eq('owner_id', ownerId).maybeSingle(),
-        _s.from('payouts').select('*').eq('owner_id', ownerId).eq('recipient_type','owner').order('initiated_at',{ascending:false}).limit(50),
-        _s.from('bookings').select('id',{count:'exact',head:true}).eq('owner_id', ownerId).eq('status','completed'),
-    ]);
-
-    // Stat cards
-    const balance       = wallet?.balance ?? 0;
-    const totalPaid     = (payouts||[]).filter(p=>p.status==='completed').reduce((s,p)=>s+(Number(p.amount)||0),0);
-    document.getElementById('earningsBalance').textContent  = fmtMoney(balance);
-    document.getElementById('earningsPaid').textContent     = fmtMoney(totalPaid);
-    document.getElementById('earningsBookings').textContent = completedCount ?? '—';
-
-    // Wallet notice
-    const noticeEl = document.getElementById('earningsWalletNotice');
-    if (noticeEl) {
-        noticeEl.innerHTML = wallet?.verified
-            ? `<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px 18px;font-size:13px;color:#166534;display:flex;align-items:center;gap:10px;">
-                   <i class="fa-solid fa-circle-check"></i>
-                   <span>Payouts go to <strong>${wallet.momo_phone ? wallet.momo_phone : wallet.bank_name}</strong>. Update details in <a href="#" onclick="document.querySelector('[data-tab=settings]').click();return false;" style="color:#166534;font-weight:700;">Settings</a>.</span>
-               </div>`
-            : `<div style="background:#fff8f3;border:1.5px solid #fdd5c4;border-radius:12px;padding:14px 18px;font-size:13px;color:#9a3412;display:flex;align-items:center;gap:10px;">
-                   <i class="fa-solid fa-triangle-exclamation"></i>
-                   <span>No payout wallet set up. <a href="#" onclick="document.querySelector('[data-tab=settings]').click();return false;" style="color:#9a3412;font-weight:700;">Add your details in Settings</a> to receive payouts.</span>
-               </div>`;
-    }
-
-    // Payout rows
+    const _set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     const section = document.getElementById('earningsPayoutSection');
-    if (!section) return;
-    if (!payouts?.length) {
-        section.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;padding:20px;">No payouts yet.</p>';
-        return;
+    const fmtMoney = n => Number(n||0).toLocaleString('en-RW') + ' RWF';
+
+    // If profile isn't ready yet, retry once after a short wait
+    if (!_s || !window.CURRENT_PROFILE) {
+        await new Promise(r => setTimeout(r, 1200));
+        if (!window.CURRENT_PROFILE) {
+            _set('earningsBalance',  '0 RWF');
+            _set('earningsPaid',     '0 RWF');
+            _set('earningsBookings', '0');
+            if (section) section.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;padding:20px;">Sign in to view earnings.</p>';
+            return;
+        }
     }
-    const fmtDate  = d => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    const sColors  = {completed:'#166534',pending:'#92400e',processing:'#1e40af',failed:'#991b1b'};
-    const sBg      = {completed:'#f0fdf4',pending:'#fffbeb',processing:'#eff6ff',failed:'#fff0f0'};
-    section.innerHTML = payouts.map(p => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f5f5f5;gap:12px;flex-wrap:wrap;">
-            <div>
-                <p style="margin:0;font-size:13px;font-weight:700;color:#161616;">${fmtMoney(p.amount)} ${p.currency||'RWF'}</p>
-                <p style="margin:2px 0 0;font-size:12px;color:#888;">${fmtDate(p.initiated_at)}${p.note?` · ${p.note}`:''}</p>
-            </div>
-            <span style="background:${sBg[p.status]||'#f5f5f5'};color:${sColors[p.status]||'#333'};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;">${p.status}</span>
-        </div>`).join('');
+
+    const ownerId = window.CURRENT_PROFILE.id;
+
+    try {
+        // Fetch wallet + payouts + completed booking count in parallel
+        const [walletRes, payoutsRes, listingsRes] = await Promise.all([
+            _s.from('owner_wallets').select('balance, verified, payout_method, momo_phone, bank_name').eq('owner_id', ownerId).maybeSingle(),
+            _s.from('payouts').select('*').eq('owner_id', ownerId).eq('recipient_type','owner').order('initiated_at',{ascending:false}).limit(50),
+            _s.from('listings').select('id').eq('owner_id', ownerId),
+        ]);
+
+        const wallet   = walletRes.data;
+        const payouts  = payoutsRes.data || [];
+        const listingIds = (listingsRes.data || []).map(l => l.id);
+
+        // Completed bookings count
+        let completedCount = 0;
+        if (listingIds.length) {
+            const { count } = await _s.from('bookings')
+                .select('id', { count: 'exact', head: true })
+                .in('listing_id', listingIds)
+                .eq('status', 'completed');
+            completedCount = count || 0;
+        }
+
+        // Stat cards — always show a value, 0 if nothing
+        const balance   = wallet?.balance ?? 0;
+        const totalPaid = payouts.filter(p => p.status === 'completed').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        _set('earningsBalance',  fmtMoney(balance));
+        _set('earningsPaid',     fmtMoney(totalPaid));
+        _set('earningsBookings', completedCount);
+
+        // Wallet notice
+        const noticeEl = document.getElementById('earningsWalletNotice');
+        if (noticeEl) {
+            noticeEl.innerHTML = wallet?.verified
+                ? `<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px 18px;font-size:13px;color:#166534;display:flex;align-items:center;gap:10px;">
+                       <i class="fa-solid fa-circle-check"></i>
+                       <span>Payouts go to <strong>${wallet.momo_phone || wallet.bank_name}</strong>. Update in <a href="#" onclick="document.querySelector('[data-tab=settings]').click();return false;" style="color:#166534;font-weight:700;">Settings</a>.</span>
+                   </div>`
+                : `<div style="background:#fff8f3;border:1.5px solid #fdd5c4;border-radius:12px;padding:14px 18px;font-size:13px;color:#9a3412;display:flex;align-items:center;gap:10px;">
+                       <i class="fa-solid fa-triangle-exclamation"></i>
+                       <span>No payout wallet set up. <a href="#" onclick="document.querySelector('[data-tab=settings]').click();return false;" style="color:#9a3412;font-weight:700;">Add payout details in Settings</a> to receive payouts.</span>
+                   </div>`;
+        }
+
+        // Payout rows
+        if (!section) return;
+        if (!payouts.length) {
+            section.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;padding:20px;"><i class="fa-solid fa-inbox" style="display:block;font-size:28px;margin-bottom:10px;"></i>No payouts yet.</p>';
+            return;
+        }
+        const fmtDate  = d => new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+        const sColors  = { completed:'#166534', pending:'#92400e', processing:'#1e40af', failed:'#991b1b' };
+        const sBg      = { completed:'#f0fdf4', pending:'#fffbeb', processing:'#eff6ff', failed:'#fff0f0' };
+        section.innerHTML = payouts.map(p => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f5f5f5;gap:12px;flex-wrap:wrap;">
+                <div>
+                    <p style="margin:0;font-size:13px;font-weight:700;color:#161616;">${fmtMoney(p.amount)} ${p.currency||'RWF'}</p>
+                    <p style="margin:2px 0 0;font-size:12px;color:#888;">${fmtDate(p.initiated_at)}${p.note ? ' · ' + p.note : ''}</p>
+                </div>
+                <span style="background:${sBg[p.status]||'#f5f5f5'};color:${sColors[p.status]||'#333'};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;">${p.status}</span>
+            </div>`).join('');
+
+    } catch(err) {
+        console.error('[EARNINGS]', err);
+        const offline = !navigator.onLine;
+        _set('earningsBalance',  '—');
+        _set('earningsPaid',     '—');
+        _set('earningsBookings', '—');
+        if (section) section.innerHTML = `<p style="color:#aaa;font-size:13px;text-align:center;padding:20px;">
+            <i class="fa-solid fa-${offline ? 'wifi-slash' : 'triangle-exclamation'}" style="display:block;font-size:28px;margin-bottom:10px;color:#e0a0a0;"></i>
+            ${offline ? 'No internet connection' : 'Could not load earnings. Try refreshing.'}
+        </p>`;
+    }
 }
 </script>
 </body>

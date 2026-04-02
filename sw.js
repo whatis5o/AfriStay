@@ -3,7 +3,7 @@
  * Strategy: Cache-first for static assets, network-first for API/Supabase calls
  */
 
-const CACHE_NAME  = 'afristay-v1';
+const CACHE_NAME  = 'afristay-v2';
 const OFFLINE_URL = '/offline.html';
 
 // Static shell assets to pre-cache
@@ -13,8 +13,21 @@ const PRECACHE = [
     '/Listings/',
     '/Events/',
     '/Style/style.css',
+    '/Style/index.css',
+    '/Style/listing.css',
+    '/Style/about.css',
+    '/Style/auth.css',
+    '/Style/dashboard.css',
+    '/Style/contact.css',
     '/js/config.js',
     '/js/utils.js',
+    '/js/script.js',
+    '/js/auth.js',
+    '/js/profile.js',
+    '/js/home.js',
+    '/js/detail.js',
+    '/js/favorites.js',
+    '/js/checkout.js',
     '/Pictures/favicon.png',
     OFFLINE_URL,
 ];

@@ -91,12 +91,13 @@ const TAB_LOADERS = {
     bookings:       loadActiveBookings,
     history:        loadHistory,
     favorites:      loadFavorites,
+    notifications:  () => loadNotifications(),
     'become-owner': loadOwnerApplicationStatus,
 };
 
 let loadedTabs = new Set(['overview']);
 
-const TAB_TITLES = { overview: 'Overview', profile: 'Edit Profile', bookings: 'My Bookings', history: 'History', favorites: 'Favorites', settings: 'Security', 'become-owner': 'Become an Owner' };
+const TAB_TITLES = { overview: 'Overview', profile: 'Edit Profile', bookings: 'My Bookings', history: 'History', favorites: 'Favorites', notifications: 'Notifications', settings: 'Security', 'become-owner': 'Become an Owner' };
 
 window.switchTab = function(name) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -129,7 +130,7 @@ async function loadOverview() {
         { count: favCnt }
     ] = await Promise.all([
         _sb.from('bookings').select('id', { count: 'exact', head: true })
-            .eq('user_id', _user.id).in('status', ['pending', 'approved', 'confirmed']),
+            .eq('user_id', _user.id).in('status', ['pending', 'awaiting_approval', 'approved', 'confirmed']),
         _sb.from('bookings').select('id', { count: 'exact', head: true })
             .eq('user_id', _user.id).in('status', ['completed', 'rejected', 'cancelled']),
         _sb.from('favorites').select('id', { count: 'exact', head: true })
@@ -177,7 +178,7 @@ async function loadActiveBookings() {
         .from('bookings')
         .select('id, listing_id, start_date, end_date, total_amount, status, payment_method, created_at, payment_deadline')
         .eq('user_id', _user.id)
-        .in('status', ['pending', 'approved', 'confirmed'])
+        .in('status', ['pending', 'awaiting_approval', 'approved', 'confirmed'])
         .order('created_at', { ascending: false });
 
     if (error || !data || !data.length) {
@@ -303,7 +304,18 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
             ? `<button class="receipt-btn" onclick="event.stopPropagation();downloadReceipt('${b.id}')"><i class="fa-solid fa-download"></i> Receipt</button>`
             : '';
 
-        const canCancel = b.status === 'pending' || b.status === 'approved' || b.status === 'confirmed';
+        const STATUS_LABELS = {
+            pending:           'Pending',
+            awaiting_approval: 'Awaiting Approval',
+            approved:          'Approved',
+            confirmed:         'Confirmed',
+            completed:         'Completed',
+            cancelled:         'Cancelled',
+            rejected:          'Rejected',
+        };
+        const statusLabel = STATUS_LABELS[b.status] || b.status;
+
+        const canCancel = ['pending', 'awaiting_approval', 'approved', 'confirmed'].includes(b.status);
         const cancelBtnHtml = canCancel
             ? `<button class="cancel-booking-btn" onclick="event.stopPropagation();cancelBooking('${b.id}',this)"><i class="fa-solid fa-xmark"></i> Cancel</button>`
             : '';
@@ -332,7 +344,7 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
                         ${viewBtnHtml}
                         ${receiptBtnHtml}
                         ${cancelBtnHtml}
-                        <span class="status-pill status-${b.status}" id="pill-${b.id}">${b.status}</span>
+                        <span class="status-pill status-${b.status}" id="pill-${b.id}">${statusLabel}</span>
                     </div>
                 </div>
             </div>
@@ -798,7 +810,7 @@ window.cancelBooking = async function(bookingId, btn) {
     // Update the pill in-place
     const pill = document.getElementById('pill-' + bookingId);
     if (pill) {
-        pill.textContent = 'cancelled';
+        pill.textContent = 'Cancelled';
         pill.className = 'status-pill status-cancelled';
     }
 
@@ -1088,11 +1100,4 @@ document.addEventListener('afristay:profileReady', () => {
         });
 });
 
-// Patch tab switching to auto-load notifications panel
-(function patchNotifTab() {
-    const origSwitch = window._switchTab;
-    window._switchTab = function(tab) {
-        if (origSwitch) origSwitch(tab);
-        if (tab === 'notifications') loadNotifications();
-    };
-})();
+// notifications tab is handled via TAB_LOADERS above

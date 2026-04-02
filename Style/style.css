@@ -739,3 +739,80 @@
     .meta-chip { font-size: 11px !important; padding: 3px 8px !important; }
     .section-header h2, .section-title { font-size: 18px !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   ADDITIONAL MOBILE POLISH
+   ═══════════════════════════════════════════════════════════ */
+
+/* Home page: listings carousel swipeable on touch */
+.listings-carousel {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+}
+.listings-carousel .property-card {
+    scroll-snap-align: start;
+}
+
+/* Prevent horizontal overflow on all pages */
+html, body { max-width: 100%; overflow-x: hidden; }
+
+/* Better touch targets for buttons throughout */
+@media (max-width: 768px) {
+    /* Nav heart & profile icon spacing */
+    .nav-right { gap: 16px; }
+    .icon-link i { font-size: 22px; }
+
+    /* Stat cards in profile/dashboard: 2 per row on tablet, 1 on tiny */
+    .stat-cards { grid-template-columns: repeat(2, 1fr) !important; }
+
+    /* Fav card on Favorites page: already stacked at 700px */
+
+    /* Events grid: single column */
+    .events-grid { grid-template-columns: 1fr !important; }
+
+    /* Ensure modals don't overflow on small screens */
+    .modal-box, .form-modal > div {
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    /* Info card booking form: full width inputs */
+    .info-card input[type="date"],
+    .info-card input[type="number"] {
+        font-size: 16px; /* prevents iOS auto-zoom */
+    }
+
+    /* Dashboard sidebar toggle area */
+    .sb-toggle-btn {
+        display: flex !important;
+        align-items: center;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Property card min width reset — cards go full width in grid */
+    .property-card { min-width: 0 !important; }
+
+    /* Listings page filter: smaller chip text */
+    .chip { font-size: 12px !important; padding: 5px 12px !important; }
+    .cat-toggle { font-size: 12px !important; padding: 5px 12px !important; }
+
+    /* Home hero buttons: stack on very small phones */
+    .hero-btns { flex-direction: column !important; align-items: center !important; gap: 10px !important; }
+    .hero-btns a, .hero-btns button { width: 100% !important; text-align: center !important; justify-content: center !important; }
+
+    /* Profile stats: single column */
+    .stat-cards { grid-template-columns: 1fr !important; }
+
+    /* Fav page header count badge: smaller */
+    .fav-count { font-size: 11px; padding: 2px 8px; }
+
+    /* Legal pages hero: smaller heading */
+    .legal-hero h1 { font-size: 24px; }
+    .legal-hero { padding: 28px 20px; }
+    .legal-body { padding: 24px 16px; }
+
+    /* Checkout success screen: center layout */
+    .checkout-success { padding: 32px 16px !important; }
+}

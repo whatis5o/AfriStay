@@ -244,7 +244,7 @@
                 submitBtn.innerText = 'Sending...';
 
                 const { error } = await client.auth.resetPasswordForEmail(email, {
-                    redirectTo: window.location.origin + '/Auth/'
+                    redirectTo: (typeof CONFIG !== 'undefined' && CONFIG.SITE_URL ? CONFIG.SITE_URL : window.location.origin) + '/Auth/'
                 });
 
                 submitBtn.innerText = 'Send Reset Link';
