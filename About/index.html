@@ -57,7 +57,7 @@
         <section class="story-section">
             <div class="story-container">
                 <div class="story-image">
-                    <img src="/Pictures/Rwanda.jpg" alt="Rwanda landscape">
+                    <img src="/Pictures/Rwanda.jpg" loading="lazy" alt="Rwanda landscape">
                 </div>
                 <div class="story-content">
                     <h2>Our Story: <span class="highlight">Born from Passion</span></h2>
@@ -154,7 +154,7 @@
                 <div class="team-grid">
                     <div class="team-card">
                         <div class="team-image">
-                            <img src="/Pictures/emma.jpg" alt="Team member">
+                            <img src="/Pictures/emma.jpg" loading="lazy" alt="Team member">
                         </div>
                         <h4>Emma Butera</h4>
                         <p class="role">Founder & CEO</p>
@@ -162,7 +162,7 @@
                     </div>
                     <div class="team-card">
                         <div class="team-image">
-                            <img src="/Pictures/amina.jpg" alt="Team member">
+                            <img src="/Pictures/amina.jpg" loading="lazy" alt="Team member">
                         </div>
                         <h4>Amina Keza</h4>
                         <p class="role">Head of Operations</p>
@@ -184,7 +184,7 @@
                     <p>Find your perfect stay or vehicle today and start your authentic Rwandan adventure.</p>
                 </div>
                 <div class="cta-actions">
-                    <a href="#" class="cta-btn">Start Exploring</a>
+                    <a href="/Listings/" class="cta-btn">Start Exploring</a>
                     <div class="cta-phone">
                         <span>Email us anytime</span>
                         <strong>info@afristay.rw</strong>
@@ -249,9 +249,8 @@
                 <div class="footer-bottom-content">
                     <p class="copyright">&copy; 2026 AfriStay. All rights reserved. Made with care in Rwanda.</p>
                     <div class="footer-bottom-links">
-                        <a href="#">Privacy Policy</a>
-                        <a href="#">Terms of Service</a>
-                        <a href="#">Cookie Policy</a>
+                        <a href="/Privacy/">Privacy Policy</a>
+                        <a href="/Terms/">Terms of Service</a>
                     </div>
                 </div>
             </div>
@@ -259,7 +258,8 @@
         </footer>
         
     </body>
-    <script src="/js/script.js"></script>
-    <script src="/js/utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/js/config.js"></script>
+    <script src="/js/utils.js"></script>
+    <script src="/js/script.js"></script>
 </html>

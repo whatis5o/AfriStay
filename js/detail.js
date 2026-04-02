@@ -64,7 +64,7 @@ async function loadListingDetails(today) {
                 availability_status, status, avg_rating, reviews_count,
                 category_slug, landmark_description,
                 province_id, district_id, sector_id, owner_id,
-                rooms, bathrooms, beds, max_guests, floor_area, amenities_data,
+                room_count, bathroom_count, bed_count, max_guests, floor_area_sqm, amenities_data,
                 provinces ( name ),
                 districts ( name ),
                 sectors ( name ),
@@ -159,7 +159,7 @@ async function loadListingDetails(today) {
                 '<div class="detail-promo-wrap">' +
                 '<span class="detail-promo-original">' + price + ' <small>' + currency + '</small></span>' +
                 '<span>' + discStr + ' <small>' + currency + '</small> <span style="font-size:14px;color:#bbb;font-weight:400;">' + priceUnit + '</span>' +
-                '<span class="detail-promo-badge">' + promoData.discount + '% OFF</span>' +
+                '<span class="detail-promo-badge">Promo</span>' +
                 '</span>' +
                 '<small style="color:#EB6753;font-size:12px;margin-top:2px;">Promo ends ' + endFmt + '</small>' +
                 '</div>';
@@ -251,11 +251,11 @@ function renderListingSpecs(listing) {
     if (!descEl || document.getElementById('listingSpecsEl')) return;
 
     const specs = [];
-    if (listing.rooms)      specs.push({ icon: 'fa-solid fa-door-open',    label: listing.rooms + ' Bedroom' + (listing.rooms > 1 ? 's' : '') });
-    if (listing.bathrooms)  specs.push({ icon: 'fa-solid fa-bath',          label: listing.bathrooms + ' Bathroom' + (listing.bathrooms > 1 ? 's' : '') });
-    if (listing.beds)       specs.push({ icon: 'fa-solid fa-bed',           label: listing.beds + ' Bed' + (listing.beds > 1 ? 's' : '') });
-    if (listing.max_guests) specs.push({ icon: 'fa-solid fa-users',         label: listing.max_guests + ' Guest' + (listing.max_guests > 1 ? 's' : '') });
-    if (listing.floor_area) specs.push({ icon: 'fa-solid fa-ruler-combined', label: listing.floor_area + ' m²' });
+    if (listing.room_count)     specs.push({ icon: 'fa-solid fa-door-open',     label: listing.room_count + ' Bedroom' + (listing.room_count > 1 ? 's' : '') });
+    if (listing.bathroom_count) specs.push({ icon: 'fa-solid fa-bath',           label: listing.bathroom_count + ' Bathroom' + (listing.bathroom_count > 1 ? 's' : '') });
+    if (listing.bed_count)      specs.push({ icon: 'fa-solid fa-bed',            label: listing.bed_count + ' Bed' + (listing.bed_count > 1 ? 's' : '') });
+    if (listing.max_guests)     specs.push({ icon: 'fa-solid fa-users',          label: listing.max_guests + ' Guest' + (listing.max_guests > 1 ? 's' : '') });
+    if (listing.floor_area_sqm) specs.push({ icon: 'fa-solid fa-ruler-combined', label: listing.floor_area_sqm + ' m²' });
 
     if (!specs.length) return;
 
@@ -418,7 +418,7 @@ async function loadReviews() {
 
     const { data: reviews, error } = await _supabase
         .from('reviews')
-        .select('id, rating, comment, created_at, user_id, profiles ( full_name )')
+        .select('id, rating, comment, created_at, user_id, owner_reply, owner_replied_at, profiles ( full_name )')
         .eq('listing_id', LISTING_ID)
         .order('created_at', { ascending: false });
 
@@ -434,14 +434,70 @@ function renderReviews(reviews) {
         list.innerHTML = '<div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:32px;text-align:center;margin-bottom:20px;"><i class="fa-regular fa-comment-dots" style="font-size:36px;color:#ddd;display:block;margin-bottom:10px;"></i><p style="color:#999;font-size:15px;font-weight:500;margin:0;">No reviews yet</p><p style="color:#bbb;font-size:13px;margin:6px 0 0;">Be the first to share your experience!</p></div>';
         return;
     }
-    list.innerHTML = reviews.map(r => {
-        const name = r.profiles?.full_name || 'Anonymous';
-        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-        const date = new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-        const stars = Array.from({ length: 5 }, (_, i) => '<i class="fa-' + (i < r.rating ? 'solid' : 'regular') + ' fa-star" style="color:' + (i < r.rating ? '#f1c40f' : '#ddd') + ';font-size:13px;"></i>').join('');
-        return '<div style="background:#fff;border:1px solid #eee;border-radius:14px;padding:20px;margin-bottom:14px;"><div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;"><div style="width:40px;height:40px;border-radius:50%;background:#EB6753;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">' + initials + '</div><div style="flex:1;"><div style="font-weight:600;font-size:14px;color:#222;">' + escHtml(name) + '</div><div style="font-size:12px;color:#aaa;">' + date + '</div></div><div>' + stars + '</div></div>' + (r.comment ? '<p style="color:#555;font-size:14px;line-height:1.65;margin:0;">' + escHtml(r.comment) + '</p>' : '') + '</div>';
-    }).join('');
+    const isOwner = CURRENT_USER && CURRENT_LISTING?.owner_id === CURRENT_USER.id;
+
+    list.innerHTML = '';
+    reviews.forEach(r => {
+        const name      = r.profiles?.full_name || 'Anonymous';
+        const initials  = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const date      = new Date(r.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        const stars     = Array.from({ length: 5 }, (_, i) => '<i class="fa-' + (i < r.rating ? 'solid' : 'regular') + ' fa-star" style="color:' + (i < r.rating ? '#f1c40f' : '#ddd') + ';font-size:13px;"></i>').join('');
+        const replyDate = r.owner_replied_at ? new Date(r.owner_replied_at).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '';
+
+        const card = document.createElement('div');
+        card.id = 'review-' + r.id;
+        card.style.cssText = 'background:#fff;border:1px solid #eee;border-radius:14px;padding:20px;margin-bottom:14px;';
+        card.innerHTML =
+            '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">' +
+            '<div style="width:40px;height:40px;border-radius:50%;background:#EB6753;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">' + initials + '</div>' +
+            '<div style="flex:1;"><div style="font-weight:600;font-size:14px;color:#222;">' + escHtml(name) + '</div><div style="font-size:12px;color:#aaa;">' + date + '</div></div>' +
+            '<div>' + stars + '</div></div>' +
+            (r.comment ? '<p style="color:#555;font-size:14px;line-height:1.65;margin:0 0 10px;">' + escHtml(r.comment) + '</p>' : '') +
+            // Existing reply
+            (r.owner_reply
+                ? '<div style="background:#fff8f6;border-left:3px solid #EB6753;border-radius:0 10px 10px 0;padding:10px 14px;margin-top:8px;">' +
+                  '<p style="font-size:11px;font-weight:700;color:#EB6753;margin:0 0 4px;text-transform:uppercase;letter-spacing:.5px;"><i class="fa-solid fa-reply"></i> Host Reply · ' + replyDate + '</p>' +
+                  '<p id="reply-text-' + r.id + '" style="font-size:13px;color:#444;margin:0;line-height:1.6;">' + escHtml(r.owner_reply) + '</p>' +
+                  (isOwner ? '<button onclick="openReplyForm(\'' + r.id + '\',true)" style="margin-top:6px;background:none;border:none;font-size:12px;color:#EB6753;cursor:pointer;font-weight:600;padding:0;">Edit reply</button>' : '') +
+                  '</div>'
+                : '') +
+            // Reply button for owner (no reply yet)
+            (isOwner && !r.owner_reply
+                ? '<button onclick="openReplyForm(\'' + r.id + '\',false)" style="margin-top:8px;background:none;border:1px solid #EB6753;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;color:#EB6753;cursor:pointer;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-reply"></i> Reply</button>'
+                : '') +
+            '<div id="reply-form-' + r.id + '" style="display:none;margin-top:10px;"></div>';
+        list.appendChild(card);
+    });
 }
+
+window.openReplyForm = function(reviewId, isEdit) {
+    const wrap = document.getElementById('reply-form-' + reviewId);
+    if (!wrap) return;
+    if (wrap.style.display === 'block') { wrap.style.display = 'none'; return; } // toggle
+    const existing = document.getElementById('reply-text-' + reviewId)?.textContent || '';
+    wrap.style.display = 'block';
+    wrap.innerHTML =
+        '<textarea id="reply-input-' + reviewId + '" style="width:100%;min-height:70px;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:10px;font-family:Inter,sans-serif;font-size:13px;resize:vertical;" placeholder="Write your reply...">' + (isEdit ? existing : '') + '</textarea>' +
+        '<div style="display:flex;gap:8px;margin-top:8px;">' +
+        '<button onclick="submitReply(\'' + reviewId + '\')" style="background:#EB6753;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;">Post Reply</button>' +
+        '<button onclick="document.getElementById(\'reply-form-' + reviewId + '\').style.display=\'none\'" style="background:#f5f5f5;color:#555;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>' +
+        '</div>';
+};
+
+window.submitReply = async function(reviewId) {
+    const input = document.getElementById('reply-input-' + reviewId);
+    const reply = input?.value.trim();
+    if (!reply) { showToast('Please write a reply first.', 'warning'); return; }
+
+    const { error } = await _supabase.from('reviews').update({
+        owner_reply:      reply,
+        owner_replied_at: new Date().toISOString(),
+    }).eq('id', reviewId);
+
+    if (error) { showToast('Failed to post reply: ' + error.message, 'error'); return; }
+    showToast('Reply posted!', 'success');
+    await loadReviews(); // re-render
+};
 
 async function initReviewForm() {
     const formSection = document.getElementById('reviewFormSection');
@@ -683,6 +739,162 @@ function goToCheckout() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Redirecting...'; }
     const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: selectedPrice, currency, total: totalAmount, category: CURRENT_LISTING?.category_slug || 'property', price_zone: selectedZone, guests });
     window.location.href = '/Listings/Checkout/?' + params.toString();
+}
+
+/* ═══════════════════════════════════════════════
+   SHARE BUTTON
+   ═══════════════════════════════════════════════ */
+function _injectShareButton(listingId, title) {
+    // Find the actions area (next to book button) or append after header
+    const contentEl = document.getElementById('contentEl');
+    if (!contentEl) return;
+
+    // Don't double-inject
+    if (document.getElementById('shareBtn')) return;
+
+    const shareUrl  = 'https://afristay.rw/Listings/Detail/?id=' + encodeURIComponent(listingId);
+    const shareText = (title || 'Check out this listing') + ' — AfriStay Rwanda';
+
+    const btn = document.createElement('button');
+    btn.id = 'shareBtn';
+    btn.innerHTML = '<i class="fa-solid fa-share-nodes"></i> Share';
+    btn.style.cssText = 'display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border:1.5px solid #e0e0e0;background:#fff;border-radius:10px;font-family:Inter,sans-serif;font-size:14px;font-weight:600;color:#333;cursor:pointer;transition:all .2s;margin-top:12px;';
+    btn.onmouseenter = () => { btn.style.borderColor = '#EB6753'; btn.style.color = '#EB6753'; };
+    btn.onmouseleave = () => { btn.style.borderColor = '#e0e0e0'; btn.style.color = '#333'; };
+
+    btn.addEventListener('click', async () => {
+        // 1. Native share (mobile)
+        if (navigator.share) {
+            try { await navigator.share({ title: shareText, url: shareUrl }); return; } catch (_) { /* cancelled */ return; }
+        }
+        // 2. Desktop fallback — small dropdown
+        const existing = document.getElementById('shareDrop');
+        if (existing) { existing.remove(); return; }
+
+        const drop = document.createElement('div');
+        drop.id = 'shareDrop';
+        drop.style.cssText = 'position:absolute;background:#fff;border:1px solid #e0e0e0;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:8px;z-index:9999;min-width:200px;';
+
+        const items = [
+            { icon: 'fa-brands fa-whatsapp', label: 'Share on WhatsApp', color: '#25D366',
+              action: () => window.open('https://wa.me/?text=' + encodeURIComponent(shareText + '\n' + shareUrl), '_blank') },
+            { icon: 'fa-solid fa-envelope', label: 'Share via Email', color: '#EB6753',
+              action: () => window.location.href = 'mailto:?subject=' + encodeURIComponent(shareText) + '&body=' + encodeURIComponent(shareUrl) },
+            { icon: 'fa-solid fa-link', label: 'Copy Link', color: '#6366f1',
+              action: () => {
+                  navigator.clipboard?.writeText(shareUrl).then(() => showToast('Link copied!', 'success'))
+                      .catch(() => { const ta = document.createElement('textarea'); ta.value = shareUrl; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showToast('Link copied!', 'success'); });
+                  drop.remove();
+              }
+            },
+        ];
+
+        items.forEach(({ icon, label, color, action }) => {
+            const row = document.createElement('button');
+            row.style.cssText = 'display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;border:none;background:none;font-family:Inter,sans-serif;font-size:14px;font-weight:600;color:#333;cursor:pointer;border-radius:8px;text-align:left;';
+            row.innerHTML = `<i class="${icon}" style="width:18px;text-align:center;color:${color};font-size:16px;"></i>${label}`;
+            row.onmouseenter = () => row.style.background = '#f8f8f8';
+            row.onmouseleave = () => row.style.background = 'none';
+            row.addEventListener('click', () => { action(); drop.remove(); });
+            drop.appendChild(row);
+        });
+
+        // Position relative to button
+        const rect = btn.getBoundingClientRect();
+        drop.style.top  = (rect.bottom + window.scrollY + 6) + 'px';
+        drop.style.left = (rect.left  + window.scrollX)      + 'px';
+        document.body.appendChild(drop);
+
+        // Close on outside click
+        const close = e => { if (!drop.contains(e.target) && e.target !== btn) { drop.remove(); document.removeEventListener('click', close); } };
+        setTimeout(() => document.addEventListener('click', close), 10);
+    });
+
+    // Inject after the booking form or at end of header section
+    const bookingForm = document.getElementById('bookingForm');
+    if (bookingForm && bookingForm.parentNode) {
+        bookingForm.parentNode.insertBefore(btn, bookingForm.nextSibling);
+    } else {
+        contentEl.appendChild(btn);
+    }
+}
+
+/* ═══════════════════════════════════════════════
+   SIMILAR LISTINGS
+   ═══════════════════════════════════════════════ */
+async function loadSimilarListings(provinceId, categorySlug) {
+    if (!provinceId && !categorySlug) return;
+
+    // Fetch up to 3 similar listings (same province + same category, excluding current)
+    let query = _supabase
+        .from('listings')
+        .select('id, title, price, currency, category_slug, province_id, district_id, availability_status')
+        .neq('id', LISTING_ID)
+        .eq('availability_status', 'available')
+        .limit(3);
+
+    if (categorySlug) query = query.eq('category_slug', categorySlug);
+    if (provinceId)   query = query.eq('province_id', provinceId);
+
+    const { data: similar } = await query;
+    if (!similar || !similar.length) return;
+
+    // Fetch images for these listings
+    const ids = similar.map(l => l.id);
+    const { data: imgRows } = await _supabase
+        .from('listing_images')
+        .select('listing_id, image_url')
+        .in('listing_id', ids)
+        .order('display_order', { ascending: true });
+
+    const imgMap = {};
+    (imgRows || []).forEach(r => { if (!imgMap[r.listing_id]) imgMap[r.listing_id] = r.image_url; });
+
+    // Fetch province names
+    const pvIds = [...new Set(similar.map(l => l.province_id).filter(Boolean))];
+    const pvMap = {};
+    if (pvIds.length) {
+        const { data: pvs } = await _supabase.from('provinces').select('id, name').in('id', pvIds);
+        (pvs || []).forEach(p => pvMap[p.id] = p.name);
+    }
+
+    // Build section
+    const section = document.createElement('div');
+    section.id = 'similarSection';
+    section.style.cssText = 'grid-column:1/-1;margin-top:32px;';
+    section.innerHTML = '<h3 style="font-size:20px;font-weight:800;color:#1a1a1a;margin:0 0 16px;">Similar Listings</h3>';
+
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;';
+
+    similar.forEach(l => {
+        const img   = imgMap[l.id] || '';
+        const loc   = pvMap[l.province_id] || 'Rwanda';
+        const price = Number(l.price).toLocaleString('en-RW');
+        const cur   = l.currency || 'RWF';
+        const unit  = l.category_slug === 'vehicle' ? '/day' : '/night';
+
+        const card = document.createElement('a');
+        card.href = '/Listings/Detail/?id=' + l.id;
+        card.style.cssText = 'display:block;text-decoration:none;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);transition:transform .2s,box-shadow .2s;';
+        card.onmouseenter = () => { card.style.transform = 'translateY(-3px)'; card.style.boxShadow = '0 8px 24px rgba(0,0,0,.1)'; };
+        card.onmouseleave = () => { card.style.transform = 'none'; card.style.boxShadow = '0 2px 12px rgba(0,0,0,.06)'; };
+        card.innerHTML = img
+            ? `<img src="${escHtml(img)}" alt="${escHtml(l.title)}" style="width:100%;height:160px;object-fit:cover;" onerror="this.style.display='none'">`
+            : `<div style="width:100%;height:160px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:28px;color:#ddd;"></i></div>`;
+        card.innerHTML += `
+            <div style="padding:14px 16px;">
+                <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(l.title)}</p>
+                <p style="margin:0 0 10px;font-size:12px;color:#888;"><i class="fa-solid fa-location-dot" style="margin-right:4px;color:#EB6753;"></i>${escHtml(loc)}</p>
+                <p style="margin:0;font-size:15px;font-weight:800;color:#EB6753;">${price} <span style="font-size:11px;font-weight:500;color:#aaa;">${cur}${unit}</span></p>
+            </div>`;
+        grid.appendChild(card);
+    });
+
+    section.appendChild(grid);
+
+    const contentEl = document.getElementById('contentEl');
+    if (contentEl) contentEl.appendChild(section);
 }
 
 function setEl(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }

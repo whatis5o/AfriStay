@@ -175,7 +175,7 @@ async function loadActiveBookings() {
 
     const { data, error } = await _sb
         .from('bookings')
-        .select('id, listing_id, start_date, end_date, total_amount, status, payment_method, created_at')
+        .select('id, listing_id, start_date, end_date, total_amount, status, payment_method, created_at, payment_deadline')
         .eq('user_id', _user.id)
         .in('status', ['pending', 'approved', 'confirmed'])
         .order('created_at', { ascending: false });
@@ -186,6 +186,53 @@ async function loadActiveBookings() {
     }
 
     await renderBookingCards(container, data, true);
+
+    // Inject payment deadline countdown banners for approved bookings
+    data.forEach(b => {
+        if (b.status !== 'approved' || !b.payment_deadline) return;
+        const card = document.getElementById('booking-card-' + b.id);
+        if (!card) return;
+
+        const deadline = new Date(b.payment_deadline);
+        const now      = new Date();
+        const msLeft   = deadline - now;
+
+        const banner = document.createElement('div');
+        banner.id = 'countdown-' + b.id;
+        banner.style.cssText = 'grid-column:1/-1;padding:10px 14px;border-radius:0 0 12px 12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;';
+
+        if (msLeft <= 0) {
+            banner.style.background = '#fdecea';
+            banner.style.color      = '#c0392b';
+            banner.innerHTML = '<i class="fa-solid fa-clock" style="color:#e74c3c;"></i> Payment window closed — booking may be cancelled soon.';
+        } else {
+            const hoursLeft = Math.floor(msLeft / 3600000);
+            const minsLeft  = Math.floor((msLeft % 3600000) / 60000);
+            const urgent    = msLeft < 3 * 3600000; // < 3 hours — red
+            banner.style.background = urgent ? '#fff3cd' : '#fff8f3';
+            banner.style.color      = urgent ? '#92400e' : '#9a3412';
+            banner.innerHTML = `<i class="fa-solid fa-hourglass-half" style="color:${urgent?'#d97706':'#EB6753'};"></i> Pay within <strong>${hoursLeft}h ${minsLeft}m</strong> to confirm your booking.`;
+
+            // Live tick every minute
+            const interval = setInterval(() => {
+                const remaining = new Date(b.payment_deadline) - new Date();
+                if (remaining <= 0) {
+                    clearInterval(interval);
+                    banner.style.background = '#fdecea'; banner.style.color = '#c0392b';
+                    banner.innerHTML = '<i class="fa-solid fa-clock" style="color:#e74c3c;"></i> Payment window closed — booking may be cancelled soon.';
+                    return;
+                }
+                const h = Math.floor(remaining / 3600000);
+                const m = Math.floor((remaining % 3600000) / 60000);
+                const u = remaining < 3 * 3600000;
+                banner.style.background = u ? '#fff3cd' : '#fff8f3';
+                banner.style.color      = u ? '#92400e' : '#9a3412';
+                banner.innerHTML = `<i class="fa-solid fa-hourglass-half" style="color:${u?'#d97706':'#EB6753'};"></i> Pay within <strong>${h}h ${m}m</strong> to confirm your booking.`;
+            }, 60000);
+        }
+
+        card.appendChild(banner);
+    });
 }
 
 /* ══════════════════════════════════════════════
@@ -249,7 +296,7 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
         const currency= l.currency || 'RWF';
 
         const imgHtml = thumb
-            ? `<img class="booking-thumb" src="${esc(thumb)}" alt="${esc(l.title)}" onerror="this.parentNode.innerHTML='<div class=booking-thumb-placeholder><i class=fa-solid\\ fa-image style=color:#ddd;font-size:24px></i></div>'">`
+            ? `<img class="booking-thumb" src="${esc(thumb)}" alt="${esc(l.title)}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=booking-thumb-placeholder><i class=fa-solid\\ fa-image style=color:#ddd;font-size:24px></i></div>'">`
             : `<div class="booking-thumb-placeholder"><i class="fa-solid fa-image" style="color:#ddd;font-size:24px;"></i></div>`;
 
         const receiptBtnHtml = (showReceipt && ['approved','confirmed','completed'].includes(b.status))
@@ -836,3 +883,216 @@ async function loadOwnerApplicationStatus() {
         });
     }
 }
+
+/* ══════════════════════════════════════════════
+   BOOKING RECEIPT PDF — guest profile page
+   Uses jsPDF (loaded lazily on demand)
+   ══════════════════════════════════════════════ */
+window.downloadReceipt = async function(bookingId) {
+    showToast('Preparing receipt…', 'info');
+    try {
+        // Fetch booking + listing data
+        const { data: b } = await _sb
+            .from('bookings')
+            .select('*, listings(title, province_id, district_id, category_slug)')
+            .eq('id', bookingId)
+            .single();
+        if (!b) { showToast('Booking not found.', 'error'); return; }
+
+        const listing  = b.listings || {};
+        const nights   = Math.max(1, Math.ceil((new Date(b.end_date) - new Date(b.start_date)) / 86400000));
+        const unit     = listing.category_slug === 'vehicle' ? 'day' : 'night';
+        const fmtDate  = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const fmtMoney = n => Number(n||0).toLocaleString('en-RW') + ' ' + (b.currency || 'RWF');
+
+        // Load jsPDF lazily
+        if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
+            await new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                s.onload = res; s.onerror = rej;
+                document.head.appendChild(s);
+            });
+        }
+        const { jsPDF } = window.jspdf || window;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        const W = doc.internal.pageSize.getWidth();
+
+        // Header bar
+        doc.setFillColor(235, 103, 83);
+        doc.rect(0, 0, W, 28, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18); doc.setTextColor(255, 255, 255);
+        doc.text('AfriStay Rwanda', 15, 18);
+        doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+        doc.text('Booking Receipt', W - 15, 18, { align: 'right' });
+
+        // Booking ID
+        doc.setTextColor(60, 60, 60);
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+        doc.text('Booking ID: ' + bookingId.slice(0, 8).toUpperCase(), 15, 38);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+        doc.text('Generated: ' + new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }), W - 15, 38, { align: 'right' });
+
+        // Guest info
+        doc.setFontSize(10); doc.setTextColor(100, 100, 100);
+        doc.text('Guest:', 15, 52);
+        doc.setTextColor(30, 30, 30); doc.setFont('helvetica', 'bold');
+        doc.text((_profile?.full_name || _user?.email || 'Guest'), 40, 52);
+
+        // Details table
+        const rows = [
+            ['Listing',         listing.title || 'N/A'],
+            ['Check-in',        fmtDate(b.start_date)],
+            ['Check-out',       fmtDate(b.end_date)],
+            ['Duration',        nights + ' ' + unit + (nights > 1 ? 's' : '')],
+            ['Status',          (b.status || '').toUpperCase()],
+            ['Payment Method',  (b.payment_method || '—').replace(/_/g,' ')],
+            ['Total Amount',    fmtMoney(b.total_amount)],
+        ];
+        let y = 62;
+        rows.forEach(([k, v], i) => {
+            if (i % 2 === 0) { doc.setFillColor(248, 248, 248); doc.rect(12, y - 5, W - 24, 8, 'F'); }
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
+            doc.text(k, 15, y);
+            doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
+            doc.text(String(v), 75, y);
+            y += 10;
+        });
+
+        // Footer
+        doc.setFontSize(8); doc.setTextColor(150, 150, 150);
+        doc.text('Thank you for choosing AfriStay Rwanda! For support: support@afristay.rw', W / 2, 280, { align: 'center' });
+
+        doc.save('AfriStay-Receipt-' + bookingId.slice(0, 8) + '.pdf');
+        showToast('Receipt downloaded!', 'success');
+    } catch (err) {
+        showToast('Failed to generate receipt: ' + err.message, 'error');
+    }
+};
+
+/* ══════════════════════════════════════════════
+   NOTIFICATIONS TAB
+   ══════════════════════════════════════════════ */
+async function loadNotifications() {
+    const el = document.getElementById('notifList');
+    if (!el) return;
+    if (!window._profileSupabase || !window._profileUser) {
+        el.innerHTML = '<p style="text-align:center;color:#bbb;padding:40px;font-size:14px;"><i class="fa-regular fa-bell" style="font-size:32px;display:block;margin-bottom:12px;"></i>Sign in to view notifications.</p>';
+        return;
+    }
+
+    el.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb;"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:22px;"></i></div>';
+    try {
+        const { data, error } = await window._profileSupabase
+            .from('notifications')
+            .select('id, type, title, message, link, read, created_at')
+            .eq('user_id', window._profileUser.id)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (error) throw error;
+
+        if (!data?.length) {
+            el.innerHTML = '<p style="text-align:center;color:#bbb;padding:40px;font-size:14px;"><i class="fa-solid fa-bell-slash" style="font-size:32px;display:block;margin-bottom:12px;"></i>No notifications yet.</p>';
+            return;
+        }
+
+        const unread = data.filter(n => !n.read).length;
+        const badge = document.getElementById('notifBadge');
+        if (badge) { badge.textContent = unread > 99 ? '99+' : unread; badge.style.display = unread ? 'flex' : 'none'; }
+
+        const typeIcon = {
+            broadcast: 'fa-paper-plane',
+            new_booking: 'fa-calendar-check',
+            listing_approved: 'fa-house-circle-check',
+            booking_approved: 'fa-check-circle',
+            booking_rejected: 'fa-xmark-circle',
+            default: 'fa-bell',
+        };
+
+        el.innerHTML = data.map(n => {
+            const icon = typeIcon[n.type] || typeIcon.default;
+            const timeAgo = _timeAgo(n.created_at);
+            const unreadStyle = n.read ? '' : 'background:#fff8f6;border-left:3px solid #EB6753;';
+            return `<div style="${unreadStyle}padding:14px 16px;border-bottom:1px solid #f5f5f5;display:flex;gap:14px;align-items:flex-start;cursor:default;" onclick="markNotifRead('${n.id}',this)">
+                <div style="width:38px;height:38px;border-radius:50%;background:#fff0ee;color:#EB6753;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px;">
+                    <i class="fa-solid ${icon}"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:${n.read ? '500' : '700'};font-size:14px;color:#1a1a1a;">${n.title || 'Notification'}</div>
+                    <div style="font-size:13px;color:#555;margin-top:3px;">${n.message || ''}</div>
+                    ${n.link ? `<a href="${n.link}" style="font-size:12px;color:#EB6753;font-weight:600;margin-top:4px;display:inline-block;">View →</a>` : ''}
+                    <div style="font-size:11px;color:#bbb;margin-top:4px;">${timeAgo}</div>
+                </div>
+                ${!n.read ? '<div style="width:8px;height:8px;border-radius:50%;background:#EB6753;flex-shrink:0;margin-top:6px;"></div>' : ''}
+            </div>`;
+        }).join('');
+    } catch(err) {
+        const offline = !navigator.onLine;
+        el.innerHTML = `<div style="text-align:center;padding:40px;color:#bbb;">
+            <i class="fa-solid fa-${offline ? 'wifi-slash' : 'triangle-exclamation'}" style="font-size:32px;display:block;margin-bottom:12px;color:#e0a0a0;"></i>
+            <span style="font-size:14px;font-weight:600;color:#c0392b;">${offline ? 'No internet connection' : 'Could not load notifications'}</span>
+            <br><span style="font-size:12px;color:#bbb;margin-top:6px;display:block;">Tap <b>Mark all read</b> to retry.</span>
+        </div>`;
+    }
+}
+
+function _timeAgo(iso) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    return Math.floor(h / 24) + 'd ago';
+}
+
+window.markNotifRead = async function(id, rowEl) {
+    if (!window._profileSupabase) return;
+    await window._profileSupabase.from('notifications').update({ read: true }).eq('id', id);
+    if (rowEl) {
+        rowEl.style.background = '';
+        rowEl.style.borderLeft = '';
+        const dot = rowEl.querySelector('div[style*="border-radius:50%;background:#EB6753"]');
+        if (dot) dot.remove();
+    }
+    // Update badge
+    const badge = document.getElementById('notifBadge');
+    if (badge) {
+        const cur = parseInt(badge.textContent) || 0;
+        const next = Math.max(0, cur - 1);
+        badge.textContent = next > 99 ? '99+' : next;
+        badge.style.display = next ? 'flex' : 'none';
+    }
+};
+
+window.markAllNotifsRead = async function() {
+    if (!window._profileSupabase || !window._profileUser) return;
+    await window._profileSupabase.from('notifications').update({ read: true })
+        .eq('user_id', window._profileUser.id).eq('read', false);
+    loadNotifications();
+};
+
+// Hook into tab switching — load notifications when tab is opened
+document.addEventListener('afristay:profileReady', () => {
+    // Pre-load badge count
+    if (!window._profileSupabase || !window._profileUser) return;
+    window._profileSupabase.from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', window._profileUser.id)
+        .eq('read', false)
+        .then(({ count }) => {
+            const badge = document.getElementById('notifBadge');
+            if (badge && count > 0) { badge.textContent = count > 99 ? '99+' : count; badge.style.display = 'flex'; }
+        });
+});
+
+// Patch tab switching to auto-load notifications panel
+(function patchNotifTab() {
+    const origSwitch = window._switchTab;
+    window._switchTab = function(tab) {
+        if (origSwitch) origSwitch(tab);
+        if (tab === 'notifications') loadNotifications();
+    };
+})();

@@ -98,6 +98,23 @@
             display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
         }
         .amenity-chips::-webkit-scrollbar { display: none; }
+
+        /* Price range slider */
+        .price-range-bar { padding: 10px 20px 14px; border-top: 1px solid #f0f0f0; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .price-range-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #555; white-space: nowrap; }
+        .dual-range-wrap { position: relative; width: 240px; height: 28px; flex-shrink: 0; }
+        .dual-range-track { position: absolute; top: 50%; left: 0; right: 0; height: 4px; background: #e8e8e8; border-radius: 4px; transform: translateY(-50%); }
+        .dual-range-fill { position: absolute; height: 100%; background: var(--primary); border-radius: 4px; }
+        .dual-range { position: absolute; width: 100%; height: 4px; background: none; -webkit-appearance: none; appearance: none; pointer-events: none; top: 50%; transform: translateY(-50%); outline: none; }
+        .dual-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--primary); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(235,103,83,0.35); cursor: pointer; pointer-events: all; }
+        .dual-range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--primary); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(235,103,83,0.35); cursor: pointer; pointer-events: all; }
+
+        /* Listing badges */
+        .listing-badge { position: absolute; top: 36px; left: 10px; padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; z-index: 3; }
+        .badge-popular { background: #f97316; color: #fff; }
+        .badge-new     { background: #22c55e; color: #fff; }
+        .badge-limited { background: #ef4444; color: #fff; }
+
         .am-chip {
             display: inline-flex; align-items: center; gap: 6px;
             padding: 6px 14px; border: 1.5px solid #ebebeb;
@@ -536,6 +553,21 @@
                 <button class="am-chip" data-am="breakfast"><i class="fa-solid fa-mug-hot"></i> Breakfast</button>
             </div>
         </div>
+        <!-- PRICE RANGE SLIDER -->
+        <div class="price-range-bar" id="priceRangeBar">
+            <div class="price-range-label">
+                <i class="fa-solid fa-coins" style="color:var(--primary);"></i>
+                <span>Price: <strong id="priceRangeDisplay">Any</strong> RWF/night</span>
+                <button id="priceRangeClear" onclick="clearPriceRange()" style="display:none;background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:0 4px;">✕ Clear</button>
+            </div>
+            <div class="dual-range-wrap">
+                <div class="dual-range-track">
+                    <div class="dual-range-fill" id="rangeFill"></div>
+                </div>
+                <input type="range" id="priceMin" min="0" max="5000000" step="50000" value="0"         class="dual-range" oninput="onPriceRange()">
+                <input type="range" id="priceMax" min="0" max="5000000" step="50000" value="5000000"  class="dual-range" oninput="onPriceRange()">
+            </div>
+        </div>
     </div>
 
 <!-- GRID -->
@@ -546,7 +578,8 @@
                 <p>Find your perfect stay across Rwanda's most beautiful locations</p>
             </div>
             <div class="properties-grid" id="propertiesGrid"></div>
-            <div id="listingsPagination" style="margin-top:24px;"></div>
+            <div id="listingsSentinel" style="height:1px;"></div>
+            <div id="listingsLoader" style="display:none;text-align:center;padding:28px;"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px;color:var(--primary);"></i></div>
         </div>
     </section>
 
@@ -558,7 +591,7 @@
                 <p>Find your perfect stay or vehicle today and start your authentic Rwandan adventure.</p>
             </div>
             <div class="cta-actions">
-                <a href="#" class="cta-btn">Start Exploring</a>
+                <a href="/Listings/" class="cta-btn">Start Exploring</a>
                 <div class="cta-phone">
                     <span>Email us anytime</span>
                     <strong>info@afristay.rw</strong>
@@ -617,9 +650,8 @@
             <div class="footer-bottom-content">
                 <p class="copyright">&copy; 2026 AfriStay. All rights reserved. Made with care in Rwanda.</p>
                 <div class="footer-bottom-links">
-                    <a href="#">Privacy Policy</a>
-                    <a href="#">Terms of Service</a>
-                    <a href="#">Cookie Policy</a>
+                    <a href="/Privacy/">Privacy Policy</a>
+                    <a href="/Terms/">Terms of Service</a>
                 </div>
             </div>
         </div>
@@ -662,10 +694,10 @@
                 console.log('📦 [LISTINGS] Checking storage for', missing.length, 'listings...');
                 await Promise.all(missing.map(async (id) => {
                     try {
-                        const { data: files } = await sb.storage.from('listing_images').list(id, { limit: 1 });
+                        const { data: files } = await sb.storage.from('listing-images').list(id, { limit: 1 });
                         const file = (files || []).find(f => f.name && !f.id?.endsWith('/'));
                         if (file) {
-                            imgMap[id] = STORAGE_BASE + '/listing_images/' + id + '/' + file.name;
+                            imgMap[id] = STORAGE_BASE + '/listing-images/' + id + '/' + file.name;
                             console.log('  ✅ [LISTINGS] Storage img found:', id, file.name);
                         }
                     } catch(e) {}
@@ -736,6 +768,34 @@
             applyFilters();
         };
     
+        function _applyCatUI(cat) {
+            const isVeh = cat === 'vehicle';
+            // Amenity chips: hide house-specific ones for vehicles
+            document.querySelectorAll('.am-chip').forEach(c => {
+                const houseOnly = ['kitchen','washer','dryer','workspace','fireplace'].includes(c.dataset.am);
+                c.style.display = (isVeh && houseOnly) ? 'none' : '';
+                if (isVeh && houseOnly) { c.classList.remove('active'); }
+            });
+            // Price slider: adjust max and step for vehicles vs real estate
+            const minEl = document.getElementById('priceMin');
+            const maxEl = document.getElementById('priceMax');
+            const dispEl = document.getElementById('priceRangeDisplay');
+            if (minEl && maxEl) {
+                const newMax  = isVeh ? 500000 : 5000000;
+                const newStep = isVeh ? 10000  : 50000;
+                PRICE_MAX = newMax;
+                minEl.max = newMax; minEl.step = newStep; minEl.value = 0;
+                maxEl.max = newMax; maxEl.step = newStep; maxEl.value = newMax;
+                if (dispEl) dispEl.textContent = 'Any';
+                const clearBtn = document.getElementById('priceRangeClear');
+                if (clearBtn) clearBtn.style.display = 'none';
+                onPriceRange(true); // update fill only; applyFilters() called by caller
+            }
+            // Update label unit
+            const unitSpan = document.querySelector('#priceRangeBar .price-range-label span');
+            if (unitSpan) unitSpan.innerHTML = 'Price: <strong id="priceRangeDisplay">' + (dispEl?.textContent || 'Any') + '</strong> RWF' + (isVeh ? '/day' : '/night');
+        }
+
         document.querySelectorAll('.cat-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
@@ -743,6 +803,7 @@
                 activeCat = btn.dataset.cat;
                 const labels = { '': 'All Listings', 'real_estate': 'Real Estate', 'vehicle': 'Vehicles' };
                 heading.textContent = labels[activeCat] || 'All Listings';
+                _applyCatUI(activeCat);
                 applyFilters();
             });
         });
@@ -751,6 +812,49 @@
     
         let _lastFilters = {};
         const PAGE_SIZE = 15;
+        let _currentPage = 0, _hasMore = true, _isLoading = false;
+        let PRICE_MAX = 5000000; // default; 500000 for vehicles
+
+        // ── Price range slider ──────────────────────────────────
+        let _priceDebounce = null;
+        function onPriceRange(skipApply) {
+            const minEl = document.getElementById('priceMin');
+            const maxEl = document.getElementById('priceMax');
+            let lo = parseInt(minEl.value), hi = parseInt(maxEl.value);
+            if (lo > hi - 10000) { lo = hi - 10000; minEl.value = lo; }
+            // Visual updates always instant
+            const pct = v => (v / PRICE_MAX * 100) + '%';
+            const fill = document.getElementById('rangeFill');
+            fill.style.left  = pct(lo);
+            fill.style.width = (hi - lo) / PRICE_MAX * 100 + '%';
+            const fmt = n => Number(n).toLocaleString('en-RW');
+            document.getElementById('priceRangeDisplay').textContent =
+                (lo === 0 && hi === PRICE_MAX) ? 'Any' : fmt(lo) + ' – ' + fmt(hi);
+            const clearBtn = document.getElementById('priceRangeClear');
+            if (clearBtn) clearBtn.style.display = (lo === 0 && hi === PRICE_MAX) ? 'none' : '';
+            // Query debounced 500ms after user stops sliding
+            if (!skipApply && typeof window.applyFilters === 'function') {
+                clearTimeout(_priceDebounce);
+                _priceDebounce = setTimeout(applyFilters, 500);
+            }
+        }
+        window.onPriceRange = onPriceRange; // expose for oninput HTML attribute
+        window.clearPriceRange = function() {
+            document.getElementById('priceMin').value = 0;
+            document.getElementById('priceMax').value = PRICE_MAX;
+            onPriceRange();
+        };
+        onPriceRange(true); // init fill only — applyFilters not yet defined
+
+        // ── Infinite scroll sentinel ────────────────────────────
+        const _sentinel  = document.getElementById('listingsSentinel');
+        const _loader    = document.getElementById('listingsLoader');
+        const _scrollObs = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && _hasMore && !_isLoading) {
+                _currentPage++;
+                loadListings({ ...(_lastFilters || {}), page: _currentPage, append: true });
+            }
+        }, { rootMargin: '200px' });
 
         // ── Amenity chip toggle ──
         let _activeAmenities = [];
@@ -772,70 +876,130 @@
             const province = document.getElementById('flProvince').value;
             const district = document.getElementById('flDistrict').value;
             const sector   = document.getElementById('flSector').value;
-            _lastFilters = { qtext, province, district, sector, category: activeCat, amenities: _activeAmenities };
+            const priceMin = parseInt(document.getElementById('priceMin')?.value || '0');
+            const priceMax = parseInt(document.getElementById('priceMax')?.value || String(PRICE_MAX));
+            _lastFilters = { qtext, province, district, sector, category: activeCat, amenities: _activeAmenities, priceMin, priceMax };
+            _currentPage = 0; _hasMore = true;
+            grid.innerHTML = '';
+            _scrollObs.unobserve(_sentinel);
             await loadListings({ ..._lastFilters, page: 0 });
+            _scrollObs.observe(_sentinel);
         };
 
-        async function loadListings({ qtext='', province='', district='', sector='', category='', amenities=[], page=0 } = {}) {
-            showSkeletons(6);
-            document.getElementById('listingsPagination').innerHTML = '';
+        async function loadListings({ qtext='', province='', district='', sector='', category='', amenities=[], priceMin=0, priceMax=500000, page=0, append=false } = {}) {
+            if (_isLoading) return;
+            _isLoading = true;
+            if (_loader) _loader.style.display = 'block';
+            if (!append) showSkeletons(6);
+
             const start = page * PAGE_SIZE;
             const end   = start + PAGE_SIZE - 1;
 
             let q = sb.from('listings')
-                .select('id,title,price,price_display,currency,availability_status,status,category_slug,province_id,district_id,created_at,avg_rating,reviews_count', { count: 'exact' })
+                .select('id,title,price,price_display,currency,availability_status,status,category_slug,province_id,district_id,created_at,avg_rating,reviews_count,amenities_data', { count: 'exact' })
                 .eq('status', 'approved')
                 .eq('availability_status', 'available')
                 .order('created_at', { ascending: false })
                 .range(start, end);
 
-            console.log('🔍 [LISTINGS] Fetching page', page, 'listings...');
-
-            if (qtext)    q = q.ilike('title', `%${qtext}%`);
+            if (qtext) {
+                // Also search by location name (province / district / sector)
+                const [pvMatch, dtMatch, scMatch] = await Promise.all([
+                    sb.from('provinces').select('id').ilike('name', `%${qtext}%`),
+                    sb.from('districts').select('id').ilike('name', `%${qtext}%`),
+                    sb.from('sectors').select('id').ilike('name', `%${qtext}%`),
+                ]);
+                const pvIds = (pvMatch.data || []).map(r => r.id);
+                const dtIds = (dtMatch.data || []).map(r => r.id);
+                const scIds = (scMatch.data || []).map(r => r.id);
+                let orParts = [
+                    `title.ilike.%${qtext}%`,
+                    `description.ilike.%${qtext}%`,
+                    `address.ilike.%${qtext}%`,
+                    `category_slug.ilike.%${qtext}%`,
+                ];
+                if (pvIds.length) orParts.push(`province_id.in.(${pvIds.join(',')})`);
+                if (dtIds.length) orParts.push(`district_id.in.(${dtIds.join(',')})`);
+                if (scIds.length) orParts.push(`sector_id.in.(${scIds.join(',')})`);
+                q = q.or(orParts.join(','));
+            }
             if (province) q = q.eq('province_id', province);
             if (district) q = q.eq('district_id', district);
             if (sector)   q = q.eq('sector_id', sector);
             if (category) q = q.eq('category_slug', category);
-            if (amenities && amenities.length) q = q.contains('amenities_data', amenities);
+            if (priceMin > 0)          q = q.gte('price', priceMin);
+            if (priceMax < PRICE_MAX)  q = q.lte('price', priceMax);
 
-            const { data, error, count } = await q;
-            if (error) { grid.innerHTML = `<div class="state-box"><i class="fa-solid fa-triangle-exclamation"></i><p>${esc(error.message)}</p></div>`; return; }
+            let { data, error, count } = await q;
 
-            console.log('📋 [LISTINGS] Fetched', data?.length || 0, '/', count, 'listings');
-            if (!data || !data.length) { grid.innerHTML = '<div class="state-box"><i class="fa-solid fa-house-circle-xmark"></i><p>No listings found. Try different filters.</p></div>'; countEl.textContent = '0 results'; return; }
+            // Client-side amenity filter (avoids jsonb/array type ambiguity in PostgREST)
+            if (!error && data && amenities && amenities.length) {
+                data = data.filter(l => {
+                    const ams = Array.isArray(l.amenities_data) ? l.amenities_data
+                               : (l.amenities_data && typeof l.amenities_data === 'object') ? Object.keys(l.amenities_data).filter(k => l.amenities_data[k])
+                               : [];
+                    return amenities.every(am => ams.includes(am));
+                });
+            }
+            if (_loader) _loader.style.display = 'none';
+            _isLoading = false;
+
+            if (error) {
+                if (!append) grid.innerHTML = `<div class="state-box"><i class="fa-solid fa-triangle-exclamation"></i><p>${esc(error.message)}</p></div>`;
+                return;
+            }
+            if (!data || !data.length) {
+                if (!append) grid.innerHTML = '<div class="state-box"><i class="fa-solid fa-house-circle-xmark"></i><p>No listings found. Try different filters.</p></div>';
+                _hasMore = false;
+                return;
+            }
 
             const total = count || data.length;
-            countEl.textContent = total + ' result' + (total !== 1 ? 's' : '');
-    
-            // batch images — table first, then storage fallback
+            if (page === 0) countEl.textContent = total + ' result' + (total !== 1 ? 's' : '');
+            _hasMore = (start + data.length) < total;
+
+            // batch images + locations
             const ids = data.map(l => l.id);
             const imgMap = await resolveImages(ids);
-    
-            // batch location names
             const pvIds = [...new Set(data.map(l => l.province_id).filter(Boolean))];
             const dtIds = [...new Set(data.map(l => l.district_id).filter(Boolean))];
             const pvMap = {}, dtMap = {};
             if (pvIds.length) { const { data: ps } = await sb.from('provinces').select('id,name').in('id', pvIds); (ps||[]).forEach(p => pvMap[p.id] = p.name); }
             if (dtIds.length) { const { data: ds } = await sb.from('districts').select('id,name').in('id', dtIds); (ds||[]).forEach(d => dtMap[d.id] = d.name); }
-    
-            grid.innerHTML = '';
+
+            if (!append) grid.innerHTML = '';
+
+            const now = Date.now();
             data.forEach(l => {
-                const thumb  = imgMap[l.id];
-                const avail  = l.availability_status || 'available';
-                const isVeh  = l.category_slug === 'vehicle';
-                const catLbl = isVeh ? 'Vehicle' : 'Real Estate';
-                const catIcon= isVeh ? 'fa-car' : 'fa-house';
-                const loc    = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
-                const unit   = isVeh ? '/day' : '/night';
-                const price  = Number(l.price).toLocaleString();
-    
+                const thumb   = imgMap[l.id];
+                const avail   = l.availability_status || 'available';
+                const isVeh   = l.category_slug === 'vehicle';
+                const catLbl  = isVeh ? 'Vehicle' : 'Real Estate';
+                const catIcon = isVeh ? 'fa-car' : 'fa-house';
+                const loc     = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
+                const unit    = isVeh ? '/day' : '/night';
+                const price   = Number(l.price).toLocaleString();
+
+                // Badges
+                const ageMs    = now - new Date(l.created_at).getTime();
+                const isNew    = ageMs < 7 * 86400000; // < 7 days
+                const isPopular= (l.reviews_count || 0) >= 5 || (l.avg_rating || 0) >= 4.5;
+                const isLimited= avail === 'limited';
+                const badge    = isLimited ? '<span class="listing-badge badge-limited">Limited</span>'
+                               : isPopular  ? '<span class="listing-badge badge-popular">Popular</span>'
+                               : isNew      ? '<span class="listing-badge badge-new">New</span>'
+                               : '';
+
                 const card = document.createElement('a');
                 card.href = '/Listings/Detail/?id=' + l.id;
                 card.className = 'property-card';
                 card.innerHTML =
                     '<div class="card-image">' +
-                        (thumb ? '<img src="' + esc(thumb) + '" alt="' + esc(l.title) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' + '<div class="card-no-img" style="display:none;width:100%;height:100%;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:44px;color:#ddd;"></i></div>' : '<div class="card-no-img" style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:44px;color:#ddd;"></i></div>') +
+                        (thumb ? '<img src="' + esc(thumb) + '" alt="' + esc(l.title) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">'
+                               + '<div class="card-no-img" style="display:none;width:100%;height:100%;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:44px;color:#ddd;"></i></div>'
+                               : '<div class="card-no-img" style="display:flex;width:100%;height:100%;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:44px;color:#ddd;"></i></div>') +
                         '<div class="cat-label">' + catLbl + '</div>' +
+                        badge +
                         '<div class="card-heart" data-lid="' + l.id + '" onclick="event.preventDefault();event.stopPropagation();window.toggleFavorite(event,this,\'' + l.id + '\')"><i class="fa-regular fa-heart"></i></div>' +
                         '<div class="avail-strip ' + avail + '">' + (avail === 'available' ? '&#9679; Available' : '&#9679; ' + avail) + '</div>' +
                     '</div>' +
@@ -844,7 +1008,7 @@
                         '<div class="card-location"><i class="fa-solid fa-location-dot"></i><span>' + esc(loc) + '</span></div>' +
                         '<div class="card-features">' +
                             '<div class="feature"><i class="fa-solid ' + catIcon + '"></i><span>' + catLbl + '</span></div>' +
-                            '<div class="feature"><i class="fa-solid fa-circle-check" style="color:#2ecc71"></i><span>' + avail + '</span></div>' +
+                            (l.avg_rating ? '<div class="feature"><i class="fa-solid fa-star" style="color:#f59e0b"></i><span>' + Number(l.avg_rating).toFixed(1) + ' (' + (l.reviews_count||0) + ')</span></div>' : '') +
                         '</div>' +
                         '<div class="card-footer">' +
                             '<div class="card-price">' + price + ' <span>' + (l.currency||'RWF') + unit + '</span></div>' +
@@ -853,20 +1017,11 @@
                     '</div>';
                 grid.appendChild(card);
             });
-
-            // Pagination
-            if (window.renderPagination) {
-                const totalCount = count || data.length;
-                const pageCount = Math.ceil(totalCount / PAGE_SIZE);
-                renderPagination('listingsPagination', page, pageCount, totalCount, PAGE_SIZE, (newPage) => {
-                    loadListings({ ...(_lastFilters || {}), page: newPage });
-                    grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
-            }
         }
     
         showSkeletons(6);
         await loadListings();
+        _scrollObs.observe(_sentinel);
     })();
     </script>
 </body>

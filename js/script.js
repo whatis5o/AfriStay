@@ -9,26 +9,66 @@ async function initGlobalNav() {
     const navRight = document.querySelector('.nav-right');
     if (!navRight) return;
 
+    // Ensure heart is always present — add it if the static HTML somehow lost it
+    if (!navRight.querySelector('.nav-heart')) {
+        const heart = document.createElement('a');
+        heart.href = '/Favorites';
+        heart.className = 'icon-link nav-heart';
+        heart.title = 'Favorites';
+        heart.innerHTML = '<i class="fa-regular fa-heart"></i>';
+        navRight.insertBefore(heart, navRight.firstChild);
+    }
+
+    // Update only the auth button part (never touch the heart)
+    function _setAuthBtn(html) {
+        const existing = navRight.querySelector('#auth-btn, .nav-auth-btn');
+        if (existing) {
+            existing.outerHTML = html;
+        } else {
+            // auth-btn was already replaced (e.g. by page-specific code) — append
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            navRight.appendChild(tmp.firstElementChild);
+        }
+    }
+
     const cachedRole = localStorage.getItem('afriStay_role');
     if (cachedRole) {
         const profileLink = cachedRole === 'admin' ? '/Dashboards/Admin/' : cachedRole === 'owner' ? '/Dashboards/Owner/' : '/Dashboards/Profile/';
-        navRight.innerHTML = `
-            <a href="/Favorites" class="icon-link" title="Favorites"><i class="fa-regular fa-heart"></i></a>
-            <a href="${profileLink}" class="icon-link" title="${cachedRole === 'user' ? 'Profile' : 'Dashboard'}">
-                <i class="fa-solid fa-circle-user" style="font-size:24px;margin-left:10px;"></i>
-            </a>
-        `;
+        _setAuthBtn(`<a href="${profileLink}" class="icon-link nav-auth-btn" title="${cachedRole === 'user' ? 'Profile' : 'Dashboard'}"><i class="fa-solid fa-circle-user" style="font-size:24px;margin-left:10px;"></i></a>`);
     }
 
     const client = window.supabaseClient;
     if (!client) return;
-    const { data: { user } } = await client.auth.getUser();
-    if (!user) {
-        localStorage.removeItem('afriStay_role');
-        localStorage.removeItem('afriStay_firstName');
-        navRight.innerHTML = `<a href="/Auth" class="signin-btn">Sign In</a>`;
-    }
+    try {
+        const { data: { user } } = await client.auth.getUser();
+        if (!user) {
+            localStorage.removeItem('afriStay_role');
+            localStorage.removeItem('afriStay_firstName');
+            _setAuthBtn(`<a href="/Auth" id="auth-btn" class="signin-btn nav-auth-btn">Sign In</a>`);
+        }
+    } catch (_) { /* keep current state */ }
 }
+
+// Heart click interception — logged-out users get a toast + redirect
+document.addEventListener('click', function(e) {
+    const heart = e.target.closest('.nav-heart');
+    if (!heart) return;
+    if (localStorage.getItem('afriStay_role')) return; // logged in — let link work
+    e.preventDefault();
+    // Show inline toast
+    let toast = document.getElementById('_navFavToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = '_navFavToast';
+        toast.style.cssText = 'position:fixed;top:76px;right:20px;z-index:9999;background:#1a1a1a;color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;transition:opacity .3s;';
+        toast.innerHTML = '<i class="fa-solid fa-heart" style="color:#EB6753;"></i> <span>Sign in to save listings to favorites</span> <a href="/Auth?redirect=favorites" style="color:#EB6753;font-weight:700;text-decoration:none;margin-left:4px;">Sign In →</a>';
+        document.body.appendChild(toast);
+    }
+    toast.style.opacity = '1';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+});
 
 window.toggleMenu = function() {
     const navWrapper = document.getElementById("navWrapper");
@@ -82,7 +122,7 @@ function generateListingCard(listing, locationName) {
                     ${listing.promo_discount
                         ? '<div class="card-price">' +
                           '<span class="promo-original">' + (currency === 'RWF' ? '' : currency + ' ') + price + ' <span style="font-size:11px;">' + (currency === 'RWF' ? 'RWF' : '') + unit + '</span></span>' +
-                          '<span class="promo-badge">' + listing.promo_discount + '% OFF</span><br>' +
+                          '<span class="promo-badge">Promo</span><br>' +
                           (currency === 'RWF' ? '' : currency + ' ') + Number(listing.promo_price).toLocaleString() + ' <span>' + (currency === 'RWF' ? 'RWF' : '') + unit + '</span>' +
                           '</div>'
                         : '<div class="card-price">' + (currency === 'RWF' ? '' : currency + ' ') + price + ' <span>' + (currency === 'RWF' ? 'RWF' : '') + unit + '</span></div>'

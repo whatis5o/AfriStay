@@ -78,6 +78,9 @@
         .save-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
         .btn-p{background:var(--primary);color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;border:none;cursor:pointer;font-family:'Inter',sans-serif;display:inline-flex;align-items:center;gap:8px;transition:all .2s;text-decoration:none;}
         .btn-p:hover{opacity:.88;transform:translateY(-1px);}
+        .btn-s{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:600;border:1.5px solid #e8e8e8;background:#fff;color:#555;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;}
+        .btn-s:hover{border-color:var(--primary);color:var(--primary);background:#fff8f6;}
+        .btn-s:active{background:var(--ps);}
 
         /* ── BOOKING CARDS ── */
         .booking-card{border:1.5px solid #f0f0f0;border-radius:16px;padding:18px;margin-bottom:14px;display:flex;gap:16px;align-items:flex-start;transition:all .2s;cursor:pointer;background:#fff;}
@@ -197,6 +200,7 @@
             <span class="nav-badge" id="bookingsBadge" style="display:none;"></span>
         </button>
         <button class="nav-btn" data-tab="history"><i class="fa-solid fa-clock-rotate-left"></i> History</button>
+        <button class="nav-btn" data-tab="notifications"><i class="fa-solid fa-bell"></i> Notifications <span class="nav-badge" id="notifBadge" style="display:none;"></span></button>
         <button class="nav-btn" data-tab="favorites"><i class="fa-solid fa-heart"></i> Favorites</button>
         <div class="nav-sep"></div>
         <button class="nav-btn" data-tab="settings"><i class="fa-solid fa-lock"></i> Security</button>
@@ -318,6 +322,30 @@
                     <div>
                         <div class="skeleton" style="height:80px;border-radius:14px;margin-bottom:12px;"></div>
                         <div class="skeleton" style="height:80px;border-radius:14px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOTIFICATIONS TAB -->
+        <div class="tab-panel" id="tab-notifications">
+            <div class="section-card">
+                <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                    <div>
+                        <h2>Notifications</h2>
+                        <p>Messages and updates from AfriStay</p>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn-s" id="notifRefreshBtn" onclick="(async(b)=>{const i=b.querySelector('i');i.classList.add('fa-spin');b.disabled=true;await loadNotifications();i.classList.remove('fa-spin');b.disabled=false;})(this)"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                        <button class="btn-p" style="font-size:13px;padding:8px 16px;" onclick="markAllNotifsRead()">
+                            <i class="fa-solid fa-check-double"></i> Mark all read
+                        </button>
+                    </div>
+                </div>
+                <div class="section-body" id="notifList">
+                    <div style="text-align:center;padding:40px;color:#bbb;">
+                        <i class="fa-regular fa-bell" style="font-size:32px;display:block;margin-bottom:12px;"></i>
+                        <span style="font-size:14px;">No notifications yet.</span>
                     </div>
                 </div>
             </div>

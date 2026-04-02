@@ -22,6 +22,30 @@ const DEMO_MODE = false; // Set to true only when testing with mock provider
 
 console.log("🎯 [ADMIN] Demo mode:", DEMO_MODE ? "ENABLED" : "DISABLED");
 
+/* ═══════════════════════════════════════════════════════════════
+   AUDIT LOGGING  — fire-and-forget; never crashes the caller
+   Calls the log_audit() SECURITY DEFINER RPC in Supabase.
+   If the RPC itself fails, the DB-level fallback in log_audit()
+   writes an error row automatically.
+   ═══════════════════════════════════════════════════════════════ */
+function logAudit({ action, entityType = null, entityId = null, description = null, metadata = {}, isError = false }) {
+    if (!window.supabaseClient) return;
+    const actor = window.CURRENT_PROFILE;
+    window.supabaseClient.rpc('log_audit', {
+        p_actor_id:    actor?.id    || null,
+        p_actor_role:  actor?.role  || null,
+        p_action:      action,
+        p_entity_type: entityType,
+        p_entity_id:   entityId ? String(entityId) : null,
+        p_description: description,
+        p_metadata:    metadata,
+        p_is_error:    isError,
+    }).then(({ error }) => {
+        if (error) console.warn('[AUDIT] log_audit RPC returned error:', error.message);
+    }).catch(err => console.warn('[AUDIT] log_audit call failed:', err.message));
+}
+window.logAudit = logAudit;;
+
 /* ═══════════════════════════════════════════════════
    CLIENT-SIDE CACHE  ← reduces redundant DB calls
    Key structure:  'table:queryHash'
@@ -215,6 +239,38 @@ function injectDashboardStyles() {
         .promo-badge { background:#EB6753;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;vertical-align:middle; }
         /* New bookings container */
         #newBookingsContainer { min-height: 100px; }
+        /* ── Amenity chips — forced override ── */
+        #amenityCheckboxes { display:flex !important; flex-wrap:wrap !important; gap:8px !important; padding:4px 0 !important; align-items:flex-start !important; }
+        #amenityCheckboxes button.am-chip {
+            display:inline-flex !important; align-items:center !important; gap:6px !important;
+            padding:6px 14px !important; border:1.5px solid #ebebeb !important;
+            border-radius:20px !important; background:#fff !important;
+            font-size:12px !important; font-weight:600 !important; color:#666 !important;
+            cursor:pointer !important; white-space:nowrap !important;
+            transition:all .18s !important; flex-shrink:0 !important;
+            font-family:'Inter',sans-serif !important; line-height:1.3 !important;
+            outline:none !important; box-shadow:none !important;
+            text-decoration:none !important; margin:0 !important;
+        }
+        #amenityCheckboxes button.am-chip i {
+            color:#bbb !important; font-size:11px !important;
+            width:12px !important; text-align:center !important;
+            display:inline-block !important;
+        }
+        #amenityCheckboxes button.am-chip:hover {
+            border-color:#EB6753 !important; color:#EB6753 !important;
+        }
+        #amenityCheckboxes button.am-chip:hover i { color:#EB6753 !important; }
+        #amenityCheckboxes button.am-chip.active {
+            background:#EB6753 !important; color:#fff !important;
+            border-color:#EB6753 !important;
+        }
+        #amenityCheckboxes button.am-chip.active i { color:#fff !important; }
+        /* ── Stepper +/- ── */
+        .stepper-wrap { display:flex !important; align-items:center !important; border:1.5px solid #e8e8e8 !important; border-radius:11px !important; overflow:hidden !important; background:#fff !important; }
+        button.step-btn { width:38px !important; height:42px !important; border:none !important; background:none !important; font-size:18px !important; font-weight:700 !important; color:#555 !important; cursor:pointer !important; display:flex !important; align-items:center !important; justify-content:center !important; flex-shrink:0 !important; font-family:'Inter',sans-serif !important; line-height:1 !important; padding:0 !important; margin:0 !important; outline:none !important; }
+        button.step-btn:hover { background:#fff0ee !important; color:#EB6753 !important; }
+        input.step-inp { border:none !important; text-align:center !important; font-size:15px !important; font-weight:700 !important; color:#1a1a1a !important; width:100% !important; min-width:0 !important; padding:10px 4px !important; background:#fff !important; outline:none !important; box-shadow:none !important; -moz-appearance:textfield !important; }
     `;
     document.head.appendChild(s);
 }
@@ -440,11 +496,13 @@ function bindUIInteractions() {
     const listingSearchInput = document.getElementById('listingSearchInput');
 
     if (listingSearchInput) {
+        let _lsTimer;
+        listingSearchInput.addEventListener('input', () => {
+            clearTimeout(_lsTimer);
+            _lsTimer = setTimeout(filterListings, 300); // debounce 300ms
+        });
         listingSearchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-            e.preventDefault();
-            filterListings();
-            }
+            if (e.key === 'Enter') { e.preventDefault(); clearTimeout(_lsTimer); filterListings(); }
         });
     }
     document.getElementById('searchIcon')?.addEventListener('click', filterListings);
@@ -759,6 +817,8 @@ function updateFormLabels() {
         if (priceLabel) priceLabel.innerText = 'Price per Night (RWF) *';
         if (vehiclePricingGroup) vehiclePricingGroup.style.display = 'none';
     }
+    // Reload amenity chips for the selected category
+    updateAmenitiesForCategory();
 }
 window.updateFormLabels = updateFormLabels;
 
@@ -771,27 +831,142 @@ function stepField(id, delta) {
 }
 window.stepField = stepField;
 
-// ── Load amenity checkboxes from amenity_definitions ──
+// ── FA6 Free icon map by slug (overrides any broken DB icons) ──
+const AMENITY_ICONS = {
+    air_conditioning:  'fa-solid fa-snowflake',
+    wifi:              'fa-solid fa-wifi',
+    pool:              'fa-solid fa-person-swimming',
+    parking:           'fa-solid fa-square-parking',
+    kitchen:           'fa-solid fa-utensils',
+    generator:         'fa-solid fa-bolt',
+    backup_generator:  'fa-solid fa-bolt',
+    tv:                'fa-solid fa-tv',
+    gym:               'fa-solid fa-dumbbell',
+    laundry:           'fa-solid fa-rotate',
+    washing_machine:   'fa-solid fa-rotate',
+    balcony:           'fa-solid fa-building',
+    security:          'fa-solid fa-shield-halved',
+    breakfast:         'fa-solid fa-mug-hot',
+    workspace:         'fa-solid fa-laptop',
+    fireplace:         'fa-solid fa-fire',
+    pet_friendly:      'fa-solid fa-paw',
+    pets_allowed:      'fa-solid fa-paw',
+    hot_tub:           'fa-solid fa-bath',
+    elevator:          'fa-solid fa-up-down',
+    cctv:              'fa-solid fa-camera',
+    water_tank:        'fa-solid fa-droplet',
+    garden:            'fa-solid fa-leaf',
+    smoking_allowed:   'fa-solid fa-smoking',
+    first_aid:         'fa-solid fa-briefcase-medical',
+    fire_extinguisher: 'fa-solid fa-fire-extinguisher',
+    gps:               'fa-solid fa-location-dot',
+    driver_included:   'fa-solid fa-user-tie',
+    full_tank:         'fa-solid fa-gas-pump',
+    fuel_included:     'fa-solid fa-gas-pump',
+    insurance:         'fa-solid fa-shield-halved',
+    fully_insured:     'fa-solid fa-shield-halved',
+    child_seat:        'fa-solid fa-baby',
+    roadside_assist:   'fa-solid fa-wrench',
+    sunroof:           'fa-solid fa-sun',
+    four_by_four:      'fa-solid fa-truck-monster',
+    bluetooth:         'fa-solid fa-headphones',
+    bluetooth_audio:   'fa-solid fa-headphones',
+    dash_cam:          'fa-solid fa-camera-retro',
+    usb_charging:      'fa-solid fa-plug',
+    swimming_pool:     'fa-solid fa-person-swimming',
+    free_parking:      'fa-solid fa-square-parking',
+    gps_navigation:    'fa-solid fa-location-dot',
+};
+
+// ── Amenity chip renderer — fetches from amenity_definitions table ──
+let _amenityCache = null; // cache full list so we only fetch once per session
+
 async function loadAmenityCheckboxes() {
     const container = document.getElementById('amenityCheckboxes');
     if (!container) return;
-    const { data, error } = await _supabase
-        .from('amenity_definitions')
-        .select('slug, label, icon, category')
-        .order('category').order('label');
-    if (error || !data || !data.length) {
-        container.innerHTML = '<span style="color:#aaa;font-size:13px;">No amenities configured.</span>';
+
+    const cat = document.getElementById('listCategory')?.value || '';
+    const isVehicle = cat === 'vehicle';
+
+    // Wait for supabase to be ready (in case modal opens before auth init)
+    if (!_supabase) {
+        container.innerHTML = '<span style="color:#bbb;font-size:13px;">Session not ready — please wait…</span>';
         return;
     }
-    container.innerHTML = data.map(a =>
-        `<label class="amenity-chip" onclick="this.classList.toggle('checked');this.querySelector('input').checked=!this.querySelector('input').checked">
-            <input type="checkbox" name="amenity" value="${a.slug}" style="display:none">
-            <i class="${a.icon || 'fa-solid fa-check'}"></i>
-            <span>${a.label}</span>
-        </label>`
-    ).join('');
+
+    // Show loading state
+    container.innerHTML = '<span style="color:#bbb;font-size:13px;"><i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Loading amenities…</span>';
+
+    try {
+        // Fetch once and cache
+        if (!_amenityCache) {
+            const { data, error } = await _supabase
+                .from('amenity_definitions')
+                .select('slug, label, icon, category')
+                .order('label');
+            if (error) throw error;
+            _amenityCache = data || [];
+        }
+
+        // Filter by category: vehicle listings get vehicle + general, others get non-vehicle
+        const list = _amenityCache.filter(a => {
+            const c = (a.category || '').toLowerCase();
+            if (isVehicle) return c === 'vehicle' || c === 'general' || c === '';
+            return c !== 'vehicle';
+        });
+
+        if (!list.length) {
+            container.innerHTML = '<span style="color:#bbb;font-size:13px;">No amenities available.</span>';
+            return;
+        }
+
+        // Group by category for visual sections
+        const groups = {};
+        list.forEach(a => {
+            const g = a.category || 'General';
+            if (!groups[g]) groups[g] = [];
+            groups[g].push(a);
+        });
+
+        container.innerHTML = '';
+        Object.keys(groups).forEach(groupName => {
+            const items = groups[groupName];
+            // Only show group label if more than one group
+            if (Object.keys(groups).length > 1) {
+                const lbl = document.createElement('div');
+                lbl.style.cssText = 'width:100%;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#bbb;margin:10px 0 4px;';
+                lbl.textContent = groupName;
+                container.appendChild(lbl);
+            }
+            items.forEach(a => {
+                // Use our guaranteed FA6-Free icon map, fall back to DB icon, then generic check
+                const icon = AMENITY_ICONS[a.slug] || AMENITY_ICONS[a.slug?.toLowerCase().replace(/[\s/]+/g,'_')] || a.icon || 'fa-solid fa-circle-check';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'am-chip';
+                btn.dataset.am = a.slug;
+                btn.innerHTML = `<i class="${icon}"></i> ${a.label}`;
+                btn.addEventListener('click', () => btn.classList.toggle('active'));
+                container.appendChild(btn);
+            });
+        });
+
+    } catch (err) {
+        console.error('[AMENITIES]', err);
+        const offline = !navigator.onLine;
+        container.innerHTML = `<span style="color:#e0a0a0;font-size:13px;">
+            <i class="fa-solid fa-${offline ? 'wifi-slash' : 'triangle-exclamation'}" style="margin-right:5px;"></i>
+            ${offline ? 'No internet — amenities unavailable' : 'Could not load amenities'}
+        </span>`;
+    }
 }
 window.loadAmenityCheckboxes = loadAmenityCheckboxes;
+
+function updateAmenitiesForCategory() {
+    if (!document.getElementById('listingModal')?.classList.contains('active')) return;
+    loadAmenityCheckboxes();
+}
+window.updateAmenitiesForCategory = updateAmenitiesForCategory;
 
 // populate filterProvince (for toolbar)
 async function loadFilterProvinces() {
@@ -869,6 +1044,10 @@ function openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.add('active');
+        // Always (re)load amenity chips when the listing modal opens
+        if (modalId === 'listingModal') {
+            loadAmenityCheckboxes();
+        }
     } else {
         console.warn("⚠️ [MODAL] Modal not found:", modalId);
     }
@@ -879,6 +1058,12 @@ function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.remove('active');
+        // Reset form + amenity chips when listing modal closes
+        if (modalId === 'listingModal') {
+            const form = document.getElementById('listingForm');
+            if (form) form.reset();
+            document.querySelectorAll('#amenityCheckboxes .am-chip').forEach(c => c.classList.remove('active'));
+        }
     }
 }
 
@@ -974,10 +1159,12 @@ async function deleteListing(listingId) {
         });
         const { error } = await _supabase.from('listings').delete().eq('id', listingId);
         if (error) throw error;
+        logAudit({ action: 'listing_deleted', entityType: 'listing', entityId: listingId, description: 'Listing deleted and archived by ' + (CURRENT_PROFILE?.full_name || CURRENT_ROLE) });
         toast('Listing deleted and archived.', 'success');
         await filterListings();
         await loadCounts();
     } catch (err) {
+        logAudit({ action: 'listing_deleted_failed', entityType: 'listing', entityId: listingId, description: 'Failed to delete listing: ' + err.message, isError: true });
         console.error('deleteListing', err);
         toast('Failed to delete listing: ' + err.message, 'error');
     }
@@ -994,9 +1181,11 @@ async function updateUserRole(userId, newRole) {
     try {
         const { error } = await _supabase.from('profiles').update({ role: newRole }).eq('id', userId);
         if (error) throw error;
+        logAudit({ action: 'user_role_changed', entityType: 'user', entityId: userId, description: 'Role changed to "' + newRole + '" by admin' });
         toast('Role updated successfully.', 'success');
         await loadUsersTable();
     } catch (err) {
+        logAudit({ action: 'user_role_change_failed', entityType: 'user', entityId: userId, description: 'Failed to change role to "' + newRole + '": ' + err.message, isError: true });
         console.error('updateUserRole', err);
         toast('Failed to update role: ' + (err.message || JSON.stringify(err)), 'error');
     }
@@ -1007,9 +1196,11 @@ async function toggleUserBan(userId, action) {
         const banned = action === 'banned';
         const { error } = await _supabase.from('profiles').update({ banned }).eq('id', userId);
         if (error) throw error;
+        logAudit({ action: banned ? 'user_banned' : 'user_unbanned', entityType: 'user', entityId: userId, description: (banned ? 'User banned' : 'User unbanned') + ' by admin' });
         toast(banned ? 'User banned.' : 'User unbanned.', banned ? 'warning' : 'success');
         await loadUsersTable();
     } catch (err) {
+        logAudit({ action: 'user_ban_toggle_failed', entityType: 'user', entityId: userId, description: 'Failed to toggle ban: ' + err.message, isError: true });
         console.error('toggleUserBan', err);
         toast('Failed to change user status.', 'error');
     }
@@ -1020,10 +1211,12 @@ async function deleteUser(userId) {
     try {
         const { error } = await _supabase.from('profiles').delete().eq('id', userId);
         if (error) throw error;
+        logAudit({ action: 'user_deleted', entityType: 'user', entityId: userId, description: 'User profile hard-deleted by admin' });
         toast('User profile deleted.', 'success');
         await loadUsersTable();
         await loadCounts();
     } catch (err) {
+        logAudit({ action: 'user_deleted_failed', entityType: 'user', entityId: userId, description: 'Failed to delete user: ' + err.message, isError: true });
         console.error('deleteUser', err);
         toast('Failed to delete user: ' + (err.message || JSON.stringify(err)), 'error');
     }
@@ -1227,7 +1420,7 @@ async function loadListingsGrid(filters = {}, page = 0) {
             <a href="/Listings/Detail/?id=${l.id}" style="text-decoration:none;color:inherit;display:block;">
                 <div style="height:180px;background:#f0f0f0;overflow:hidden;position:relative;">
                     ${thumb
-                        ? `<img src="${thumb}" alt="${escapeHtml(l.title)}" style="width:100%;height:100%;object-fit:cover;">`
+                        ? `<img src="${thumb}" alt="${escapeHtml(l.title)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`
                         : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:32px;color:#ccc;"></i></div>`}
                     <span style="position:absolute;top:8px;left:8px;background:${availBadgeColor};color:#fff;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:600;">${l.availability_status || 'available'}</span>
                     <span style="position:absolute;top:8px;right:8px;background:${statusBadgeColor};color:#fff;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:600;">${l.status || 'pending'}</span>
@@ -1322,7 +1515,7 @@ async function loadCounts() {
             const { data: revRows } = await _supabase
                 .from('bookings')
                 .select('total_amount')
-                .in('status', ['approved', 'completed']);
+                .in('status', ['confirmed', 'approved', 'completed']);
             const adminRevenue = (revRows || []).reduce((s, r) => s + Number(r.total_amount || 0), 0);
 
             setCount('#totalUsers', usersCount || 0);
@@ -1527,7 +1720,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
         return;
     }
 
-    tbody.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">Loading...</td></tr>';
 
     try {
         let q = _supabase.from('bookings').select('id, listing_id, start_date, end_date, total_amount, status, payment_status, payment_method, user_id, guest_name, guest_email, created_at, category_slug, price_zone', { count: 'exact' });
@@ -1561,13 +1754,13 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
         
         if (error) {
             console.error("❌ [BOOKINGS] Error loading bookings:", error);
-            tbody.innerHTML = `<tr><td colspan="7">Error: ${error.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
             return;
         }
 
         if (!data || data.length === 0) {
             console.log("  No bookings found");
-            tbody.innerHTML = '<tr><td colspan="7">No bookings found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8">No bookings found.</td></tr>';
             return;
         }
 
@@ -1612,6 +1805,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
             const pmLabel = (r.payment_method || '—').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
 
             row.innerHTML = `
+                <td><input type="checkbox" class="booking-cb" data-id="${r.id}" onchange="toggleBookingCheck('${r.id}',this.checked)" style="width:15px;height:15px;accent-color:var(--primary,#EB6753);"></td>
                 <td>${i + 1}.</td>
                 <td style="font-family:monospace;font-size:12px;">${shortId(r.id)}</td>
                 <td>${escapeHtml(listing?.title || '—')}</td>
@@ -1656,7 +1850,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
 
     } catch (err) {
         console.error("❌ [BOOKINGS] Exception:", err);
-        tbody.innerHTML = '<tr><td colspan="7">Failed to load bookings</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8">Failed to load bookings</td></tr>';
     }
 }
 
@@ -1715,9 +1909,10 @@ async function loadUsersTable(searchTerm = '', page = 0) {
             `;
 
             const isBanned = u.banned === true;
-            const actionSelectHtml = isBanned
+            const actionSelectHtml = (isBanned
                 ? `<button class="btn-small" onclick="toggleUserBan('${u.id}','active')" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:4px;"><i class="fa-solid fa-unlock"></i> Unban</button>`
-                : `<button class="btn-small" onclick="toggleUserBan('${u.id}','banned')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-ban"></i> Ban</button>`;
+                : `<button class="btn-small" onclick="toggleUserBan('${u.id}','banned')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:4px;"><i class="fa-solid fa-ban"></i> Ban</button>`) +
+                `<button class="btn-small" onclick="impersonateUser('${u.id}','${escapeHtml(u.email||'').replace(/'/g,'&apos;')}')" style="background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;font-weight:600;gap:4px;margin-left:4px;" title="Login as this user"><i class="fa-solid fa-user-secret"></i></button>`;
 
             tr.innerHTML = `
                 <td>${rowNum}.</td>
@@ -1755,10 +1950,12 @@ async function loadMessagesPreview() {
     console.log("💬 [MESSAGES] Loading messages...");
     const list = $('#chatUserList');
     if (!list) return;
-    list.innerHTML = '<div style="padding:16px;color:#999;">Loading...</div>';
+
+    const headerHTML = '<div class="chat-list-header">Inbox</div>';
+    list.innerHTML = headerHTML + '<div style="padding:40px 20px;text-align:center;color:#ccc;"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:24px;display:block;margin-bottom:10px;"></i><span style="font-size:13px;">Loading…</span></div>';
 
     if (!CURRENT_ROLE || CURRENT_ROLE !== 'admin') {
-        list.innerHTML = '<div style="padding:16px;color:#999;">Admin access only.</div>';
+        list.innerHTML = headerHTML + '<div style="padding:40px 20px;text-align:center;color:#ccc;"><i class="fa-solid fa-lock" style="font-size:28px;display:block;margin-bottom:10px;"></i><span style="font-size:13px;">Admin access only.</span></div>';
         return;
     }
 
@@ -1768,76 +1965,106 @@ async function loadMessagesPreview() {
         .order('created_at', { ascending: false })
         .limit(50);
 
-    if (error) { list.innerHTML = `<div style="padding:16px;color:red;">${error.message}</div>`; return; }
-    if (!data || !data.length) { list.innerHTML = '<div style="padding:16px;color:#999;">No messages yet.</div>'; return; }
+    if (error) {
+        const offline = !navigator.onLine;
+        list.innerHTML = headerHTML + `<div style="padding:40px 20px;text-align:center;color:#ccc;">
+            <i class="fa-solid fa-${offline ? 'wifi-slash' : 'triangle-exclamation'}" style="font-size:28px;display:block;margin-bottom:10px;color:#e0a0a0;"></i>
+            <span style="font-size:13px;color:#c0392b;">${offline ? 'No internet' : 'Could not load messages'}</span>
+        </div>`;
+        return;
+    }
+    if (!data || !data.length) {
+        list.innerHTML = headerHTML + '<div style="padding:40px 20px;text-align:center;color:#ccc;"><i class="fa-solid fa-inbox" style="font-size:28px;display:block;margin-bottom:10px;"></i><span style="font-size:13px;">No messages yet.</span></div>';
+        return;
+    }
 
-    // Seed the right pane with the first message
-    list.innerHTML = '';
+    list.innerHTML = headerHTML;
     data.forEach((m, i) => {
         const el = document.createElement('div');
         el.className = 'chat-user-item' + (i === 0 ? ' active' : '');
         el.dataset.id = m.id;
-        const preview = (m.message || '').slice(0, 60) + ((m.message || '').length > 60 ? '…' : '');
+        const initial = (m.name || 'U')[0].toUpperCase();
+        const preview = (m.message || '').slice(0, 55) + ((m.message || '').length > 55 ? '…' : '');
+        const timeStr = m.created_at ? _fmtMsgTime(m.created_at) : '';
         el.innerHTML = `
-            <div class="chat-user-avatar" style="background:var(--primary);color:#fff;font-weight:700;">${escapeHtml((m.name || 'U')[0].toUpperCase())}</div>
+            <div class="chat-user-avatar">${escapeHtml(initial)}</div>
             <div class="chat-user-info">
                 <h4>${escapeHtml(m.name || 'Unknown')}</h4>
-                <p style="color:#999;font-size:12px;">${escapeHtml(preview)}</p>
+                <p>${escapeHtml(preview)}</p>
             </div>
+            <span class="chat-user-time">${timeStr}</span>
         `;
         el.addEventListener('click', () => {
             $$('.chat-user-item').forEach(x => x.classList.remove('active'));
             el.classList.add('active');
             showMessageDetail(m);
-            // Mobile: show right pane
-            const cw = $('.chat-window');
-            if (cw && window.innerWidth <= 768) cw.classList.add('active');
         });
         list.appendChild(el);
     });
 
-    // Auto-show first message
     if (data.length) showMessageDetail(data[0]);
     console.log("✅ [MESSAGES] Loaded", data.length, "messages");
+}
+
+function _fmtMsgTime(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffDays = Math.floor((now - d) / 86400000);
+    if (diffDays === 0) return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return d.toLocaleDateString('en-US', { weekday: 'short' });
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function showMessageDetail(m) {
     const area = $('#chatMessagesArea');
     if (!area) return;
-    const date = m.created_at ? new Date(m.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    const date = m.created_at ? new Date(m.created_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }) : '';
+    const initial = escapeHtml((m.name || 'U')[0].toUpperCase());
     const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(m.email || '')}&su=${encodeURIComponent('Re: Your message to AfriStay')}&body=${encodeURIComponent('Hi ' + (m.name || '') + ',\n\nThank you for reaching out to AfriStay!\n\n')}`;
     const mailtoUrl = `mailto:${encodeURIComponent(m.email || '')}?subject=${encodeURIComponent('Re: Your message to AfriStay')}&body=${encodeURIComponent('Hi ' + (m.name || '') + ',\n\n')}`;
 
-    area.innerHTML = `
-        <div style="padding:28px;max-width:680px;">
-            <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:24px;">
-                <div style="width:52px;height:52px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0;">
-                    ${escapeHtml((m.name || 'U')[0].toUpperCase())}
-                </div>
-                <div style="flex:1;">
-                    <h3 style="margin:0 0 4px;font-size:18px;color:#1a1a1a;">${escapeHtml(m.name || 'Unknown')}</h3>
-                    <p style="margin:0;color:#888;font-size:13px;display:flex;align-items:center;gap:6px;">
-                        <i class="fa-solid fa-envelope" style="color:var(--primary);font-size:12px;"></i>
-                        <a href="mailto:${escapeHtml(m.email || '')}" style="color:var(--primary);text-decoration:none;">${escapeHtml(m.email || '')}</a>
-                    </p>
-                    <p style="margin:4px 0 0;color:#bbb;font-size:12px;"><i class="fa-regular fa-clock" style="margin-right:4px;"></i>${date}</p>
-                </div>
-                <div style="display:flex;gap:8px;flex-shrink:0;">
-                    <a href="${gmailUrl}" target="_blank" class="btn-small" style="display:flex;align-items:center;gap:6px;text-decoration:none;background:var(--primary);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;">
-                        <i class="fa-solid fa-reply"></i> Reply via Gmail
-                    </a>
-                    <a href="${mailtoUrl}" class="btn-small" style="display:flex;align-items:center;gap:6px;text-decoration:none;background:#f0f0f0;color:#555;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;">
-                        <i class="fa-solid fa-envelope"></i> Email Client
-                    </a>
-                </div>
+    // Update header
+    const win = area.closest('.chat-window');
+    if (win) {
+        let hdr = win.querySelector('.chat-win-header');
+        if (!hdr) {
+            hdr = document.createElement('div');
+            hdr.className = 'chat-win-header';
+            win.insertBefore(hdr, win.firstChild);
+        }
+        hdr.innerHTML = `
+            <div class="chat-win-avatar">${initial}</div>
+            <div>
+                <div class="chat-win-name">${escapeHtml(m.name || 'Unknown')}</div>
+                <div class="chat-win-sub">${escapeHtml(m.email || '')}</div>
             </div>
-            <div style="background:#f8f8f8;border-radius:16px;padding:24px;border-left:4px solid var(--primary);">
-                <p style="font-size:15px;line-height:1.8;color:#333;margin:0;white-space:pre-wrap;">${escapeHtml(m.message || '')}</p>
+        `;
+    }
+
+    area.innerHTML = `
+        <div style="padding:24px 28px;">
+            <!-- Meta row -->
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap;">
+                <span style="font-size:12px;color:#bbb;"><i class="fa-regular fa-clock" style="margin-right:4px;"></i>${date}</span>
+                <span style="color:#e8e8e8;">·</span>
+                <a href="mailto:${escapeHtml(m.email || '')}" style="font-size:12px;color:var(--primary);text-decoration:none;font-weight:600;">${escapeHtml(m.email || '')}</a>
+            </div>
+            <!-- Message bubble -->
+            <div style="background:#fff;border-radius:16px;padding:22px 24px;box-shadow:0 2px 12px rgba(0,0,0,.06);border-left:4px solid var(--primary);margin-bottom:20px;">
+                <p style="font-size:15px;line-height:1.85;color:#333;margin:0;white-space:pre-wrap;">${escapeHtml(m.message || '')}</p>
+            </div>
+            <!-- Reply actions -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <a href="${gmailUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;text-decoration:none;background:var(--primary);color:#fff;padding:9px 18px;border-radius:10px;font-size:13px;font-weight:600;transition:opacity .2s;" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+                    <i class="fa-solid fa-reply"></i> Reply via Gmail
+                </a>
+                <a href="${mailtoUrl}" style="display:inline-flex;align-items:center;gap:7px;text-decoration:none;background:#f5f5f5;color:#555;padding:9px 18px;border-radius:10px;font-size:13px;font-weight:600;transition:background .2s;" onmouseover="this.style.background='#ebebeb'" onmouseout="this.style.background='#f5f5f5'">
+                    <i class="fa-solid fa-envelope"></i> Default Mail App
+                </a>
             </div>
         </div>
     `;
-    const header = $('#chatWindowHeader');
-    if (header) header.textContent = m.name || 'Message';
 }
 
 /* ===========================
@@ -1852,9 +2079,11 @@ async function approveListing(listingId) {
             .update({ status: 'approved' })
             .eq('id', listingId);
         if (error) throw error;
+        logAudit({ action: 'listing_approved', entityType: 'listing', entityId: listingId, description: 'Listing approved by admin' });
         toast('Listing approved successfully!', 'success');
         await filterListings();
     } catch (err) {
+        logAudit({ action: 'listing_approved_failed', entityType: 'listing', entityId: listingId, description: 'Failed to approve listing: ' + err.message, isError: true });
         console.error("❌ [ACTION] Error approving listing:", err);
         toast('Failed to approve listing: ' + err.message, 'error');
     }
@@ -1922,10 +2151,12 @@ async function approveBooking(bookingId) {
             toast('✅ Approved! Guest received a confirmation email.', 'success');
         }
 
+        logAudit({ action: 'booking_approved', entityType: 'booking', entityId: bookingId, description: 'Booking approved for "' + (booking.listings?.title || bookingId) + '"' });
         await loadBookingsTable();
         await loadCounts();
 
     } catch (err) {
+        logAudit({ action: 'booking_approved_failed', entityType: 'booking', entityId: bookingId, description: 'Failed to approve booking: ' + err.message, isError: true });
         console.error('❌ [APPROVE]', err);
         toast('Failed to approve: ' + err.message, 'error');
     }
@@ -1961,11 +2192,13 @@ async function rejectBooking(bookingId) {
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || 'Rejection failed');
 
+        logAudit({ action: 'booking_rejected', entityType: 'booking', entityId: bookingId, description: 'Booking rejected for "' + title + '"' + (reason ? ' — reason: ' + reason : '') });
         toast('Booking rejected. Guest has been notified.', 'success');
         await loadBookingsTable();
         await filterListings();
 
     } catch (err) {
+        logAudit({ action: 'booking_rejected_failed', entityType: 'booking', entityId: bookingId, description: 'Failed to reject booking: ' + err.message, isError: true });
         console.error('❌ [REJECT]', err);
         toast('Failed to reject: ' + err.message, 'error');
     }
@@ -2062,7 +2295,7 @@ async function handleCreateListing() {
     const floorArea = parseInt($('#listFloorArea')?.value)  || null;
 
     // Amenities
-    const checkedAmenities = Array.from(document.querySelectorAll('#amenityCheckboxes input[type="checkbox"]:checked')).map(cb => cb.value);
+    const checkedAmenities = Array.from(document.querySelectorAll('#amenityCheckboxes .am-chip.active')).map(c => c.dataset.am);
     const amenitiesData = checkedAmenities.length ? checkedAmenities : null;
 
     const statusEl  = document.getElementById('listingCreateStatus');
@@ -2589,7 +2822,7 @@ async function loadPromotionsCards(page = 0, searchTerm = '') {
                 '<div style="height:160px;overflow:hidden;background:#f5f5f5;position:relative;">' +
                 (imgSrc ? '<img src="' + escapeHtml(imgSrc) + '" style="width:100%;height:100%;object-fit:cover;">' :
                     '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-tag" style="font-size:36px;color:#ddd;"></i></div>') +
-                '<div style="position:absolute;top:10px;left:10px;background:#EB6753;color:#fff;padding:5px 14px;border-radius:20px;font-size:14px;font-weight:800;">' + p.discount + '% OFF</div>' +
+                '<div style="position:absolute;top:10px;left:10px;background:#EB6753;color:#fff;padding:5px 14px;border-radius:20px;font-size:14px;font-weight:800;">Promo</div>' +
                 '<div style="position:absolute;top:10px;right:10px;background:' + (isActive ? 'rgba(46,204,113,0.9)' : 'rgba(150,150,150,0.9)') + ';color:#fff;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;">' + (isActive ? 'ACTIVE' : 'INACTIVE') + '</div></div>' +
                 '<div style="padding:16px;">' +
                 '<h4 style="font-size:15px;font-weight:700;color:#1a1a1a;margin:0 0 4px;">' + escapeHtml(p.title || '') + '</h4>' +
@@ -2630,7 +2863,7 @@ function openPromoEditModal(promo, listingImgFallback) {
         fld('Title', '<input id="epTitle" value="' + escapeHtml(promo.title||'') + '" style="' + inp + '">') +
         fld('Description', '<textarea id="epDesc" style="' + inp + 'min-height:70px;resize:vertical;">' + escapeHtml(promo.description||'') + '</textarea>') +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">' +
-        fld('Discount (%)', '<input id="epDiscount" type="number" min="1" max="100" value="' + promo.discount + '" style="' + inp + '">') +
+        fld('Discount (RWF)', '<input id="epDiscount" type="number" min="0" value="' + promo.discount + '" style="' + inp + '">') +
         fld('Start Date', '<input id="epStart" type="date" value="' + (promo.start_date||'') + '" style="' + inp + '">') +
         '</div>' +
         fld('End Date', '<input id="epEnd" type="date" value="' + (promo.end_date||'') + '" style="' + inp + '">') +
@@ -3022,7 +3255,7 @@ async function loadOwnerApplications() {
     try {
         const { data, error } = await _supabase
             .from('owner_applications')
-            .select('id, user_id, motivation, phone, property_type, status, created_at, profiles ( full_name, email )')
+            .select('id, user_id, phone, status, answers, admin_note, created_at, profiles ( full_name, email )')
             .order('created_at', { ascending: false });
         if (error) throw error;
         if (!data || !data.length) {
@@ -3040,8 +3273,11 @@ async function loadOwnerApplications() {
                 '<div style="flex:1;min-width:200px;">' +
                 '<p style="font-weight:700;color:#1a1a1a;margin:0 0 3px;font-size:15px;">' + escapeHtml(profile.full_name || 'Unknown') + '</p>' +
                 '<p style="color:#aaa;font-size:12px;margin:0 0 8px;">' + escapeHtml(profile.email || '') + ' · ' + escapeHtml(app.phone || '') + '</p>' +
-                '<p style="color:#555;font-size:13px;margin:0;line-height:1.6;">' + escapeHtml(app.motivation || '') + '</p>' +
-                (app.property_type ? '<p style="font-size:12px;color:#888;margin:6px 0 0;"><i class="fa-solid fa-tag" style="color:#EB6753;margin-right:4px;"></i>' + escapeHtml(app.property_type) + '</p>' : '') +
+                (app.answers && typeof app.answers === 'object'
+                    ? Object.entries(app.answers).slice(0,3).map(([k,v]) =>
+                        '<p style="font-size:12px;color:#555;margin:2px 0;"><strong>' + escapeHtml(k) + ':</strong> ' + escapeHtml(String(v||'')) + '</p>'
+                    ).join('')
+                    : '') +
                 '</div>' +
                 '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">' +
                 '<span style="padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;background:' + (statusColors[app.status] || '#f5f5f5') + ';color:' + (statusTextColors[app.status] || '#333') + ';">' + (app.status || 'pending') + '</span>' +
@@ -3068,10 +3304,12 @@ async function handleOwnerApplication(appId, userId, newStatus) {
             const { error: profileErr } = await _supabase.from('profiles').update({ role: 'owner' }).eq('id', userId);
             if (profileErr) console.warn('Profile role update:', profileErr.message);
         }
+        logAudit({ action: 'owner_application_' + newStatus, entityType: 'user', entityId: userId, description: 'Owner application ' + newStatus + ' by admin', metadata: { app_id: appId } });
         toast(newStatus === 'approved' ? 'Applicant approved as owner!' : 'Application rejected.', newStatus === 'approved' ? 'success' : 'warning');
         loadOwnerApplications();
         loadAttentionItems();
     } catch(err) {
+        logAudit({ action: 'owner_application_failed', entityType: 'user', entityId: userId, description: 'Failed to ' + newStatus + ' owner application: ' + err.message, isError: true });
         toast('Failed: ' + err.message, 'error');
     }
 }
@@ -3116,6 +3354,30 @@ async function loadAttentionItems() {
                 action: '<button onclick="document.querySelector(\'[data-tab=listing-requests]\')?.click();loadListingRequests()" style="background:#f5f3ff;color:#8b5cf6;border:1px solid #ddd6fe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Review</button>' });
         }
 
+        // 4) Error audit logs (most recent 10)
+        const { data: errorLogs } = await _supabase
+            .from('audit_logs')
+            .select('id, created_at, action, entity_type, entity_id, description, actor_role')
+            .eq('is_error', true)
+            .order('created_at', { ascending: false })
+            .limit(10);
+        if (errorLogs?.length) {
+            const fmtTs = ts => new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            errorLogs.forEach(log => {
+                const label = (log.entity_type ? log.entity_type + ' ' : '') + (log.action || 'error');
+                items.push({
+                    icon: 'fa-solid fa-triangle-exclamation',
+                    color: '#dc2626',
+                    bg: '#fef2f2',
+                    text: '<strong style="color:#dc2626;">[Error] ' + escapeHtml(label) + '</strong>'
+                        + (log.description ? '<br><span style="font-size:12px;color:#666;">' + escapeHtml(log.description.slice(0, 220)) + '</span>' : '')
+                        + '<br><span style="font-size:11px;color:#aaa;">' + fmtTs(log.created_at) + (log.actor_role ? ' · ' + escapeHtml(log.actor_role) : '') + '</span>',
+                    action: '',
+                    isError: true,
+                });
+            });
+        }
+
         if (badge) { badge.textContent = items.length; badge.style.display = items.length ? '' : 'none'; }
 
         if (!items.length) {
@@ -3123,7 +3385,7 @@ async function loadAttentionItems() {
             return;
         }
         container.innerHTML = items.map(item =>
-            '<div style="display:flex;align-items:flex-start;gap:14px;background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:10px;border:1px solid #f0f0f0;">' +
+            '<div style="display:flex;align-items:flex-start;gap:14px;background:' + (item.isError ? '#fff8f8' : '#fff') + ';border-radius:14px;padding:16px 18px;margin-bottom:10px;border:1px solid ' + (item.isError ? '#fecaca' : '#f0f0f0') + ';">' +
             '<div style="width:38px;height:38px;border-radius:10px;background:' + item.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
             '<i class="' + item.icon + '" style="color:' + item.color + ';font-size:16px;"></i></div>' +
             '<div style="flex:1;font-size:13px;color:#444;line-height:1.7;">' + item.text + '</div>' +
@@ -3143,6 +3405,7 @@ async function rejectListingRequest(listingId, btn) {
         await _supabase.rpc('archive_deleted_listing', { p_listing_id: listingId, p_deleter_id: CURRENT_PROFILE?.id || null, p_deleter_name: CURRENT_PROFILE?.full_name || 'admin', p_reason: 'request_rejected' });
         const { error } = await _supabase.from('listings').delete().eq('id', listingId);
         if (error) throw error;
+        logAudit({ action: 'listing_request_rejected', entityType: 'listing', entityId: listingId, description: 'Listing request rejected and archived by admin' });
         toast('Listing request rejected.', 'warning');
         bustListingCache();
         // Remove just this row from DOM
@@ -3150,6 +3413,7 @@ async function rejectListingRequest(listingId, btn) {
         if (row) { row.style.opacity = '0'; row.style.transition = 'opacity 0.3s'; setTimeout(() => row.remove(), 320); }
         loadDashPendingListings();
     } catch (err) {
+        logAudit({ action: 'listing_request_rejected_failed', entityType: 'listing', entityId: listingId, description: 'Failed to reject listing request: ' + err.message, isError: true });
         toast('Failed: ' + err.message, 'error');
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Reject'; }
     }
@@ -3215,7 +3479,8 @@ async function loadNewBookings() {
         console.log('✅ [NEW BOOKINGS] Loaded', data.length);
     } catch (err) {
         console.error('❌ [NEW BOOKINGS]', err);
-        container.innerHTML = '<div style="color:red;padding:16px;">' + err.message + '</div>';
+        const offline = !navigator.onLine;
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:#ccc;"><i class="fa-solid fa-' + (offline ? 'wifi-slash' : 'triangle-exclamation') + '" style="font-size:32px;display:block;margin-bottom:12px;color:#e0a0a0;"></i><p style="font-size:14px;color:#c0392b;">' + (offline ? 'No internet connection' : 'Could not load bookings') + '</p></div>';
     }
 }
 window.loadNewBookings = loadNewBookings;
@@ -3383,12 +3648,14 @@ async function dashReject(id, btn) {
         await _supabase.rpc('archive_deleted_listing', { p_listing_id: id, p_deleter_id: CURRENT_PROFILE?.id || null, p_deleter_name: CURRENT_PROFILE?.full_name || 'admin', p_reason: 'request_rejected' });
         const { error } = await _supabase.from('listings').delete().eq('id', id);
         if (error) throw error;
+        logAudit({ action: 'listing_request_rejected', entityType: 'listing', entityId: id, description: 'Listing request rejected and deleted by ' + (CURRENT_PROFILE?.full_name || 'admin') });
         toast('Listing rejected and removed.', 'warning');
         bustListingCache();
         const row = document.getElementById('dplRow_' + id);
         if (row) { row.style.opacity = '0'; setTimeout(() => row.remove(), 320); }
         if (document.getElementById('listingRequestsContainer')) loadListingRequests();
     } catch(err) {
+        logAudit({ action: 'listing_request_rejected_failed', entityType: 'listing', entityId: id, description: 'Failed dashReject: ' + err.message, isError: true });
         toast('Failed: ' + err.message, 'error');
         if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Reject'; }
     }
@@ -3588,8 +3855,7 @@ async function loadOwnerWallet() {
                 <i class="fa-solid fa-wallet" style="color:#EB6753;"></i> Payout Wallet
             </h3>
             <p style="font-size:13px;color:#aaa;margin-bottom:20px;">
-                Where AfriStay sends your 95% after each confirmed booking.
-                <strong style="color:#EB6753;">5% platform fee</strong> is deducted automatically.
+                Where AfriStay sends your earnings after each confirmed booking.
             </p>
 
             ${!wallet?.verified ? `
@@ -3703,7 +3969,7 @@ async function saveOwnerWallet() {
         if (error) throw error;
 
         console.log('✅ [WALLET] Saved successfully');
-        toast("✅ Payout wallet saved! You'll receive 95% of each booking here.", 'success');
+        toast("✅ Payout wallet saved! Your earnings will be sent here after each booking.", 'success');
         await loadOwnerWallet(); // refresh to show verified state
     } catch (err) {
         console.error('❌ [WALLET] Save error:', err);
@@ -3720,6 +3986,51 @@ window.toggleWalletFields = toggleWalletFields;
 window.saveOwnerWallet    = saveOwnerWallet;
 window.loadOwnerWallet    = loadOwnerWallet;
 window.handleUrlActions   = handleUrlActions;
+
+/* ═══════════════════════════════════════════════════════════════
+   EARNINGS TAB (owner)
+   ═══════════════════════════════════════════════════════════════ */
+async function loadEarnings() {
+    if (CURRENT_ROLE !== 'owner' || !CURRENT_PROFILE) {
+        const sec = document.getElementById('earningsPayoutSection');
+        if (sec) sec.innerHTML = '<p style="color:#bbb;font-size:13px;text-align:center;padding:20px;">Sign in as an owner to view earnings.</p>';
+        return;
+    }
+    const _set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    _set('earningsBalance', '…'); _set('earningsPaid', '…'); _set('earningsBookings', '…');
+
+    try {
+        const [bkRes, payRes] = await Promise.all([
+            _supabase.from('bookings')
+                .select('total_amount, status')
+                .in('listing_id',
+                    (await _supabase.from('listings').select('id').eq('owner_id', CURRENT_PROFILE.id)).data?.map(l => l.id) || [])
+                .in('status', ['confirmed', 'approved', 'completed']),
+            _supabase.from('payouts')
+                .select('payout_amount, status')
+                .eq('owner_id', CURRENT_PROFILE.id)
+                .eq('status', 'completed'),
+        ]);
+
+        const totalEarned  = (bkRes.data  || []).reduce((s, b) => s + (b.total_amount || 0), 0);
+        const totalPaidOut = (payRes.data || []).reduce((s, p) => s + (p.payout_amount || 0), 0);
+        const pending      = Math.max(0, totalEarned - totalPaidOut);
+        const completedBks = (bkRes.data  || []).filter(b => b.status === 'completed').length;
+
+        const fmt = n => Number(n).toLocaleString('en-RW') + ' RWF';
+        _set('earningsBalance',  fmt(pending));
+        _set('earningsPaid',     fmt(totalPaidOut));
+        _set('earningsBookings', completedBks || '0');
+    } catch (e) {
+        _set('earningsBalance',  'Error');
+        _set('earningsPaid',     'Error');
+        _set('earningsBookings', 'Error');
+        console.error('[EARNINGS]', e);
+    }
+
+    await loadPayoutHistory();
+}
+window.loadEarnings = loadEarnings;
 
 /* ═══════════════════════════════════════════════════════════════
    PAYOUT HISTORY (for owners + admin)
@@ -3740,7 +4051,12 @@ async function loadPayoutHistory() {
     if (CURRENT_ROLE === 'owner') q = q.eq('owner_id', CURRENT_PROFILE.id).eq('recipient_type','owner');
 
     const { data: payouts, error } = await q;
-    if (error) { console.error('[PAYOUTS] Error:', error); return; }
+    if (error) {
+        console.error('[PAYOUTS] Error:', error);
+        const payOffline = !navigator.onLine;
+        section.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;padding:20px;"><i class="fa-solid fa-' + (payOffline ? 'wifi-slash' : 'triangle-exclamation') + '" style="margin-right:6px;color:#e0a0a0;"></i>' + (payOffline ? 'No internet connection' : 'Could not load payout history') + '</p>';
+        return;
+    }
 
     if (!payouts?.length) {
         section.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;padding:20px;">No payouts yet.</p>';
@@ -3960,15 +4276,14 @@ window.downloadReceipt = async function(bookingId) {
         };
         drawLine('Rate per night',  money(receiptData.price_per_night),  y + 12);
         drawLine('× ' + receiptData.nights + ' nights', '',              y + 12); // already shown
-        drawLine('Subtotal',         money(receiptData.subtotal),        y + 22);
-        drawLine('Platform fee (5%)', money(receiptData.platform_fee),   y + 32, false, [150,150,150]);
+        drawLine('Subtotal',     money(receiptData.subtotal),        y + 22);
 
         // Divider
         doc.setDrawColor(235, 103, 83); doc.setLineWidth(0.5);
-        doc.line(col1, y + 37, W - M - 6, y + 37);
+        doc.line(col1, y + 28, W - M - 6, y + 28);
 
-        drawLine('TOTAL AMOUNT', money(receiptData.total_amount),        y + 46, true, [235,103,83]);
-        y += 64;
+        drawLine('TOTAL AMOUNT', money(receiptData.total_amount),    y + 37, true, [235,103,83]);
+        y += 54;
 
         // ── Guest + Host info ─────────────────────────────────────
         const boxH = 36;
@@ -4056,7 +4371,7 @@ async function loadOwnerPromotions(page = 0) {
                 '<div style="font-size:15px;font-weight:800;color:#1a1a1a;">' + escapeHtml(p.title || '—') + '</div>' +
                 '<div style="font-size:12px;color:#EB6753;margin-top:3px;font-weight:600;"><i class="fa-solid fa-house"></i> ' + escapeHtml(lstMap[p.listing_id] || '—') + '</div>' +
                 '</div>' +
-                '<div style="background:#EB6753;color:#fff;padding:6px 14px;border-radius:20px;font-size:14px;font-weight:800;white-space:nowrap;">' + p.discount + '% OFF</div>' +
+                '<div style="background:#EB6753;color:#fff;padding:6px 14px;border-radius:20px;font-size:14px;font-weight:800;white-space:nowrap;">Promo</div>' +
                 '</div>' +
                 (p.description ? '<p style="font-size:13px;color:#888;margin:0 0 10px;">' + escapeHtml(p.description) + '</p>' : '') +
                 '<div style="font-size:12px;color:#aaa;margin-bottom:10px;"><i class="fa-regular fa-calendar"></i> ' + (p.start_date || '—') + ' → ' + (p.end_date || '—') + '</div>' +
@@ -4259,6 +4574,11 @@ async function loadFinancialData(page = 0, searchTerm = '') {
             renderPagination('finPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadFinancialData(p, searchTerm));
         }
 
+        // Draw revenue chart (only on first page load with no search)
+        if (page === 0 && typeof window.drawRevenueChart === 'function') {
+            window.drawRevenueChart();
+        }
+
     } catch (err) {
         console.error('❌ [FINANCIAL]', err);
         tbody.innerHTML = `<tr><td colspan="10" style="color:red;padding:20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
@@ -4362,5 +4682,413 @@ window.exportFinancial = function(format) {
             w.document.close();
             w.print();
         }
+    }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   BULK BOOKING ACTIONS
+   ═══════════════════════════════════════════════════════════════ */
+window._bulkBookingIds = new Set();
+
+function _updateBulkBar() {
+    const bar = document.getElementById('bookingsBulkBar');
+    if (!bar) return;
+    const count = window._bulkBookingIds.size;
+    if (count > 0) {
+        bar.style.display = 'flex';
+        const lbl = bar.querySelector('.bulk-count');
+        if (lbl) lbl.textContent = count + ' selected';
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+window.toggleBookingCheck = function(id, checked) {
+    if (checked) window._bulkBookingIds.add(id);
+    else window._bulkBookingIds.delete(id);
+    _updateBulkBar();
+};
+
+window.bulkSelectAllBookings = function(checked) {
+    document.querySelectorAll('.booking-cb').forEach(cb => {
+        cb.checked = checked;
+        if (checked) window._bulkBookingIds.add(cb.dataset.id);
+        else window._bulkBookingIds.delete(cb.dataset.id);
+    });
+    _updateBulkBar();
+};
+
+window.clearBulkBookings = function() {
+    window._bulkBookingIds.clear();
+    document.querySelectorAll('.booking-cb').forEach(cb => cb.checked = false);
+    const all = document.getElementById('bookingSelectAll');
+    if (all) all.checked = false;
+    _updateBulkBar();
+};
+
+window.bulkActionBookings = async function(status) {
+    const ids = [...window._bulkBookingIds];
+    if (!ids.length) return;
+    const label = { approved: 'approve', rejected: 'reject', completed: 'mark complete' }[status] || status;
+    if (!confirm(`${label.charAt(0).toUpperCase() + label.slice(1)} ${ids.length} booking(s)?`)) return;
+    try {
+        const { error } = await _supabase.from('bookings').update({ status }).in('id', ids);
+        if (error) throw error;
+        toast(`${ids.length} booking(s) updated to "${status}"!`, 'success');
+        logAudit({ action: 'bulk_update_bookings', entityType: 'booking', description: `Bulk ${label} — ${ids.length} bookings`, metadata: { ids, status } });
+        window.clearBulkBookings();
+        loadBookingsTable();
+    } catch(err) {
+        toast('Bulk action failed: ' + err.message, 'error');
+        logAudit({ action: 'bulk_update_bookings', entityType: 'booking', description: `Error bulk ${label}: ${err.message}`, isError: true });
+    }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   REVENUE CHART (Chart.js)
+   ═══════════════════════════════════════════════════════════════ */
+let _revenueChart = null;
+
+window.drawRevenueChart = function() {
+    const canvas = document.getElementById('revenueChart');
+    const wrap   = document.getElementById('revenueChartWrap');
+    if (!canvas) return;
+
+    // Build day-by-day map for current month (day 1 → today)
+    const now   = new Date();
+    const year  = now.getFullYear();
+    const month = now.getMonth(); // 0-indexed
+    const today = now.getDate();
+
+    const dayTotals = {};
+    for (let d = 1; d <= today; d++) dayTotals[d] = 0;
+
+    (_finData || []).forEach(r => {
+        if (!r.created_at) return;
+        const d = new Date(r.created_at);
+        if (d.getFullYear() === year && d.getMonth() === month) {
+            const day = d.getDate();
+            if (day <= today) dayTotals[day] = (dayTotals[day] || 0) + (r.total || 0);
+        }
+    });
+
+    const labels = Object.keys(dayTotals).map(d => {
+        const dt = new Date(year, month, parseInt(d));
+        return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    const values = Object.values(dayTotals);
+
+    if (wrap) wrap.style.display = 'block';
+    if (_revenueChart) _revenueChart.destroy();
+    _revenueChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Revenue (RWF)',
+                data: values,
+                backgroundColor: values.map(v => v > 0 ? 'rgba(235,103,83,0.85)' : 'rgba(235,103,83,0.15)'),
+                borderRadius: 6,
+                borderSkipped: false,
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false }, tooltip: { callbacks: {
+                label: ctx => Number(ctx.parsed.y).toLocaleString('en-RW') + ' RWF'
+            }}},
+            scales: {
+                y: { beginAtZero: true, grid: { color: '#f0f0f0' }, ticks: {
+                    font: { size: 11 },
+                    callback: v => v === 0 ? '0' : (v >= 1000 ? Math.round(v/1000) + 'K' : v)
+                }},
+                x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } }
+            }
+        }
+    });
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   CSV EXPORTS — Users & Bookings
+   ═══════════════════════════════════════════════════════════════ */
+window.exportUsers = async function() {
+    if (CURRENT_ROLE !== 'admin') { toast('Admin only', 'error'); return; }
+    toast('Preparing users export…', 'info', 2000);
+    try {
+        const { data, error } = await _supabase
+            .from('profiles')
+            .select('id, full_name, email, phone, role, banned, created_at')
+            .order('created_at', { ascending: false })
+            .limit(10000);
+        if (error) throw error;
+
+        const headers = ['#', 'Name', 'Email', 'Phone', 'Role', 'Banned', 'Joined'];
+        const rows = (data || []).map((u, i) => [
+            i + 1,
+            '"' + (u.full_name || '').replace(/"/g, '""') + '"',
+            u.email || '',
+            u.phone || '',
+            u.role || '',
+            u.banned ? 'Yes' : 'No',
+            (u.created_at || '').slice(0, 10),
+        ]);
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'AfriStay-Users-' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click(); URL.revokeObjectURL(url);
+        toast('Users CSV exported!', 'success');
+        logAudit({ action: 'export_users_csv', entityType: 'profile', description: `Exported ${(data||[]).length} users as CSV` });
+    } catch(err) {
+        toast('Export failed: ' + err.message, 'error');
+        logAudit({ action: 'export_users_csv', description: 'CSV export error: ' + err.message, isError: true });
+    }
+};
+
+window.exportBookings = async function() {
+    if (CURRENT_ROLE !== 'admin') { toast('Admin only', 'error'); return; }
+    toast('Preparing bookings export…', 'info', 2000);
+    try {
+        const { data, error } = await _supabase
+            .from('bookings')
+            .select('id, listing_id, guest_name, guest_email, start_date, end_date, total_amount, status, payment_method, created_at')
+            .order('created_at', { ascending: false })
+            .limit(10000);
+        if (error) throw error;
+
+        const headers = ['#', 'Booking ID', 'Listing ID', 'Guest', 'Email', 'Check-in', 'Check-out', 'Amount (RWF)', 'Status', 'Payment', 'Created'];
+        const rows = (data || []).map((b, i) => [
+            i + 1,
+            b.id,
+            b.listing_id,
+            '"' + (b.guest_name || '').replace(/"/g, '""') + '"',
+            b.guest_email || '',
+            b.start_date || '',
+            b.end_date || '',
+            Math.round(b.total_amount || 0),
+            b.status || '',
+            (b.payment_method || '').replace(/_/g, ' '),
+            (b.created_at || '').slice(0, 10),
+        ]);
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'AfriStay-Bookings-' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click(); URL.revokeObjectURL(url);
+        toast('Bookings CSV exported!', 'success');
+        logAudit({ action: 'export_bookings_csv', entityType: 'booking', description: `Exported ${(data||[]).length} bookings as CSV` });
+    } catch(err) {
+        toast('Export failed: ' + err.message, 'error');
+        logAudit({ action: 'export_bookings_csv', description: 'CSV export error: ' + err.message, isError: true });
+    }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   PLATFORM CONFIG EDITOR
+   ═══════════════════════════════════════════════════════════════ */
+window.loadPlatformConfig = async function() {
+    if (CURRENT_ROLE !== 'admin') return;
+    const container = document.getElementById('platformConfigContainer');
+    if (!container) return;
+    container.innerHTML = '<p style="color:#aaa;font-size:13px;text-align:center;padding:16px;">Loading…</p>';
+    try {
+        const { data, error } = await _supabase
+            .from('platform_config')
+            .select('key, value, description')
+            .order('key');
+        if (error) throw error;
+
+        if (!data?.length) {
+            container.innerHTML = '<p style="color:#bbb;text-align:center;padding:16px;font-size:13px;">No config keys found.</p>';
+            return;
+        }
+
+        container.innerHTML = data.map(c => `
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5;">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;font-weight:600;color:#1a1a1a;font-family:monospace;">${escapeHtml(c.key)}</div>
+                    ${c.description ? `<div style="font-size:11px;color:#aaa;margin-top:1px;">${escapeHtml(c.description)}</div>` : ''}
+                </div>
+                <input type="text" id="cfg_${c.key}" value="${escapeHtml(c.value || '')}"
+                    style="width:160px;padding:6px 10px;border:1.5px solid #ebebeb;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;"
+                    onkeydown="if(event.key==='Enter'){event.preventDefault();savePlatformConfig('${c.key}',this.value);}">
+                <button class="btn-s" onclick="savePlatformConfig('${escapeHtml(c.key)}',document.getElementById('cfg_${c.key}').value)" title="Save">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                </button>
+            </div>
+        `).join('');
+    } catch(err) {
+        container.innerHTML = `<p style="color:#e74c3c;font-size:13px;">${escapeHtml(err.message)}</p>`;
+    }
+};
+
+window.savePlatformConfig = async function(key, value) {
+    try {
+        const { error } = await _supabase.from('platform_config').update({ value }).eq('key', key);
+        if (error) throw error;
+        toast(`"${key}" saved!`, 'success');
+        logAudit({ action: 'update_platform_config', entityType: 'platform_config', entityId: key, description: `Set "${key}" = "${value}"` });
+    } catch(err) {
+        toast('Save failed: ' + err.message, 'error');
+    }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   BROADCAST NOTIFICATIONS
+   ═══════════════════════════════════════════════════════════════ */
+window.sendBroadcast = async function() {
+    if (CURRENT_ROLE !== 'admin') { toast('Admin only', 'error'); return; }
+    const title   = document.getElementById('broadcastTitle')?.value.trim();
+    const message = document.getElementById('broadcastMessage')?.value.trim();
+    const target  = document.getElementById('broadcastTarget')?.value || 'all';
+    const link    = document.getElementById('broadcastLink')?.value.trim() || null;
+
+    if (!title || !message) { toast('Title and message are required', 'warning'); return; }
+
+    const btn = document.getElementById('sendBroadcastBtn');
+    const statusEl = document.getElementById('broadcastStatus');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending…'; }
+
+    try {
+        let q = _supabase.from('profiles').select('id').neq('id', CURRENT_PROFILE.id);
+        if (target !== 'all') q = q.eq('role', target);
+        const { data: users, error: uErr } = await q;
+        if (uErr) throw uErr;
+        if (!users?.length) { toast('No users matched that target', 'warning'); return; }
+
+        const BATCH_SIZE = 100;
+        for (let i = 0; i < users.length; i += BATCH_SIZE) {
+            const batch = users.slice(i, i + BATCH_SIZE).map(u => ({
+                user_id: u.id,
+                type: 'broadcast',
+                title,
+                message,
+                link: link || null,
+                read: false,
+            }));
+            const { error: insErr } = await _supabase.from('notifications').insert(batch);
+            if (insErr) throw insErr;
+        }
+
+        toast(`Broadcast sent to ${users.length} user(s)!`, 'success');
+        logAudit({ action: 'broadcast_notification', entityType: 'notification', description: `Broadcast to "${target}" (${users.length} users): "${title}"` });
+        if (statusEl) statusEl.innerHTML = `<div style="background:#e8f5e9;color:#27ae60;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:600;">✓ Sent to ${users.length} users</div>`;
+        document.getElementById('broadcastTitle').value = '';
+        document.getElementById('broadcastMessage').value = '';
+        document.getElementById('broadcastLink').value = '';
+    } catch(err) {
+        toast('Broadcast failed: ' + err.message, 'error');
+        logAudit({ action: 'broadcast_notification', description: 'Broadcast error: ' + err.message, isError: true });
+        if (statusEl) statusEl.innerHTML = `<div style="background:#fde8e8;color:#e74c3c;padding:12px 16px;border-radius:10px;font-size:13px;">${escapeHtml(err.message)}</div>`;
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Broadcast'; }
+    }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   USER IMPERSONATION
+   Admin generates a magic-link for any user via edge function
+   ═══════════════════════════════════════════════════════════════ */
+window.impersonateUser = async function(userId, userEmail) {
+    if (CURRENT_ROLE !== 'admin') { toast('Admin only', 'error'); return; }
+    if (!confirm(`Impersonate ${userEmail}?\n\nYou will be redirected and logged in as this user. Open in a new tab to keep your admin session.`)) return;
+
+    toast('Generating impersonation link…', 'info', 4000);
+    try {
+        const { data: { session } } = await _supabase.auth.getSession();
+        const res = await fetch(CONFIG.FUNCTIONS_BASE + '/impersonate-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session?.access_token },
+            body: JSON.stringify({ user_id: userId }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Edge function error');
+        if (!json.url) throw new Error('No URL returned');
+
+        logAudit({ action: 'impersonate_user', entityType: 'profile', entityId: userId, description: `Admin impersonated ${userEmail}` });
+        window.open(json.url, '_blank');
+    } catch(err) {
+        toast('Impersonation failed: ' + err.message, 'error');
+        logAudit({ action: 'impersonate_user', entityType: 'profile', entityId: userId, description: 'Impersonation error: ' + err.message, isError: true });
+    }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   MANUAL PAYOUT TRIGGER
+   ═══════════════════════════════════════════════════════════════ */
+window.loadPayoutOwners = async function() {
+    if (CURRENT_ROLE !== 'admin') return;
+    const sel = document.getElementById('payoutOwnerSelect');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Loading…</option>';
+    try {
+        const { data, error } = await _supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('role', 'owner')
+            .order('full_name');
+        if (error) throw error;
+        sel.innerHTML = '<option value="">Select owner…</option>' +
+            (data || []).map(o => `<option value="${o.id}">${escapeHtml(o.full_name || o.email)}</option>`).join('');
+    } catch(err) {
+        sel.innerHTML = '<option value="">Failed to load</option>';
+    }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   MAINTENANCE MODE TOGGLE
+   ═══════════════════════════════════════════════════════════════ */
+window.setMaintenanceMode = async function(enable) {
+    if (CURRENT_ROLE !== 'admin') { toast('Admin only', 'error'); return; }
+    const msg = document.getElementById('maintenanceMsg')?.value.trim() || '';
+    const label = enable ? 'ENABLE' : 'DISABLE';
+    if (!confirm(`${label} maintenance mode? ${enable ? 'This will block the site for all non-admin users.' : 'This will restore normal access.'}`)) return;
+    try {
+        // Upsert maintenance_mode key
+        await _supabase.from('platform_config').upsert({ key: 'maintenance_mode', value: enable ? 'true' : 'false' }, { onConflict: 'key' });
+        if (enable && msg) {
+            await _supabase.from('platform_config').upsert({ key: 'maintenance_message', value: msg }, { onConflict: 'key' });
+        }
+        toast(`Maintenance mode ${enable ? 'ENABLED — site is now blocked for users' : 'disabled — site is live again'}!`, enable ? 'warning' : 'success');
+        logAudit({ action: enable ? 'enable_maintenance_mode' : 'disable_maintenance_mode', entityType: 'platform_config', description: enable ? `Maintenance enabled: ${msg || '(no message)'}` : 'Maintenance disabled' });
+    } catch(err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+};
+
+window.triggerPayout = async function() {
+    if (CURRENT_ROLE !== 'admin') { toast('Admin only', 'error'); return; }
+    const ownerId = document.getElementById('payoutOwnerSelect')?.value;
+    const amount  = parseFloat(document.getElementById('payoutAmount')?.value || '0');
+    const notes   = document.getElementById('payoutNotes')?.value.trim() || '';
+
+    if (!ownerId) { toast('Select an owner', 'warning'); return; }
+    if (!amount || amount <= 0) { toast('Enter a valid amount', 'warning'); return; }
+
+    const ownerName = document.getElementById('payoutOwnerSelect')?.selectedOptions[0]?.text || ownerId;
+    if (!confirm(`Trigger payout of ${amount.toLocaleString()} RWF to ${ownerName}?`)) return;
+
+    try {
+        const { error } = await _supabase.from('payouts').insert({
+            owner_id:       ownerId,
+            payout_amount:  amount,
+            currency:       'RWF',
+            status:         'pending',
+            recipient_type: 'owner',
+            notes:          notes || null,
+            initiated_at:   new Date().toISOString(),
+            fee_percent:    0,
+            fee_amount:     0,
+        });
+        if (error) throw error;
+        toast(`Payout of ${amount.toLocaleString()} RWF triggered!`, 'success');
+        logAudit({ action: 'trigger_manual_payout', entityType: 'payout', entityId: ownerId, description: `Manual payout ${amount} RWF to ${ownerName}. Notes: ${notes}`, metadata: { owner_id: ownerId, amount, notes } });
+        document.getElementById('payoutAmount').value = '';
+        document.getElementById('payoutNotes').value  = '';
+    } catch(err) {
+        toast('Payout failed: ' + err.message, 'error');
+        logAudit({ action: 'trigger_manual_payout', entityType: 'payout', description: 'Payout error: ' + err.message, isError: true });
     }
 };

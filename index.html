@@ -9,6 +9,11 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
         <link href="https://fonts.googleapis.com/css2?family=Oleo+Script+Swash+Caps:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
         <link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#EB6753">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="AfriStay">
         <meta property="og:title" content="AfriStay — Experience Rwanda. Stay Authentically.">
         <meta property="og:description" content="Unique homes and stays across Rwanda's most loved destinations. Book verified properties, vehicles and experiences.">
         <meta property="og:image" content="https://afristay.rw/Pictures/light-afri1.png">
@@ -188,7 +193,7 @@
                 <!-- CENTER: Image + Badge -->
                 <div class="why-center">
                     <div class="building-img-wrap">
-                        <img src="https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80" alt="AfriStay Property">
+                        <img loading="lazy" src="https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80" alt="AfriStay Property">
     
                         <div class="stat-badge">
                             
@@ -255,7 +260,7 @@
                     <p>Find your perfect stay or vehicle today and start your authentic Rwandan adventure.</p>
                 </div>
                 <div class="cta-actions">
-                    <a href="#" class="cta-btn">Start Exploring</a>
+                    <a href="/Listings/" class="cta-btn">Start Exploring</a>
                     <div class="cta-phone">
                         <span>Email us anytime</span>
                         <strong>info@afristay.rw</strong>
@@ -322,7 +327,6 @@
                     <div class="footer-bottom-links">
                         <a href="/Privacy/">Privacy Policy</a>
                         <a href="/Terms/">Terms of Service</a>
-                        <a href="/Contact">Cookie Policy</a>
                     </div>
                 </div>
             </div>
@@ -332,6 +336,24 @@
         
     
     </body>
+    <script>
+    // Register Service Worker + PWA install prompt
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+    let _deferredInstall = null;
+    window.addEventListener('beforeinstallprompt', e => {
+        e.preventDefault();
+        _deferredInstall = e;
+        const btn = document.getElementById('pwaInstallBtn');
+        if (btn) btn.style.display = 'flex';
+    });
+    window.triggerPwaInstall = function() {
+        if (!_deferredInstall) return;
+        _deferredInstall.prompt();
+        _deferredInstall.userChoice.then(() => { _deferredInstall = null; const btn = document.getElementById('pwaInstallBtn'); if (btn) btn.style.display = 'none'; });
+    };
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/js/config.js"></script>
     <script src="/js/utils.js"></script>

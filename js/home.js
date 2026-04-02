@@ -161,7 +161,7 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
                         ? '<div class="card-price">' +
                           '<span class="promo-original">' + price + ' <span style="font-size:11px;">' + (l.currency||'RWF') + unit + '</span></span>' +
                           '<span class="promo-new-price">' + promoPrice + ' <span style="font-size:12px;font-weight:500;">' + (l.currency||'RWF') + unit + '</span></span>' +
-                          '<span class="promo-badge">' + l.promo_discount + '% OFF</span>' +
+                          '<span class="promo-badge">Promo</span>' +
                           '</div>'
                         : '<div class="card-price">' + price + ' <span>' + (l.currency || 'RWF') + unit + '</span></div>') +
                     '<button class="details-btn" onclick="event.preventDefault();event.stopPropagation();window.location.href=\'/Listings/Detail/?id=' + l.id + '\'">View Details</button>' +
