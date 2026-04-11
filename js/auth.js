@@ -1,12 +1,11 @@
-// auth.js — AfriStay v2 (Email OR Phone Login, Phone OTP on Signup only)
+// auth.js — AfriStay (Email-only login & signup)
 (function () {
     const toggleSignin    = document.getElementById('btn-signin');
     const toggleSignup    = document.getElementById('btn-signup');
     const authToggleCont  = document.getElementById('authToggleContainer');
-    
+
     const loginGroup      = document.getElementById('loginGroup');
     const signupGroup     = document.getElementById('signupGroup');
-    const otpGroup        = document.getElementById('otpGroup');
     const passwordGroup   = document.getElementById('passwordGroup');
     const forgotGroup     = document.getElementById('forgotGroup');
     const resetGroup      = document.getElementById('resetGroup');
@@ -18,14 +17,19 @@
     const formTitle       = document.getElementById('dynamicTitle');
     const submitBtn       = document.getElementById('submitBtn');
 
-    let mode = 'signin'; // 'signin', 'signup', 'verify_otp', 'forgot', 'reset'
+    let mode = 'signin'; // 'signin', 'signup', 'forgot', 'reset'
+
+    // Show banned message if redirected here from a suspended-account block
+    if (new URLSearchParams(window.location.search).get('error') === 'banned') {
+        showError('Your account has been suspended. Contact support if you believe this is a mistake.');
+    }
 
     function showError(msg) {
-        if (authError)   { authError.style.display = 'block'; authError.innerText = msg; }
+        if (authError)   { authError.style.display = msg ? 'block' : 'none'; authError.innerText = msg; }
         if (authSuccess) { authSuccess.style.display = 'none'; authSuccess.innerText = ''; }
     }
     function showSuccess(msg) {
-        if (authSuccess) { authSuccess.style.display = 'block'; authSuccess.innerText = msg; }
+        if (authSuccess) { authSuccess.style.display = msg ? 'block' : 'none'; authSuccess.innerText = msg; }
         if (authError)   { authError.style.display = 'none'; authError.innerText = ''; }
     }
 
@@ -37,7 +41,6 @@
         // Reset all groups
         loginGroup.classList.add('hidden');
         signupGroup.classList.add('hidden');
-        otpGroup.classList.add('hidden');
         forgotGroup.classList.add('hidden');
         resetGroup.classList.add('hidden');
         passwordGroup.classList.remove('hidden');
@@ -55,12 +58,6 @@
             signupGroup.classList.remove('hidden');
             formTitle.innerText = 'Sign Up';
             submitBtn.innerText = 'Create Account';
-        } else if (mode === 'verify_otp') {
-            authToggleCont.classList.add('hidden');
-            passwordGroup.classList.add('hidden');
-            otpGroup.classList.remove('hidden');
-            formTitle.innerText = 'Verify Phone';
-            submitBtn.innerText = 'Verify & Login';
         } else if (mode === 'forgot') {
             authToggleCont.classList.add('hidden');
             passwordGroup.classList.add('hidden');
@@ -95,7 +92,6 @@
     })();
 
     async function handleSuccessfulLogin(client, user) {
-        // Fetch profile — including banned flag
         const { data: profile, error: pErr } = await client
             .from('profiles')
             .select('full_name, role, banned, email')
@@ -104,7 +100,6 @@
 
         if (pErr) { showError('Could not load your profile.'); return; }
 
-        // ── BAN CHECK ──
         if (profile?.banned === true) {
             await client.auth.signOut();
             const { data: admins } = await client
@@ -124,9 +119,7 @@
         localStorage.setItem('afriStay_firstName', firstName);
 
         showSuccess('Welcome back, ' + firstName + '! Redirecting...');
-        setTimeout(() => {
-            window.location.href = '/';
-        }, 1000);
+        setTimeout(() => { window.location.href = '/'; }, 1000);
     }
 
     authForm.addEventListener('submit', async (e) => {
@@ -138,106 +131,48 @@
 
         try {
             if (mode === 'signin') {
-                // ── LOG IN FLOW (Auto-detect Email vs Phone) ──
-                const identifier = document.getElementById('loginIdentifier')?.value?.trim();
-                const password   = document.getElementById('password')?.value;
-
-                if (!identifier || !password) { showError('Please enter your credentials'); return; }
-
-                submitBtn.innerText = 'Logging in...';
-                let authResponse;
-
-                if (identifier.includes('@')) {
-                    // It's an Email
-                    authResponse = await client.auth.signInWithPassword({ email: identifier, password });
-                } else {
-                    // It's a Phone Number (Ensure it has a +)
-                    let formattedPhone = identifier.startsWith('+') ? identifier : '+' + identifier;
-                    authResponse = await client.auth.signInWithPassword({ phone: formattedPhone, password });
-                }
-
-                if (authResponse.error) { 
-                    showError(authResponse.error.message || 'Sign in failed'); 
-                    submitBtn.innerText = 'Login';
-                    return; 
-                }
-
-                await handleSuccessfulLogin(client, authResponse.data.user);
-
-            } else if (mode === 'signup') {
-                // ── SIGN UP FLOW ──
-                const fullName = document.getElementById('fullName')?.value?.trim();
-                const email    = document.getElementById('signupEmail')?.value?.trim();
-                let phone      = document.getElementById('signupPhone')?.value?.trim();
+                const email    = document.getElementById('loginEmail')?.value?.trim();
                 const password = document.getElementById('password')?.value;
 
-                if (!password) { showError('Password is required'); return; }
-                if (!email && !phone) { showError('Please provide an email or phone number'); return; }
+                if (!email || !password) { showError('Please enter your email and password'); return; }
 
-                submitBtn.innerText = 'Creating Account...';
-
-                // If they provided a phone, prioritize phone signup so we can send the OTP
-                if (phone) {
-                    phone = phone.startsWith('+') ? phone : '+' + phone;
-                    
-                    const { data, error } = await client.auth.signUp({
-                        phone,
-                        password,
-                        options: { data: { full_name: fullName || null, custom_email: email || null } }
-                    });
-
-                    if (error) { 
-                        showError(error.message || 'Phone sign up failed'); 
-                        submitBtn.innerText = 'Create Account';
-                        return; 
-                    }
-
-                    // Success! Supabase just sent an OTP. Move to Verify step.
-                    toggleAuth('verify_otp');
-
-                } else {
-                    // Email only signup
-                    const { data, error } = await client.auth.signUp({
-                        email,
-                        password,
-                        options: { data: { full_name: fullName || null } }
-                    });
-
-                    if (error) { 
-                        showError(error.message || 'Email sign up failed'); 
-                        submitBtn.innerText = 'Create Account';
-                        return; 
-                    }
-                    showSuccess('Sign up successful! Please check your email to confirm, then sign in.');
-                    submitBtn.innerText = 'Create Account';
-                }
-
-            } else if (mode === 'verify_otp') {
-                // ── OTP VERIFICATION FLOW (Post-Phone Signup) ──
-                let phone = document.getElementById('signupPhone')?.value?.trim();
-                phone = phone.startsWith('+') ? phone : '+' + phone;
-                const token = document.getElementById('otpCode')?.value?.trim();
-
-                if (!token) { showError('Please enter the 6-digit code'); return; }
-
-                submitBtn.innerText = 'Verifying...';
-
-                const { data, error } = await client.auth.verifyOtp({
-                    phone,
-                    token,
-                    type: 'sms'
-                });
+                submitBtn.innerText = 'Logging in...';
+                const { data, error } = await client.auth.signInWithPassword({ email, password });
 
                 if (error) {
-                    showError(error.message || 'Invalid code. Try again.');
-                    submitBtn.innerText = 'Verify & Login';
+                    showError(error.message || 'Sign in failed');
+                    submitBtn.innerText = 'Login';
                     return;
                 }
 
                 await handleSuccessfulLogin(client, data.user);
 
+            } else if (mode === 'signup') {
+                const fullName = document.getElementById('fullName')?.value?.trim();
+                const email    = document.getElementById('signupEmail')?.value?.trim();
+                const password = document.getElementById('password')?.value;
+
+                if (!email)    { showError('Email address is required'); return; }
+                if (!password) { showError('Password is required'); return; }
+
+                submitBtn.innerText = 'Creating Account...';
+
+                const { error } = await client.auth.signUp({
+                    email,
+                    password,
+                    options: { data: { full_name: fullName || null } }
+                });
+
+                if (error) {
+                    showError(error.message || 'Sign up failed');
+                    submitBtn.innerText = 'Create Account';
+                    return;
+                }
+
+                showSuccess('Account created! Please check your email to confirm, then sign in.');
+                submitBtn.innerText = 'Create Account';
+
             } else if (mode === 'forgot') {
-                // ── FORGOT PASSWORD: send reset email ──
                 const email = document.getElementById('forgotEmail')?.value?.trim();
                 if (!email) { showError('Please enter your email address'); return; }
 
@@ -248,13 +183,10 @@
                 });
 
                 submitBtn.innerText = 'Send Reset Link';
-
                 if (error) { showError(error.message || 'Could not send reset email'); return; }
-
                 showSuccess('Check your inbox — we sent a password reset link.');
 
             } else if (mode === 'reset') {
-                // ── RESET PASSWORD: set new password ──
                 const newPwd  = document.getElementById('newPassword')?.value;
                 const confPwd = document.getElementById('confirmPassword')?.value;
 
@@ -279,7 +211,7 @@
         } catch (err) {
             console.error('Auth error', err);
             showError('Something went wrong. Please try again.');
-            const btnLabels = { signup: 'Create Account', verify_otp: 'Verify & Login', forgot: 'Send Reset Link', reset: 'Save New Password' };
+            const btnLabels = { signup: 'Create Account', forgot: 'Send Reset Link', reset: 'Save New Password' };
             submitBtn.innerText = btnLabels[mode] || 'Login';
         }
     });

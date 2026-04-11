@@ -436,11 +436,8 @@
                 </div>
                 <div class="section-body">
                     <div id="ownerAppStatus"></div>
-                    <form id="ownerApplicationForm" style="max-width:520px;">
-                        <div class="form-group">
-                            <label>Why do you want to list on AfriStay? *</label>
-                            <textarea id="appMotivation" class="form-input" style="min-height:100px;resize:vertical;" placeholder="Tell us about your property, what makes it special, and why you want to join AfriStay..." required></textarea>
-                        </div>
+                    <form id="ownerApplicationForm" style="max-width:560px;">
+
                         <div class="form-group">
                             <label>Phone Number *</label>
                             <div style="display:flex;align-items:center;border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden;">
@@ -448,18 +445,75 @@
                                 <input type="tel" id="appPhone" class="form-input" style="border:none!important;border-radius:0!important;flex:1;padding-left:12px;" placeholder="78X XXX XXX" maxlength="9" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
                             </div>
                         </div>
+
                         <div class="form-group">
-                            <label>Property / Vehicle Type</label>
-                            <select id="appPropertyType" class="form-input" style="padding:12px 14px;">
-                                <option value="">Select type (optional)</option>
+                            <label>What type of listing(s) do you want to add? *</label>
+                            <select id="appListingType" class="form-input" style="padding:12px 14px;" required>
+                                <option value="">Select a type…</option>
                                 <option value="apartment">Apartment</option>
                                 <option value="house">House / Villa</option>
                                 <option value="hotel">Hotel / Lodge</option>
-                                <option value="room">Room</option>
-                                <option value="vehicle">Vehicle</option>
+                                <option value="room">Single Room</option>
+                                <option value="vehicle">Vehicle / Car Rental</option>
+                                <option value="multiple">Multiple types</option>
                                 <option value="other">Other</option>
                             </select>
                         </div>
+
+                        <div class="form-group">
+                            <label>How many properties or vehicles do you plan to list?</label>
+                            <select id="appListingCount" class="form-input" style="padding:12px 14px;">
+                                <option value="">Select…</option>
+                                <option value="1">1</option>
+                                <option value="2-3">2 – 3</option>
+                                <option value="4-10">4 – 10</option>
+                                <option value="10+">More than 10</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Have you hosted guests or rented out before?</label>
+                            <select id="appHostingExp" class="form-input" style="padding:12px 14px;">
+                                <option value="">Select…</option>
+                                <option value="yes_airbnb">Yes, on Airbnb / Booking.com</option>
+                                <option value="yes_informal">Yes, informally</option>
+                                <option value="no_planning">No, but I'm ready to start</option>
+                                <option value="no">No hosting experience yet</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Do you have valid ownership or registration documents?</label>
+                            <select id="appHasDocs" class="form-input" style="padding:12px 14px;">
+                                <option value="">Select…</option>
+                                <option value="yes">Yes, I have them ready</option>
+                                <option value="in_progress">In progress / being arranged</option>
+                                <option value="no">Not yet</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Expected monthly income from your listing(s)?</label>
+                            <select id="appExpectedIncome" class="form-input" style="padding:12px 14px;">
+                                <option value="">Select a range…</option>
+                                <option value="under_100k">Under 100,000 RWF</option>
+                                <option value="100k_300k">100,000 – 300,000 RWF</option>
+                                <option value="300k_500k">300,000 – 500,000 RWF</option>
+                                <option value="500k_1m">500,000 – 1,000,000 RWF</option>
+                                <option value="over_1m">Over 1,000,000 RWF</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Describe what you're listing — what makes it special? *</label>
+                            <textarea id="appDescription" class="form-input" style="min-height:90px;resize:vertical;" placeholder="e.g. A fully furnished 2-bedroom apartment in Kigali with mountain views, fast WiFi, and parking…" required></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Why do you want to join AfriStay? *</label>
+                            <textarea id="appMotivation" class="form-input" style="min-height:80px;resize:vertical;" placeholder="Tell us your goals and why AfriStay is the right fit for you…" required></textarea>
+                        </div>
+
                         <button type="submit" class="save-btn" id="ownerAppBtn">
                             <i class="fa-solid fa-paper-plane"></i> Submit Application
                         </button>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Review Booking - AfriStay</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',system-ui,sans-serif;background:#f2f0ec;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .card{background:#fff;border-radius:20px;padding:44px 36px;max-width:440px;width:100%;text-align:center;box-shadow:0 4px 28px rgba(0,0,0,.09)}
+    .logo{font-size:13px;color:#aaa;margin-bottom:24px;letter-spacing:1px;text-transform:uppercase;font-weight:700}
+    .icon{font-size:52px;margin-bottom:16px;line-height:1}
+    .title{font-size:22px;font-weight:800;color:#1a1a1a;margin-bottom:10px}
+    .sub{font-size:14px;color:#666;line-height:1.7;margin-bottom:8px}
+    .ref{display:inline-block;background:#f5f5f5;padding:4px 14px;border-radius:20px;font-family:monospace;font-size:14px;color:#EB6753;font-weight:700;margin-bottom:24px}
+    .btn{display:block;width:100%;padding:18px;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;transition:opacity .2s;margin-top:4px}
+    .btn:hover{opacity:.86}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .btn-approve{background:#16a34a;color:#fff}
+    .btn-reject{background:#ef4444;color:#fff}
+    .btn-secondary{display:inline-block;margin-top:14px;color:#aaa;font-size:13px;text-decoration:none}
+    .btn-secondary:hover{color:#555}
+    .spinner{display:none;width:22px;height:22px;border:3px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .result-msg{margin-top:14px;font-size:13px;font-weight:600;display:none;padding:10px 14px;border-radius:10px}
+    .result-msg.ok{background:#f0fdf4;color:#16a34a}
+    .result-msg.err{background:#fef2f2;color:#dc2626}
+    /* loading state */
+    .loading-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:12px 0}
+    .load-spin{width:28px;height:28px;border:3px solid #eee;border-top-color:#EB6753;border-radius:50%;animation:spin .7s linear infinite}
+    .load-text{font-size:14px;color:#aaa}
+    /* error state */
+    .err-wrap{padding:8px 0}
+    .err-icon{font-size:46px;margin-bottom:14px}
+    .err-title{font-size:18px;font-weight:800;color:#1a1a1a;margin-bottom:8px}
+    .err-sub{font-size:14px;color:#666;line-height:1.7;margin-bottom:20px}
+    .err-btn{display:inline-block;padding:12px 28px;background:#EB6753;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:14px}
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">AfriStay</div>
+
+  <!-- Loading -->
+  <div id="stateLoading" class="loading-wrap">
+    <div class="load-spin"></div>
+    <div class="load-text">Loading booking details&hellip;</div>
+  </div>
+
+  <!-- Error -->
+  <div id="stateError" class="err-wrap" style="display:none">
+    <div class="err-icon">&#128683;</div>
+    <div class="err-title">Could Not Load Booking</div>
+    <p class="err-sub" id="errMsg"></p>
+    <a href="https://afristay.rw" class="err-btn">Go to AfriStay</a>
+  </div>
+
+  <!-- Main confirm UI -->
+  <div id="stateMain" style="display:none">
+    <div class="icon" id="mainIcon"></div>
+    <h1 class="title" id="mainTitle"></h1>
+    <p class="sub">Guest: <strong id="guestName"></strong></p>
+    <p class="sub">Property: <strong id="listingTitle"></strong></p>
+    <div class="ref" id="bookingRef"></div>
+    <button class="btn" id="actionBtn" onclick="process()"></button>
+    <div class="spinner" id="spinner"></div>
+    <div class="result-msg" id="resultMsg"></div>
+    <a href="https://afristay.rw" class="btn-secondary">Cancel &mdash; Go to AfriStay</a>
+  </div>
+</div>
+
+<script>
+  const FN = 'https://xuxzeinufjpplxkerlsd.supabase.co/functions/v1/approve-booking';
+  const p  = new URLSearchParams(window.location.search);
+  const token  = p.get('token') || '';
+  const action = (p.get('action') || 'approve').toLowerCase();
+  const isApprove = action !== 'reject';
+
+  function show(id) {
+    ['stateLoading','stateError','stateMain'].forEach(s => {
+      document.getElementById(s).style.display = (s === id) ? '' : 'none';
+    });
+  }
+
+  function showError(msg) {
+    document.getElementById('errMsg').textContent = msg;
+    show('stateError');
+  }
+
+  async function init() {
+    if (p.get('error') === 'notoken' || !token) {
+      showError('No token found. Please use the link from your email.');
+      return;
+    }
+
+    try {
+      const res  = await fetch(`${FN}?token=${encodeURIComponent(token)}&info=1`);
+      const data = await res.json();
+      if (!res.ok || data.error) { showError(data.error || 'Invalid or expired link.'); return; }
+
+      document.getElementById('mainIcon').innerHTML   = isApprove ? '&#9989;' : '&#10060;';
+      document.getElementById('mainTitle').textContent = isApprove ? 'Approve This Booking?' : 'Reject This Booking?';
+      document.getElementById('guestName').textContent   = data.guestName   || 'Guest';
+      document.getElementById('listingTitle').textContent = data.listing || 'Listing';
+      document.getElementById('bookingRef').textContent  = data.ref || '';
+
+      const btn = document.getElementById('actionBtn');
+      btn.className = 'btn ' + (isApprove ? 'btn-approve' : 'btn-reject');
+      btn.innerHTML = isApprove ? '&#10003; Confirm Approval' : '&#10007; Confirm Rejection';
+
+      show('stateMain');
+    } catch (e) {
+      showError('Connection error. Please try again later.');
+    }
+  }
+
+  async function process() {
+    const btn = document.getElementById('actionBtn');
+    const sp  = document.getElementById('spinner');
+    const msg = document.getElementById('resultMsg');
+
+    btn.disabled = true;
+    btn.style.display = 'none';
+    sp.style.display  = 'block';
+    msg.style.display = 'none';
+
+    try {
+      const res  = await fetch(FN, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ token, action }),
+      });
+      const data = await res.json();
+      sp.style.display = 'none';
+
+      if (!res.ok || data.error) {
+        msg.className = 'result-msg err';
+        msg.textContent = data.error || 'Something went wrong. Please try again.';
+        msg.style.display = 'block';
+        btn.disabled = false;
+        btn.style.display = 'block';
+        return;
+      }
+
+      msg.className = 'result-msg ok';
+      msg.textContent = isApprove
+        ? 'Approved! The guest has been emailed to confirm.'
+        : 'Rejected. The guest has been notified.';
+      msg.style.display = 'block';
+      setTimeout(() => window.location.replace('https://afristay.rw'), 2800);
+
+    } catch (e) {
+      sp.style.display  = 'none';
+      msg.className = 'result-msg err';
+      msg.textContent = 'Connection error. Please try again.';
+      msg.style.display = 'block';
+      btn.disabled = false;
+      btn.style.display = 'block';
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

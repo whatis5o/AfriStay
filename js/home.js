@@ -2,25 +2,22 @@
  * HOME PAGE — home.js  →  /js/home.js
  */
 
+const STORAGE_BASE = 'https://xuxzeinufjpplxkerlsd.supabase.co/storage/v1/object/public/listing_images';
+const FEATURED_CACHE_KEY = 'afristay_featured_v1';
+const FEATURED_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("🏠 [HOME] DOM ready — initializing featured listings...");
     await loadFeaturedListings();
-    
 });
 
 /* ═══════════════════════════════════════════════
    IMAGE RESOLVER
    1. Try listing_images TABLE (fast, batch)
-   2. For any listing still missing an image,
-      list the Storage folder: listing_images/{id}/
-      and build the public URL from the first file found
+   2. For any listing still missing, check Storage folder
    ═══════════════════════════════════════════════ */
-const STORAGE_BASE = 'https://xuxzeinufjpplxkerlsd.supabase.co/storage/v1/object/public/listing_images';
-
 async function resolveImages(sb, ids) {
     const imgMap = {};
 
-    // Step 1 — table lookup
     const { data: rows } = await sb
         .from('listing_images')
         .select('listing_id, image_url')
@@ -30,33 +27,16 @@ async function resolveImages(sb, ids) {
         if (!imgMap[r.listing_id] && r.image_url) imgMap[r.listing_id] = r.image_url;
     });
 
-    console.log(`🗄️ [HOME] Table images found: ${Object.keys(imgMap).length}/${ids.length}`);
-
-    // Step 2 — storage fallback for listings with no table row
     const missing = ids.filter(id => !imgMap[id]);
     if (missing.length) {
-        console.log(`📦 [HOME] Checking storage for ${missing.length} listings with no table image...`);
         await Promise.all(missing.map(async (id) => {
             try {
-                const { data: files, error } = await sb.storage
+                const { data: files } = await sb.storage
                     .from('listing_images')
                     .list(id, { limit: 1 });
-
-                if (error) {
-                    console.warn(`  ⚠️ [HOME] Storage list error for ${id}:`, error.message);
-                    return;
-                }
-
                 const file = (files || []).find(f => f.name && !f.id?.endsWith('/'));
-                if (file) {
-                    imgMap[id] = `${STORAGE_BASE}/${id}/${file.name}`;
-                    console.log(`  ✅ [HOME] Storage image found for ${id}: ${file.name}`);
-                } else {
-                    console.log(`  ℹ️ [HOME] No storage image for ${id}`);
-                }
-            } catch(e) {
-                console.warn(`  ❌ [HOME] Storage error for ${id}:`, e.message);
-            }
+                if (file) imgMap[id] = `${STORAGE_BASE}/${id}/${file.name}`;
+            } catch(e) {}
         }));
     }
 
@@ -68,6 +48,18 @@ async function loadFeaturedListings() {
     const sb = window.supabaseClient;
     if (!sb) { renderFallback(); return; }
 
+    // ── Cache-first: serve from sessionStorage if fresh ──
+    try {
+        const raw = sessionStorage.getItem(FEATURED_CACHE_KEY);
+        if (raw) {
+            const { ts, listings, imgMap, dtMap, pvMap } = JSON.parse(raw);
+            if (Date.now() - ts < FEATURED_CACHE_TTL) {
+                renderCards(listings, imgMap, dtMap, pvMap);
+                return;
+            }
+        }
+    } catch(e) {}
+
     const { data: listings, error } = await sb
         .from('listings')
         .select('id, title, price, price_display, price_outside_kigali_display, currency, availability_status, category_slug, province_id, district_id, created_at')
@@ -78,18 +70,14 @@ async function loadFeaturedListings() {
         .limit(6);
 
     if (error || !listings?.length) {
-        console.warn('⚠️ [HOME] No featured listings:', error?.message || 'empty');
         renderFallback();
         return;
     }
-    console.log(`✅ [HOME] ${listings.length} featured listings`);
 
-    const ids = listings.map(l => l.id);
-
-    // Resolve images + promos + location names in parallel
-    const today = new Date().toISOString().slice(0, 10);
-    const pvIds = [...new Set(listings.map(l => l.province_id).filter(Boolean))];
-    const dtIds = [...new Set(listings.map(l => l.district_id).filter(Boolean))];
+    const ids    = listings.map(l => l.id);
+    const today  = new Date().toISOString().slice(0, 10);
+    const pvIds  = [...new Set(listings.map(l => l.province_id).filter(Boolean))];
+    const dtIds  = [...new Set(listings.map(l => l.district_id).filter(Boolean))];
 
     const [imgMap, promoRes, pvRes, dtRes] = await Promise.all([
         resolveImages(sb, ids),
@@ -99,9 +87,10 @@ async function loadFeaturedListings() {
     ]);
 
     const pvMap = {}, dtMap = {}, promoMap = {};
-    (pvRes.data || []).forEach(p => pvMap[p.id] = p.name);
-    (dtRes.data || []).forEach(d => dtMap[d.id] = d.name);
+    (pvRes.data  || []).forEach(p => pvMap[p.id] = p.name);
+    (dtRes.data  || []).forEach(d => dtMap[d.id] = d.name);
     (promoRes.data || []).forEach(p => { promoMap[p.listing_id] = p.discount; });
+
     listings.forEach(l => {
         const disc = promoMap[l.id];
         const dp   = l.price_display || l.price;
@@ -109,10 +98,17 @@ async function loadFeaturedListings() {
         l.promo_price    = disc ? Math.round(dp * (1 - disc / 100)) : null;
     });
 
+    // ── Store in sessionStorage for subsequent loads ──
+    try {
+        sessionStorage.setItem(FEATURED_CACHE_KEY, JSON.stringify({
+            ts: Date.now(), listings, imgMap, dtMap, pvMap
+        }));
+    } catch(e) {}
+
     renderCards(listings, imgMap, dtMap, pvMap);
 }
 
-/* ── RENDER CARDS — identical structure to Listings page ── */
+/* ── RENDER CARDS ── */
 function renderCards(listings, imgMap, dtMap, pvMap) {
     const track = document.getElementById('carouselTrack');
     if (!track) return;
@@ -130,10 +126,8 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
         const promoPrice  = l.promo_discount ? Number(l.promo_price).toLocaleString() : null;
         const loc         = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
 
-        console.log(`  🃏 [HOME] "${l.title}" | loc: ${loc} | img: ${thumb ? '✅' : '❌'}`);
-
         const imgHtml = thumb
-            ? '<img src="' + esc(thumb) + '" alt="' + esc(l.title) + '" loading="eager" ' +
+            ? '<img src="' + esc(thumb) + '" alt="' + esc(l.title) + '" loading="lazy" ' +
               'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'">' +
               '<div class="card-no-img" style="display:none;"><i class="fa-solid fa-image" style="font-size:44px;color:#ddd;"></i></div>'
             : '<div class="card-no-img"><i class="fa-solid fa-image" style="font-size:44px;color:#ddd;"></i></div>';
@@ -172,9 +166,7 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
     });
 
     initCarousel();
-    console.log('✅ [HOME] All cards rendered');
 
-    // Refresh heart states now that cards are in the DOM
     if (window.refreshFavHearts) window.refreshFavHearts();
 }
 
@@ -201,7 +193,6 @@ function initCarousel() {
         current = Math.min(Math.max(current + dir, 0), max);
         const gap = parseInt(getComputedStyle(track).gap) || 25;
         const offset = current * (cards[0].offsetWidth + gap);
-        // Use requestAnimationFrame for smooth iOS animation
         requestAnimationFrame(() => {
             track.style.webkitTransform = 'translateX(-' + offset + 'px)';
             track.style.transform = 'translateX(-' + offset + 'px)';

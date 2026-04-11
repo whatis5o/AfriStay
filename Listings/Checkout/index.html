@@ -94,6 +94,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 .lock-row i{color:var(--green);font-size:10px}
 .skel{background:linear-gradient(90deg,#f0f0f0 25%,#e8e8e8 50%,#f0f0f0 75%);background-size:200%;animation:sk 1.4s infinite;border-radius:8px}
 @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* ── Payment-coming-soon ticker ── */
+.ticker-bar{position:fixed;bottom:0;left:0;right:0;z-index:1001;background:#dc2626;overflow:hidden;height:34px;display:flex;align-items:center;pointer-events:none;}
+.ticker-inner{display:inline-block;white-space:nowrap;padding-left:100vw;animation:tkr 22s linear infinite;font-size:11.5px;font-weight:800;color:#fff;letter-spacing:1.8px;text-transform:uppercase;}
+@keyframes tkr{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
 /* How it works steps */
 .how-steps{display:flex;flex-direction:column;gap:0;margin-top:4px}
 .hs{display:flex;gap:12px;align-items:flex-start;position:relative}
@@ -135,111 +139,9 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
   .m-tab{padding:10px 4px 8px}
 }
 
-.stock-ticker:hover ul {
-  animation-play-state: paused;
-}
-.stock-ticker {
-  position: fixed;
-  top: 50%;
-  left: 0;
-  width: 100%;
-  transform: translateY(-50%);
-  z-index: 9999;
-  pointer-events: none; /* Lets you click through it */
-
-  background-color: #e40000;
-  color: #ffffff;
-  font-size: 42px;
-  text-transform: uppercase;
-  padding-block: 24px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-  overflow: hidden;
-  user-select: none;
-
-  --gap: 40px;
-  display: flex; /* Keeps the two lists side-by-side */
-  gap: var(--gap);
-}
-
-.stock-ticker ul {
-  list-style: none;
-  flex-shrink: 0;
-  min-width: 100%;
-  display: flex;
-  justify-content: space-around; /* Spreads words out evenly */
-  align-items: center;
-  gap: var(--gap);
-
-  animation: scroll 20s linear infinite; /* Smooth, endless loop */
-}
-
-@keyframes scroll {
-  to {
-    transform: translateX(calc(-100% - var(--gap)));
-  }
-}
-.stock-ticker .company,
-.stock-ticker .price {
-  font-weight: 800; /* Extra bold */
-  color: #ffffff;
-}
-
-.stock-ticker .price {
-  margin-inline: 8px;
-}
-
-
-.stock-ticker ul:first-child {
-  /* background-color: yellow; */
-}
-
-.stock-ticker ul:last-child {
-  /* background-color: pink; */
-}
-.stock-ticker .plus .change,
-.stock-ticker .plus::before {
-  color: #089981;
-}
-
-.stock-ticker .minus .change,
-.stock-ticker .minus::before {
-  color: #f23645;
-}
-
 </style>
 </head>
 <body>
-<div class="stock-ticker">
-  <ul>
-    <li class="minus">
-      <span class="company">| PAYMENT SERVICES</span>
-      <span class="price">NOT AVAILABLE YET</span>
-    </li> 
-    <li class="plus">
-      <span class="company">| LAUNCHING SOON</span>
-      <span class="price">STAY TUNED</span>
-    </li>
-    <li class="minus">
-      <span class="company">|AFRISTAY</span>
-      <span class="price">RWANDA'S #1 STAYBOOKING PLATFORM</span>
-    </li>
-  </ul>
-  
-  <ul aria-hidden="true">
-    <li class="minus">
-      <span class="company">PAYMENT SERVICES</span>
-      <span class="price">NOT AVAILABLE YET</span>
-    </li> 
-    <li class="plus">
-      <span class="company">LAUNCHING SOON</span>
-      <span class="price">STAY TUNED</span>
-    </li>
-    <li class="minus">
-      <span class="company">AFRISTAY</span>
-      <span class="price">RWANDA'S #1 STAYBOOKING PLATFORM</span>
-    </li>
-  </ul>
-</div>
 
 <nav id="nav">
   <a href="/" class="nav-logo">
@@ -250,6 +152,10 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
     <i class="fa-solid fa-arrow-left"></i> Back
   </a>
 </nav>
+
+<div class="ticker-bar" aria-hidden="true">
+  <span class="ticker-inner">⚠&nbsp; PAYMENT SERVICES NOT AVAILABLE YET &nbsp;&nbsp;|&nbsp;&nbsp; LAUNCHING SOON &nbsp;&nbsp;|&nbsp;&nbsp; STAY TUNED &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ⚠&nbsp; PAYMENT SERVICES NOT AVAILABLE YET &nbsp;&nbsp;|&nbsp;&nbsp; LAUNCHING SOON &nbsp;&nbsp;|&nbsp;&nbsp; STAY TUNED &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+</div>
 
 <div class="page" id="mainPage">
   <!-- SUMMARY -->

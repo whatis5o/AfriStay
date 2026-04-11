@@ -8,8 +8,7 @@
   "theme_color": "#EB6753",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "/Pictures/favicon.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/Pictures/favicon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/Pictures/favicon.png", "sizes": "any", "type": "image/png", "purpose": "any" }
   ],
   "categories": ["travel", "lifestyle"],
   "lang": "en-RW",

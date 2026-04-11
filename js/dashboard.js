@@ -198,7 +198,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Step 6: Show default panel (dashboard)
     togglePanels('dashboardPanel');
-    
+
+    // Signal that the profile is ready (triggers cal heatmap, etc.)
+    document.dispatchEvent(new Event('afristay:profileReady'));
+
     console.log("✨ [SPECIAL USER] Initialization complete!");
 });
 
@@ -332,6 +335,7 @@ function bindUIInteractions() {
             if (tabName === 'messages')         { loadMessagesPreview(); }
             if (tabName === 'listing-requests') { loadListingRequests(); }
             if (tabName === 'bookings')         { loadBookingsTable(); }
+            if (tabName === 'attention')        { loadAttentionItems(); setTimeout(loadSiteHealthGraph, 300); }
 
             // Mark relevant notifications as read and hide the badge
             const typesToClear = _TAB_NOTIF_CLEAR[tabName];
@@ -817,6 +821,12 @@ function updateFormLabels() {
         if (priceLabel) priceLabel.innerText = 'Price per Night (RWF) *';
         if (vehiclePricingGroup) vehiclePricingGroup.style.display = 'none';
     }
+    // Toggle property vs vehicle spec sections
+    const propSpecs    = document.getElementById('propSpecsSection');
+    const vehicleSpecs = document.getElementById('vehicleSpecsSection');
+    if (propSpecs)    propSpecs.style.display    = cat === 'vehicle' ? 'none' : '';
+    if (vehicleSpecs) vehicleSpecs.style.display = cat === 'vehicle' ? ''     : 'none';
+
     // Reload amenity chips for the selected category
     updateAmenitiesForCategory();
 }
@@ -898,38 +908,25 @@ async function loadAmenityCheckboxes() {
     container.innerHTML = '<span style="color:#bbb;font-size:13px;"><i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Loading amenities…</span>';
 
     try {
-        // Fetch once and cache
+        // Fetch once and cache (now includes listing_type column)
         if (!_amenityCache) {
             const { data, error } = await _supabase
                 .from('amenity_definitions')
-                .select('slug, label, icon, category')
+                .select('slug, label, icon, category, listing_type')
                 .order('label');
             if (error) throw error;
             _amenityCache = data || [];
         }
 
-        // Known vehicle-specific slugs — fallback if DB category is null/empty
-        const VEHICLE_SLUGS = new Set([
-            'four_by_four','four_wd','awd','gps','gps_navigation','sunroof','leather_seats',
-            'cruise_control','reverse_camera','backup_camera','dashcam','child_seat',
-            'roof_rack','spare_tire','towing','bluetooth_audio','bluetooth','usb_charger',
-            'entertainment_system','android_auto','apple_carplay','heated_seats',
-        ]);
-
-        // Filter by category: vehicle listings get vehicle + general, others get non-vehicle
-        // Falls back to slug-based detection when DB category is empty/null
+        // Filter by listing_type column from DB:
+        //   'vehicle'  → only show for vehicle listings
+        //   'property' → only show for non-vehicle listings
+        //   'all'      → show for both
         const list = _amenityCache.filter(a => {
-            const c = (a.category || '').toLowerCase();
-            const slugIsVehicle = VEHICLE_SLUGS.has(a.slug) || VEHICLE_SLUGS.has((a.slug || '').toLowerCase());
-            // If DB category is set, trust it; otherwise use slug-based fallback
-            if (c === 'vehicle' || (c === '' && slugIsVehicle)) {
-                return isVehicle; // vehicle amenity → only show for vehicle listings
-            }
-            if (c === 'real_estate' || (c === '' && !slugIsVehicle)) {
-                return !isVehicle; // property amenity → only show for non-vehicle listings
-            }
-            // 'general' or unrecognised — show for both
-            return true;
+            const lt = (a.listing_type || 'all').toLowerCase();
+            if (lt === 'vehicle')  return isVehicle;
+            if (lt === 'property') return !isVehicle;
+            return true; // 'all'
         });
 
         if (!list.length) {
@@ -981,6 +978,7 @@ window.loadAmenityCheckboxes = loadAmenityCheckboxes;
 
 function updateAmenitiesForCategory() {
     if (!document.getElementById('listingModal')?.classList.contains('active')) return;
+    // Don't clear _amenityCache — it's the full list; filtering is done inside loadAmenityCheckboxes
     loadAmenityCheckboxes();
 }
 window.updateAmenitiesForCategory = updateAmenitiesForCategory;
@@ -1101,8 +1099,8 @@ async function initAuthAndRole() {
         
         const user = userData?.user;
         if (!user) {
-            console.warn("⚠️ [AUTH] No logged-in user detected");
-            applyRoleToUI(null);
+            console.warn("⚠️ [AUTH] No logged-in user detected — redirecting to auth");
+            window.location.replace('/Auth/?redirect=' + encodeURIComponent(window.location.href));
             return;
         }
 
@@ -1112,7 +1110,7 @@ async function initAuthAndRole() {
         // Fetch profile
         const { data: profile, error: pErr } = await _supabase
             .from('profiles')
-            .select('id, full_name, email, role, avatar_seed')
+            .select('id, full_name, email, phone, role, avatar_seed, banned')
             .eq('id', user.id)
             .single();
 
@@ -1126,15 +1124,30 @@ async function initAuthAndRole() {
         CURRENT_ROLE = (profile.role || 'user');
         console.log("✅ [AUTH] Profile loaded. Role:", CURRENT_ROLE);
 
-        // place inside initAuthAndRole() after CURRENT_ROLE set
-        if (CURRENT_ROLE !== 'admin' && CURRENT_ROLE !== 'owner') {
-        console.warn('Not an admin/owner — redirecting from dashboard');
-        // friendly message then redirect
-        alert('You do not have permission to access the dashboard.');
-        window.location.href = '/index.html';
-        return;
+        // Enforce page-level role access
+        const path = window.location.pathname.toLowerCase();
+        const onAdminDash = path.includes('/dashboards/admin');
+        const onOwnerDash = path.includes('/dashboards/owner');
+
+        if (onAdminDash && CURRENT_ROLE !== 'admin') {
+            window.location.replace('/Auth/?redirect=' + encodeURIComponent(window.location.href));
+            return;
+        }
+        if (onOwnerDash && CURRENT_ROLE !== 'owner' && CURRENT_ROLE !== 'admin') {
+            window.location.replace('/Auth/?redirect=' + encodeURIComponent(window.location.href));
+            return;
+        }
+        if (!onAdminDash && !onOwnerDash && CURRENT_ROLE !== 'admin' && CURRENT_ROLE !== 'owner') {
+            window.location.replace('/Auth/');
+            return;
         }
 
+        // Banned users get nothing — redirect away regardless of page
+        if (profile.banned) {
+            await _supabase.auth.signOut();
+            window.location.replace('/Auth/?error=banned');
+            return;
+        }
 
         // Update UI with user info
         const adminName = $('#adminName');
@@ -1224,12 +1237,21 @@ async function toggleUserBan(userId, action) {
 }
 
 async function deleteUser(userId) {
-    if (!confirm('Delete this user and profile? This is permanent.')) return;
+    if (!confirm('Delete this user from AfriStay AND Supabase Auth? This is permanent — they will be signed out immediately and cannot log back in.')) return;
     try {
-        const { error } = await _supabase.from('profiles').delete().eq('id', userId);
-        if (error) throw error;
-        logAudit({ action: 'user_deleted', entityType: 'user', entityId: userId, description: 'User profile hard-deleted by admin' });
-        toast('User profile deleted.', 'success');
+        const { data: { session } } = await _supabase.auth.getSession();
+        const res = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/delete-account`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({ userId }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || 'Edge function failed');
+        logAudit({ action: 'user_deleted', entityType: 'user', entityId: userId, description: 'User hard-deleted from auth + profile by admin' });
+        toast('User deleted from Auth and profile.', 'success');
         await loadUsersTable();
         await loadCounts();
     } catch (err) {
@@ -1634,7 +1656,7 @@ async function _searchOwners(e) {
     // query profiles where role = owner and name matches (case-insensitive)
     const { data, error } = await _supabase
         .from('profiles')
-        .select('id, full_name, email')
+        .select('id, full_name, email, phone')
         .ilike('full_name', `%${q}%`)
         .limit(10);
 
@@ -1646,14 +1668,31 @@ async function _searchOwners(e) {
 
     resultsEl.innerHTML = '';
     (data || []).forEach(u => {
+        const hasPhone = u.phone && u.phone.trim().length > 0;
         const row = document.createElement('div');
         row.className = 'search-result-item';
-        row.innerText = `${u.full_name} — ${u.email || ''}`;
+        row.style.cssText = hasPhone ? '' : 'background:#fff8f0;';
+        row.innerHTML = `<span>${escapeHtml(u.full_name)}${u.email ? ' — ' + escapeHtml(u.email) : ''}</span>`
+            + (!hasPhone ? `<span style="margin-left:8px;font-size:11px;font-weight:700;color:#e67e22;background:#fff3cd;padding:2px 6px;border-radius:4px;">No phone</span>` : '');
         row.onclick = () => {
-        document.getElementById('selectedOwnerId').value = u.id;
-        document.getElementById('selectedOwnerName').innerText = `Assigned to: ${u.full_name}`;
-        resultsEl.style.display = 'none';
-        document.getElementById('ownerSearch').value = u.full_name;
+            document.getElementById('selectedOwnerId').value = u.id;
+            document.getElementById('selectedOwnerName').innerText = `Assigned to: ${u.full_name}`;
+            resultsEl.style.display = 'none';
+            document.getElementById('ownerSearch').value = u.full_name;
+
+            // Show/clear phone warning
+            let warn = document.getElementById('ownerNoPhoneWarn');
+            if (!hasPhone) {
+                if (!warn) {
+                    warn = document.createElement('p');
+                    warn.id = 'ownerNoPhoneWarn';
+                    warn.style.cssText = 'margin:6px 0 0;font-size:12px;font-weight:700;color:#c0392b;background:#fdecea;padding:6px 10px;border-radius:8px;border-left:3px solid #e74c3c;';
+                    document.getElementById('selectedOwnerName').insertAdjacentElement('afterend', warn);
+                }
+                warn.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="margin-right:5px;"></i><strong>${escapeHtml(u.full_name)}</strong> has no phone number on file. They may miss SMS notifications about this listing.`;
+            } else if (warn) {
+                warn.remove();
+            }
         };
         resultsEl.appendChild(row);
     });
@@ -2210,6 +2249,21 @@ async function rejectBooking(bookingId) {
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || 'Rejection failed');
 
+        // Reset listing availability so it can be booked again
+        if (booking.listing_id) {
+            await _supabase.from('listings').update({ availability_status: 'available' }).eq('id', booking.listing_id);
+        }
+
+        // Mark any existing receipt as cancelled (don't delete — keep for audit trail)
+        await _supabase.from('digital_receipts')
+            .update({
+                cancelled_at:      new Date().toISOString(),
+                cancelled_by:      CURRENT_PROFILE?.full_name || 'Admin',
+                cancellation_note: reason || null,
+            })
+            .eq('booking_id', bookingId)
+            .is('cancelled_at', null); // only if not already cancelled
+
         logAudit({ action: 'booking_rejected', entityType: 'booking', entityId: bookingId, description: 'Booking rejected for "' + title + '"' + (reason ? ' — reason: ' + reason : '') });
         toast('Booking rejected. Guest has been notified.', 'success');
         await loadBookingsTable();
@@ -2288,6 +2342,11 @@ async function promoteToOwner(userId) {
 async function handleCreateListing() {
     console.log("➕ [LISTING] Creating new listing (with media)...");
 
+    if (CURRENT_PROFILE?.banned) {
+        toast('Your account has been suspended. You cannot create listings.', 'error');
+        return;
+    }
+
     const title    = $('#listTitle')?.value?.trim();
     const price    = Number($('#listPrice')?.value || 0);
     const desc     = $('#listDesc')?.value?.trim();
@@ -2305,12 +2364,22 @@ async function handleCreateListing() {
     const sectorId   = $('#selSector')?.value || null;
     const address    = $('#listAddress')?.value?.trim() || '';
 
-    // Specs
-    const rooms     = parseInt($('#listRooms')?.value)     || null;
-    const bathrooms = parseInt($('#listBathrooms')?.value) || null;
-    const beds      = parseInt($('#listBeds')?.value)      || null;
-    const maxGuests = parseInt($('#listMaxGuests')?.value)  || null;
-    const floorArea = parseInt($('#listFloorArea')?.value)  || null;
+    // Property specs (only relevant for non-vehicles)
+    const roomCount    = category !== 'vehicle' ? (parseInt($('#listRooms')?.value)     || null) : null;
+    const bathCount    = category !== 'vehicle' ? (parseInt($('#listBathrooms')?.value) || null) : null;
+    const bedCount     = category !== 'vehicle' ? (parseInt($('#listBeds')?.value)      || null) : null;
+    const maxGuests    = category !== 'vehicle' ? (parseInt($('#listMaxGuests')?.value)  || null) : null;
+    const floorArea    = category !== 'vehicle' ? (parseInt($('#listFloorArea')?.value)  || null) : null;
+
+    // Vehicle specs (only relevant for vehicles)
+    const vehicleSpecs   = category === 'vehicle' ? {
+        make:         $('#vMake')?.value?.trim()        || null,
+        model:        $('#vModel')?.value?.trim()       || null,
+        year:         parseInt($('#vYear')?.value)      || null,
+        fuel_type:    $('#vFuel')?.value                || null,
+        transmission: $('#vTransmission')?.value        || null,
+    } : null;
+    const maxPassengers = category === 'vehicle' ? (parseInt($('#vMaxPassengers')?.value) || null) : null;
 
     // Amenities
     const checkedAmenities = Array.from(document.querySelectorAll('#amenityCheckboxes .am-chip.active')).map(c => c.dataset.am);
@@ -2333,6 +2402,18 @@ async function handleCreateListing() {
 
     if (!title || !price || !desc || !ownerId) {
         setStatus('Please fill in all required fields.', 'error');
+        return;
+    }
+
+    // Owners must have a phone number on their profile before listing
+    if (CURRENT_ROLE === 'owner' && (!CURRENT_PROFILE?.phone || !CURRENT_PROFILE.phone.trim())) {
+        setStatus(
+            '<i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>' +
+            '<strong>Phone number required.</strong> You need a phone number on your profile before you can list. ' +
+            'Go to <a href="#" onclick="document.querySelector(\'[data-tab=settings]\')?.click();return false;" ' +
+            'style="color:#c0392b;font-weight:700;">Settings</a> and add your number, then try again.',
+            'error'
+        );
         return;
     }
 
@@ -2364,12 +2445,14 @@ async function handleCreateListing() {
                 address,
                 category_slug: category,
                 price_outside_kigali: priceOutsideKigali,
-                rooms,
-                bathrooms,
-                beds,
-                max_guests: maxGuests,
-                floor_area: floorArea,
-                amenities_data: amenitiesData,
+                room_count:      roomCount,
+                bathroom_count:  bathCount,
+                bed_count:       bedCount,
+                max_guests:      maxGuests,
+                floor_area_sqm:  floorArea,
+                vehicle_specs:   vehicleSpecs,
+                max_passengers:  maxPassengers,
+                amenities_data:  amenitiesData,
                 status: 'pending',
                 availability_status: 'available'
             }])
@@ -3274,7 +3357,7 @@ async function loadOwnerApplications() {
     try {
         const { data, error } = await _supabase
             .from('owner_applications')
-            .select('id, user_id, phone, status, answers, admin_note, created_at, profiles ( full_name, email )')
+            .select('id, user_id, phone, motivation, property_type, status, answers, admin_note, created_at, profiles ( full_name, email, phone )')
             .order('created_at', { ascending: false });
         if (error) throw error;
         if (!data || !data.length) {
@@ -3282,29 +3365,68 @@ async function loadOwnerApplications() {
             return;
         }
         container.innerHTML = '';
+
+        const answerLabels = {
+            listing_type:    'Listing type',
+            listing_count:   'Number of listings',
+            hosting_exp:     'Hosting experience',
+            has_docs:        'Ownership documents',
+            expected_income: 'Expected income',
+            description:     'Listing description',
+        };
+
         data.forEach(app => {
             const profile = app.profiles || {};
-            const statusColors = { pending: '#fff8e1', approved: '#e8f8f0', rejected: '#fdecea' };
+            const statusColors    = { pending: '#fff8e1', approved: '#e8f8f0', rejected: '#fdecea' };
             const statusTextColors = { pending: '#7c5c00', approved: '#1b7a3e', rejected: '#c0392b' };
+            const appPhone   = app.phone    || '—';
+            const profPhone  = profile.phone || '—';
+            const displayPhone = appPhone !== '—' ? appPhone : profPhone;
+
+            const answersHtml = (app.answers && typeof app.answers === 'object')
+                ? Object.entries(app.answers).map(([k, v]) =>
+                    `<div style="display:flex;gap:6px;align-items:baseline;margin:3px 0;">
+                        <span style="font-size:11px;font-weight:700;color:#888;min-width:130px;flex-shrink:0;">${escapeHtml(answerLabels[k] || k)}:</span>
+                        <span style="font-size:12px;color:#333;">${escapeHtml(String(v || '—'))}</span>
+                    </div>`
+                  ).join('')
+                : '';
+
+            const motivationHtml = app.motivation
+                ? `<div style="margin-top:8px;padding:10px 12px;background:#f8f8f8;border-radius:8px;font-size:12px;color:#555;line-height:1.5;border-left:3px solid #EB6753;">
+                     <strong style="color:#EB6753;font-size:11px;display:block;margin-bottom:4px;">WHY AFRISTAY</strong>
+                     ${escapeHtml(app.motivation)}
+                   </div>`
+                : '';
+
             const row = document.createElement('div');
-            row.style.cssText = 'background:#fff;border-radius:14px;padding:18px 20px;margin-bottom:12px;border:1px solid #f0f0f0;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;';
+            row.style.cssText = 'background:#fff;border-radius:14px;padding:20px;margin-bottom:14px;border:1px solid #f0f0f0;box-shadow:0 1px 4px rgba(0,0,0,0.04);';
             row.innerHTML =
-                '<div style="flex:1;min-width:200px;">' +
-                '<p style="font-weight:700;color:#1a1a1a;margin:0 0 3px;font-size:15px;">' + escapeHtml(profile.full_name || 'Unknown') + '</p>' +
-                '<p style="color:#aaa;font-size:12px;margin:0 0 8px;">' + escapeHtml(profile.email || '') + ' · ' + escapeHtml(app.phone || '') + '</p>' +
-                (app.answers && typeof app.answers === 'object'
-                    ? Object.entries(app.answers).slice(0,3).map(([k,v]) =>
-                        '<p style="font-size:12px;color:#555;margin:2px 0;"><strong>' + escapeHtml(k) + ':</strong> ' + escapeHtml(String(v||'')) + '</p>'
-                    ).join('')
-                    : '') +
-                '</div>' +
-                '<div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">' +
-                '<span style="padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;background:' + (statusColors[app.status] || '#f5f5f5') + ';color:' + (statusTextColors[app.status] || '#333') + ';">' + (app.status || 'pending') + '</span>' +
-                (app.status === 'pending'
-                    ? '<button onclick="handleOwnerApplication(\'' + app.id + '\',\'' + (app.user_id || '') + '\',\'approved\')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-check"></i> Approve</button>' +
-                      '<button onclick="handleOwnerApplication(\'' + app.id + '\',\'' + (app.user_id || '') + '\',\'rejected\')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-xmark"></i> Reject</button>'
-                    : '') +
-                '</div>';
+                `<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+                    <div style="flex:1;min-width:260px;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                            <div style="width:40px;height:40px;border-radius:50%;background:#EB6753;color:#fff;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${escapeHtml((profile.full_name || '?').charAt(0).toUpperCase())}</div>
+                            <div>
+                                <p style="font-weight:700;color:#1a1a1a;margin:0;font-size:15px;">${escapeHtml(profile.full_name || 'Unknown')}</p>
+                                <p style="color:#888;font-size:12px;margin:0;">${escapeHtml(profile.email || '—')}</p>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
+                            <span style="font-size:12px;color:#555;"><i class="fa-solid fa-phone" style="color:#EB6753;margin-right:4px;"></i>${escapeHtml(displayPhone)}</span>
+                            <span style="font-size:12px;color:#555;"><i class="fa-solid fa-calendar" style="color:#EB6753;margin-right:4px;"></i>${new Date(app.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>
+                            ${app.property_type ? `<span style="font-size:12px;color:#555;"><i class="fa-solid fa-tag" style="color:#EB6753;margin-right:4px;"></i>${escapeHtml(app.property_type)}</span>` : ''}
+                        </div>
+                        ${answersHtml ? `<div style="border-top:1px solid #f0f0f0;padding-top:10px;margin-top:4px;">${answersHtml}</div>` : ''}
+                        ${motivationHtml}
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">
+                        <span style="padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;background:${statusColors[app.status]||'#f5f5f5'};color:${statusTextColors[app.status]||'#333'};">${app.status||'pending'}</span>
+                        ${app.status === 'pending'
+                            ? `<button onclick="handleOwnerApplication('${app.id}','${app.user_id||''}','approved')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap;"><i class="fa-solid fa-check"></i> Approve</button>
+                               <button onclick="handleOwnerApplication('${app.id}','${app.user_id||''}','rejected')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap;"><i class="fa-solid fa-xmark"></i> Reject</button>`
+                            : ''}
+                    </div>
+                </div>`;
             container.appendChild(row);
         });
     } catch(err) {
@@ -3318,10 +3440,20 @@ async function handleOwnerApplication(appId, userId, newStatus) {
         // Update application status
         const { error: appErr } = await _supabase.from('owner_applications').update({ status: newStatus }).eq('id', appId);
         if (appErr) throw appErr;
-        // If approved, update user role to owner
+        // If approved: upgrade role + copy phone from application to profile
         if (newStatus === 'approved' && userId) {
-            const { error: profileErr } = await _supabase.from('profiles').update({ role: 'owner' }).eq('id', userId);
-            if (profileErr) console.warn('Profile role update:', profileErr.message);
+            // Fetch the application's phone number
+            const { data: appData } = await _supabase
+                .from('owner_applications')
+                .select('phone')
+                .eq('id', appId)
+                .single();
+
+            const profileUpdate = { role: 'owner' };
+            if (appData?.phone) profileUpdate.phone = appData.phone;
+
+            const { error: profileErr } = await _supabase.from('profiles').update(profileUpdate).eq('id', userId);
+            if (profileErr) console.warn('Profile update on approval:', profileErr.message);
         }
         logAudit({ action: 'owner_application_' + newStatus, entityType: 'user', entityId: userId, description: 'Owner application ' + newStatus + ' by admin', metadata: { app_id: appId } });
         toast(newStatus === 'approved' ? 'Applicant approved as owner!' : 'Application rejected.', newStatus === 'approved' ? 'success' : 'warning');
@@ -3334,12 +3466,19 @@ async function handleOwnerApplication(appId, userId, newStatus) {
 }
 window.handleOwnerApplication = handleOwnerApplication;
 
+// Stored for export
+let _attentionItemsCache = [];
+
 async function loadAttentionItems() {
     const container = document.getElementById('attentionContainer');
-    const badge = document.getElementById('attentionBadge');
+    const badge     = document.getElementById('attentionBadge');
     if (!container) return;
     container.innerHTML = '<div style="padding:20px;color:#aaa;font-size:13px;">Loading…</div>';
-    let items = [];
+
+    const fmtTs    = ts => new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const roleLabel = r => r === 'admin' ? 'Admin' : r === 'owner' ? 'Owner' : 'User';
+    const open = [], handled = [];
+
     try {
         // 1) Pending owner applications
         const { data: pendingApps } = await _supabase
@@ -3347,20 +3486,24 @@ async function loadAttentionItems() {
             .select('id, profiles ( full_name, email )')
             .eq('status', 'pending');
         (pendingApps || []).forEach(a => {
-            items.push({ icon: 'fa-solid fa-user-plus', color: '#3b82f6', bg: '#eff6ff',
+            open.push({ type: 'info', icon: 'fa-solid fa-user-plus', color: '#3b82f6', bg: '#eff6ff',
+                label: 'Owner Application',
                 text: '<strong>' + escapeHtml(a.profiles?.full_name || 'A user') + '</strong> applied to become an owner.',
+                plainText: (a.profiles?.full_name || 'A user') + ' applied to become an owner.',
                 action: '<button onclick="document.querySelector(\'[data-tab=owner-applications]\')?.click();loadOwnerApplications()" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Review</button>' });
         });
 
-        // 2) Owners with no phone number
-        const { data: noPhone } = await _supabase
-            .from('profiles')
-            .select('id, full_name, email')
-            .eq('role', 'owner')
-            .or('phone.is.null,phone.eq.');
-        (noPhone || []).slice(0, 5).forEach(p => {
-            items.push({ icon: 'fa-solid fa-phone-slash', color: '#f59e0b', bg: '#fffbeb',
+        // 2) Owners with no phone — two separate queries to avoid PostgREST .or() parsing issues
+        const [{ data: nullPhone }, { data: emptyPhone }] = await Promise.all([
+            _supabase.from('profiles').select('id, full_name, email').eq('role', 'owner').is('phone', null),
+            _supabase.from('profiles').select('id, full_name, email').eq('role', 'owner').eq('phone', ''),
+        ]);
+        const noPhone = [...(nullPhone || []), ...(emptyPhone || [])];
+        noPhone.slice(0, 5).forEach(p => {
+            open.push({ type: 'warning', icon: 'fa-solid fa-phone-slash', color: '#f59e0b', bg: '#fffbeb',
+                label: 'Missing Phone',
                 text: 'Owner <strong>' + escapeHtml(p.full_name || p.email || 'Unknown') + '</strong> has no phone number on file.',
+                plainText: 'Owner ' + (p.full_name || p.email || 'Unknown') + ' has no phone number on file.',
                 action: '' });
         });
 
@@ -3368,54 +3511,270 @@ async function loadAttentionItems() {
         const { count: pendingListings } = await _supabase
             .from('listings').select('id', { count: 'exact', head: true }).eq('status', 'pending');
         if (pendingListings > 0) {
-            items.push({ icon: 'fa-solid fa-list-check', color: '#8b5cf6', bg: '#f5f3ff',
+            open.push({ type: 'info', icon: 'fa-solid fa-list-check', color: '#8b5cf6', bg: '#f5f3ff',
+                label: 'Pending Listings',
                 text: '<strong>' + pendingListings + ' listing' + (pendingListings > 1 ? 's' : '') + '</strong> awaiting approval.',
+                plainText: pendingListings + ' listing(s) awaiting approval.',
                 action: '<button onclick="document.querySelector(\'[data-tab=listing-requests]\')?.click();loadListingRequests()" style="background:#f5f3ff;color:#8b5cf6;border:1px solid #ddd6fe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">Review</button>' });
         }
 
-        // 4) Error audit logs (most recent 10)
+        // 4) User-reported errors (last 48h) — split by handled
+        const since48h = new Date(Date.now() - 172800000).toISOString();
+        const { data: userErrors } = await _supabase
+            .from('error_reports')
+            .select('id, created_at, user_name, user_role, page, action, error_msg, handled_at')
+            .gte('created_at', since48h)
+            .order('created_at', { ascending: false })
+            .limit(30);
+
+        (userErrors || []).forEach(e => {
+            const who   = e.user_name ? `${roleLabel(e.user_role)} <strong>${escapeHtml(e.user_name)}</strong>` : `A ${roleLabel(e.user_role || 'user').toLowerCase()}`;
+            const where = e.page   ? ` on <em>${escapeHtml(e.page)}</em>` : '';
+            const what  = e.action ? ` while <em>${escapeHtml(e.action.replace(/_/g,' '))}</em>` : '';
+            const item  = {
+                type: 'error', source: 'error_report', sourceId: e.id,
+                icon: 'fa-solid fa-bug', color: '#dc2626', bg: '#fef2f2',
+                label: 'User Error',
+                text: `${who}${where}${what} encountered an error:<br><span style="font-size:12px;color:#c0392b;font-family:monospace;">${escapeHtml((e.error_msg||'').slice(0,200))}</span><br><span style="font-size:11px;color:#aaa;">${fmtTs(e.created_at)}</span>`,
+                plainText: (e.user_name || 'Unknown') + (e.page ? ' on ' + e.page : '') + ': ' + (e.error_msg || ''),
+                ts: e.created_at,
+                isError: true,
+            };
+            e.handled_at ? handled.push(item) : open.push(item);
+        });
+
+        // 5) Admin-action audit errors (last 48h) — split by handled
         const { data: errorLogs } = await _supabase
             .from('audit_logs')
-            .select('id, created_at, action, entity_type, entity_id, description, actor_role')
+            .select('id, created_at, action, entity_type, description, actor_role, handled_at')
             .eq('is_error', true)
+            .gte('created_at', since48h)
             .order('created_at', { ascending: false })
             .limit(10);
-        if (errorLogs?.length) {
-            const fmtTs = ts => new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            errorLogs.forEach(log => {
-                const label = (log.entity_type ? log.entity_type + ' ' : '') + (log.action || 'error');
-                items.push({
-                    icon: 'fa-solid fa-triangle-exclamation',
-                    color: '#dc2626',
-                    bg: '#fef2f2',
-                    text: '<strong style="color:#dc2626;">[Error] ' + escapeHtml(label) + '</strong>'
-                        + (log.description ? '<br><span style="font-size:12px;color:#666;">' + escapeHtml(log.description.slice(0, 220)) + '</span>' : '')
-                        + '<br><span style="font-size:11px;color:#aaa;">' + fmtTs(log.created_at) + (log.actor_role ? ' · ' + escapeHtml(log.actor_role) : '') + '</span>',
-                    action: '',
-                    isError: true,
-                });
-            });
-        }
 
-        if (badge) { badge.textContent = items.length; badge.style.display = items.length ? '' : 'none'; }
+        (errorLogs || []).forEach(log => {
+            const label = (log.entity_type ? log.entity_type + ' ' : '') + (log.action || 'error');
+            const item  = {
+                type: 'error', source: 'audit_log', sourceId: log.id,
+                icon: 'fa-solid fa-triangle-exclamation', color: '#f59e0b', bg: '#fffbeb',
+                label: 'Admin Error',
+                text: '<strong style="color:#b45309;">[Admin Error] ' + escapeHtml(label) + '</strong>'
+                    + (log.description ? '<br><span style="font-size:12px;color:#666;">' + escapeHtml(log.description.slice(0,220)) + '</span>' : '')
+                    + '<br><span style="font-size:11px;color:#aaa;">' + fmtTs(log.created_at) + (log.actor_role ? ' · ' + escapeHtml(log.actor_role) : '') + '</span>',
+                plainText: '[Admin Error] ' + label + (log.description ? ': ' + log.description : ''),
+                ts: log.created_at,
+                isError: true,
+            };
+            log.handled_at ? handled.push(item) : open.push(item);
+        });
 
-        if (!items.length) {
+        _attentionItemsCache = [...open, ...handled];
+
+        // Badge count = open items only
+        if (badge) { badge.textContent = open.length; badge.style.display = open.length ? '' : 'none'; }
+
+        if (!open.length && !handled.length) {
             container.innerHTML = '<div style="padding:40px;text-align:center;color:#aaa;font-size:14px;"><i class="fa-solid fa-circle-check" style="font-size:32px;color:#27ae60;display:block;margin-bottom:12px;"></i>All clear — nothing needs your attention right now.</div>';
             return;
         }
-        container.innerHTML = items.map(item =>
-            '<div style="display:flex;align-items:flex-start;gap:14px;background:' + (item.isError ? '#fff8f8' : '#fff') + ';border-radius:14px;padding:16px 18px;margin-bottom:10px;border:1px solid ' + (item.isError ? '#fecaca' : '#f0f0f0') + ';">' +
-            '<div style="width:38px;height:38px;border-radius:10px;background:' + item.bg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
-            '<i class="' + item.icon + '" style="color:' + item.color + ';font-size:16px;"></i></div>' +
-            '<div style="flex:1;font-size:13px;color:#444;line-height:1.7;">' + item.text + '</div>' +
-            (item.action ? '<div style="flex-shrink:0;">' + item.action + '</div>' : '') +
-            '</div>'
-        ).join('');
+
+        function renderItem(item, isHandled) {
+            const bg     = isHandled ? '#f9f9f9' : (item.isError ? '#fff8f8' : '#fff');
+            const border = isHandled ? '#ebebeb'  : (item.isError ? '#fecaca' : '#f0f0f0');
+            const handleBtn = (!isHandled && item.source)
+                ? `<button onclick="markAttentionHandled('${item.source}','${item.sourceId}')" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;white-space:nowrap;"><i class="fa-solid fa-circle-check"></i> Mark Fixed</button>`
+                : (isHandled ? '<span style="font-size:11px;color:#aaa;font-weight:600;white-space:nowrap;"><i class="fa-solid fa-circle-check" style="color:#27ae60;margin-right:3px;"></i>Handled</span>' : '');
+            return `<div style="display:flex;align-items:flex-start;gap:14px;background:${bg};border-radius:14px;padding:16px 18px;margin-bottom:10px;border:1px solid ${border};${isHandled ? 'opacity:0.65;' : ''}">
+                <div style="width:38px;height:38px;border-radius:10px;background:${item.bg};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="${item.icon}" style="color:${item.color};font-size:16px;"></i>
+                </div>
+                <div style="flex:1;font-size:13px;color:${isHandled ? '#888' : '#444'};line-height:1.7;">${item.text}</div>
+                <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;">
+                    ${item.action || ''}
+                    ${handleBtn}
+                </div>
+            </div>`;
+        }
+
+        let html = open.map(i => renderItem(i, false)).join('');
+        if (handled.length) {
+            html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#bbb;margin:18px 0 8px;">Handled / Fixed</div>`;
+            html += handled.map(i => renderItem(i, true)).join('');
+        }
+        container.innerHTML = html;
+
     } catch(err) {
         container.innerHTML = '<div style="color:red;padding:20px;">' + err.message + '</div>';
     }
 }
 window.loadAttentionItems = loadAttentionItems;
+
+// Mark an error item as handled (doesn't delete it)
+window.markAttentionHandled = async function(source, id) {
+    try {
+        const table = source === 'error_report' ? 'error_reports' : 'audit_logs';
+        const { error } = await _supabase.from(table).update({
+            handled_at: new Date().toISOString(),
+            handled_by: CURRENT_PROFILE?.id || null,
+        }).eq('id', id);
+        if (error) throw error;
+        toast('Marked as fixed.', 'success');
+        loadAttentionItems();
+    } catch(err) {
+        toast('Failed: ' + err.message, 'error');
+    }
+};
+
+// Export attention items as CSV or PDF
+window.exportAttention = function(format) {
+    const items = _attentionItemsCache;
+    if (!items.length) { toast('Nothing to export.', 'warning'); return; }
+
+    const date = new Date().toISOString().slice(0,10);
+
+    if (format === 'csv') {
+        const headers = ['Type', 'Label', 'Description', 'Timestamp', 'Status'];
+        const rows = items.map(i => [
+            '"' + (i.type || '').replace(/"/g,'""') + '"',
+            '"' + (i.label || '').replace(/"/g,'""') + '"',
+            '"' + (i.plainText || '').replace(/"/g,'""') + '"',
+            i.ts ? '"' + new Date(i.ts).toLocaleString() + '"' : '""',
+            i.handled_at ? 'Handled' : 'Open',
+        ]);
+        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `AfriStay-Attention-${date}.csv`;
+        a.click(); URL.revokeObjectURL(url);
+        toast('Exported as CSV!', 'success');
+
+    } else if (format === 'pdf') {
+        const jsPDF = window.jsPDF || window.jspdf?.jsPDF;
+        if (!jsPDF) { toast('PDF library not loaded on this page.', 'error'); return; }
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const W = doc.internal.pageSize.width;
+        doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+        doc.text('AfriStay — Attention Report', W / 2, 18, { align: 'center' });
+        doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+        doc.text('Generated: ' + new Date().toLocaleString(), W / 2, 25, { align: 'center' });
+        if (typeof doc.autoTable === 'function') {
+            doc.autoTable({
+                startY: 30,
+                head: [['Type', 'Label', 'Description', 'Time', 'Status']],
+                body: items.map(i => [
+                    i.type || '', i.label || '',
+                    (i.plainText || '').slice(0, 120),
+                    i.ts ? new Date(i.ts).toLocaleString() : '',
+                    i.handled_at ? 'Handled' : 'Open',
+                ]),
+                styles: { fontSize: 8, cellPadding: 3 },
+                headStyles: { fillColor: [235, 103, 83] },
+                alternateRowStyles: { fillColor: [250, 250, 250] },
+            });
+        }
+        doc.save(`AfriStay-Attention-${date}.pdf`);
+        toast('Exported as PDF!', 'success');
+    }
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   SITE HEALTH GRAPH
+   Renders a Chart.js line graph of error_reports per day (30 days)
+   ═══════════════════════════════════════════════════════════════ */
+let _siteHealthChart = null;
+async function loadSiteHealthGraph() {
+    const canvas  = document.getElementById('siteHealthChart');
+    const statsEl = document.getElementById('siteHealthStats');
+    if (!canvas) return;
+
+    try {
+        const since30d = new Date(Date.now() - 30 * 86400000).toISOString();
+        const { data: rows } = await _supabase
+            .from('error_reports')
+            .select('created_at, user_role, page')
+            .gte('created_at', since30d)
+            .order('created_at', { ascending: true });
+
+        // Aggregate by day
+        const byDay = {};
+        const byRole = { user: 0, owner: 0, admin: 0, other: 0 };
+        const byPage = {};
+        (rows || []).forEach(r => {
+            const day = r.created_at.slice(0, 10);
+            byDay[day] = (byDay[day] || 0) + 1;
+            const role = r.user_role || 'other';
+            byRole[role] = (byRole[role] || 0) + 1;
+            const pg = r.page || 'unknown';
+            byPage[pg] = (byPage[pg] || 0) + 1;
+        });
+
+        // Build labels for last 30 days
+        const labels = [], counts = [];
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 86400000);
+            const key = d.toISOString().slice(0, 10);
+            labels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            counts.push(byDay[key] || 0);
+        }
+
+        const total = (rows || []).length;
+
+        // Destroy old chart instance if it exists
+        if (_siteHealthChart) { _siteHealthChart.destroy(); _siteHealthChart = null; }
+
+        _siteHealthChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Errors',
+                    data: counts,
+                    borderColor: '#EB6753',
+                    backgroundColor: 'rgba(235,103,83,0.08)',
+                    borderWidth: 2.5,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#EB6753',
+                    tension: 0.35,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: '#f0f0f0' } },
+                    x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } }
+                }
+            }
+        });
+
+        // Top pages
+        const topPages = Object.entries(byPage).sort((a,b) => b[1]-a[1]).slice(0,3);
+        if (statsEl) {
+            statsEl.innerHTML = [
+                { label: 'Total (30d)', value: total, color: '#EB6753' },
+                { label: 'Users',       value: byRole.user,  color: '#3b82f6' },
+                { label: 'Owners',      value: byRole.owner, color: '#8b5cf6' },
+                { label: 'Admins',      value: byRole.admin, color: '#f59e0b' },
+            ].map(s =>
+                `<div style="background:#f9f9f9;border-radius:10px;padding:10px 16px;text-align:center;min-width:80px;">
+                    <div style="font-size:22px;font-weight:800;color:${s.color};">${s.value}</div>
+                    <div style="font-size:11px;color:#aaa;font-weight:600;margin-top:2px;">${s.label}</div>
+                </div>`
+            ).join('') +
+            (topPages.length ? `<div style="background:#f9f9f9;border-radius:10px;padding:10px 16px;min-width:160px;">
+                <div style="font-size:11px;color:#aaa;font-weight:700;margin-bottom:6px;">TOP ERROR PAGES</div>
+                ${topPages.map(([pg, ct]) => `<div style="font-size:12px;color:#555;margin:2px 0;"><strong>${ct}×</strong> ${escapeHtml(pg)}</div>`).join('')}
+            </div>` : '');
+        }
+    } catch(err) {
+        console.error('[SITE HEALTH]', err);
+        if (canvas) canvas.parentElement.innerHTML = `<p style="color:#e57373;font-size:13px;">Failed to load graph: ${err.message}</p>`;
+    }
+}
+window.loadSiteHealthGraph = loadSiteHealthGraph;
 
 async function rejectListingRequest(listingId, btn) {
     if (!confirm('Reject and delete this listing request?')) return;
@@ -4013,6 +4372,13 @@ window.handleUrlActions   = handleUrlActions;
    EARNINGS TAB (owner)
    ═══════════════════════════════════════════════════════════════ */
 async function loadEarnings() {
+    // Wait up to 3s for auth to complete before giving up
+    if (!CURRENT_PROFILE) {
+        await new Promise(r => setTimeout(r, 1500));
+    }
+    if (!CURRENT_PROFILE) {
+        await new Promise(r => setTimeout(r, 1500));
+    }
     if (CURRENT_ROLE !== 'owner' || !CURRENT_PROFILE) {
         const sec = document.getElementById('earningsPayoutSection');
         if (sec) sec.innerHTML = '<p style="color:#bbb;font-size:13px;text-align:center;padding:20px;">Sign in as an owner to view earnings.</p>';
@@ -4116,6 +4482,479 @@ async function loadPayoutHistory() {
 window.loadPayoutHistory = loadPayoutHistory;
 
 /* ═══════════════════════════════════════════════════════════════
+   ADMIN — RECEIPT SEARCH
+   ═══════════════════════════════════════════════════════════════ */
+window.loadReceiptsSearch = async function(page = 0) {
+    if (CURRENT_ROLE !== 'admin') return;
+
+    const tbody  = document.getElementById('rcptTableBody');
+    const pagDiv = document.getElementById('rcptPagination');
+    if (!tbody) return;
+
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:28px;color:#aaa;">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size:18px;margin-bottom:8px;display:block;"></i>Loading…</td></tr>`;
+
+    const search   = (document.getElementById('rcptSearch')?.value  || '').trim().toLowerCase();
+    const dateFrom = document.getElementById('rcptDateFrom')?.value || '';
+    const dateTo   = document.getElementById('rcptDateTo')?.value   || '';
+    const minAmt   = parseFloat(document.getElementById('rcptMinAmt')?.value);
+    const maxAmt   = parseFloat(document.getElementById('rcptMaxAmt')?.value);
+    const statusFl = document.getElementById('rcptStatus')?.value   || 'all';
+
+    try {
+        const PAGE_SIZE = 50;
+        const start     = page * PAGE_SIZE;
+
+        // Query bookings (source of truth) — all paid bookings have receipts whether
+        // stored in digital_receipts or generated on-the-fly.
+        // Join digital_receipts for stored data + cancellation info.
+        let query = _supabase
+            .from('bookings')
+            .select(`
+                id, booking_reference, guest_name, guest_email,
+                total_amount, currency, created_at, status,
+                listings(title),
+                digital_receipts(receipt_number, issued_at, cancelled_at, cancelled_by, cancellation_note)
+            `, { count: 'exact' })
+            .in('status', ['paid', 'confirmed', 'approved', 'completed'])
+            .order('created_at', { ascending: false });
+
+        // Server-side filters on bookings columns
+        if (dateFrom) query = query.gte('created_at', dateFrom);
+        if (dateTo)   query = query.lte('created_at', dateTo + 'T23:59:59');
+        if (!isNaN(minAmt)) query = query.gte('total_amount', minAmt);
+        if (!isNaN(maxAmt)) query = query.lte('total_amount', maxAmt);
+
+        if (search) {
+            query = query.limit(500);
+        } else {
+            query = query.range(start, start + PAGE_SIZE - 1);
+        }
+
+        const { data: rows, error, count } = await query;
+        if (error) throw error;
+
+        // Normalize: flatten digital_receipts (may be array or object depending on FK uniqueness)
+        let results = (rows || []).map(b => {
+            const dr = Array.isArray(b.digital_receipts) ? b.digital_receipts[0] : b.digital_receipts;
+            return {
+                booking_id:        b.id,
+                booking_reference: b.booking_reference,
+                guest_name:        b.guest_name,
+                guest_email:       b.guest_email,
+                total_amount:      b.total_amount,
+                currency:          b.currency || 'RWF',
+                listing_title:     b.listings?.title,
+                receipt_number:    dr?.receipt_number || ('RCP-' + b.id.slice(0, 8).toUpperCase()),
+                issued_at:         dr?.issued_at || b.created_at,
+                cancelled_at:      dr?.cancelled_at  || null,
+                cancelled_by:      dr?.cancelled_by  || null,
+                cancellation_note: dr?.cancellation_note || null,
+            };
+        });
+
+        // Client-side: cancelled status filter
+        if (statusFl === 'active')    results = results.filter(r => !r.cancelled_at);
+        if (statusFl === 'cancelled') results = results.filter(r =>  r.cancelled_at);
+
+        // Client-side: text search
+        if (search) {
+            results = results.filter(r =>
+                [r.receipt_number, r.booking_reference, r.guest_name, r.guest_email, r.listing_title]
+                    .some(v => (v || '').toLowerCase().includes(search))
+            );
+        }
+
+        if (!results.length) {
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:36px;color:#aaa;font-size:13px;">No receipts match your filters.</td></tr>`;
+            if (pagDiv) pagDiv.innerHTML = '';
+            return;
+        }
+
+        const fmt   = d => d ? new Date(d.includes('T') ? d : d + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
+        const money = (n, cur) => Number(n || 0).toLocaleString('en-RW') + ' ' + (cur || 'RWF');
+
+        tbody.innerHTML = results.map(r => {
+            const isCancelled = !!r.cancelled_at;
+            const badge       = isCancelled
+                ? `<span class="sb status-cancelled">Cancelled</span>`
+                : `<span class="sb status-confirmed">Active</span>`;
+            const cancelNote  = isCancelled
+                ? `<div style="font-size:10px;color:#aaa;margin-top:3px;">by ${escapeHtml(r.cancelled_by || '?')}</div>`
+                : '';
+            return `<tr>
+                <td><span style="font-family:monospace;font-size:12px;color:#EB6753;font-weight:700;">${escapeHtml(r.receipt_number)}</span></td>
+                <td style="font-family:monospace;font-size:12px;">${escapeHtml(r.booking_reference || '—')}</td>
+                <td>
+                    <div style="font-weight:600;font-size:13px;">${escapeHtml(r.guest_name || '—')}</div>
+                    <div style="font-size:11px;color:#aaa;">${escapeHtml(r.guest_email || '')}</div>
+                </td>
+                <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                    title="${escapeHtml(r.listing_title || '')}">${escapeHtml(r.listing_title || '—')}</td>
+                <td style="white-space:nowrap;font-size:13px;">${fmt(r.issued_at)}</td>
+                <td style="font-weight:700;white-space:nowrap;">${money(r.total_amount, r.currency)}</td>
+                <td>${badge}${cancelNote}</td>
+                <td style="white-space:nowrap;display:flex;gap:5px;flex-wrap:wrap;">
+                    <button class="btn-s" onclick="openReceiptPdf('${r.booking_id}')" title="Open in browser">
+                        <i class="fa-solid fa-eye"></i>
+                    </button>
+                    <button class="btn-s" onclick="downloadReceipt('${r.booking_id}')" title="Download PDF">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        // Pagination footer
+        if (pagDiv) {
+            if (!search && !statusFl || !search) {
+                const total = Math.ceil((count || 0) / PAGE_SIZE);
+                if (total > 1) {
+                    pagDiv.innerHTML = Array.from({ length: Math.min(total, 10) }, (_, i) =>
+                        `<button class="btn-s${i === page ? ' btn-p' : ''}" onclick="loadReceiptsSearch(${i})">${i + 1}</button>`
+                    ).join('');
+                } else {
+                    pagDiv.innerHTML = `<span style="font-size:12px;color:#aaa;">${results.length} receipt${results.length !== 1 ? 's' : ''}</span>`;
+                }
+            } else {
+                pagDiv.innerHTML = `<span style="font-size:12px;color:#aaa;">${results.length} result${results.length !== 1 ? 's' : ''} found</span>`;
+            }
+        }
+
+    } catch (err) {
+        console.error('[RECEIPTS]', err);
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:28px;color:#e74c3c;font-size:13px;">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+    }
+};
+
+/* ── Open receipt as PDF in a new browser tab ── */
+window.openReceiptPdf = async function(bookingId) {
+    // Re-uses downloadReceipt logic but opens in browser instead of downloading
+    toast('Preparing receipt…', 'info');
+    try {
+        // Build receipt data the same way downloadReceipt does
+        let receiptData = null;
+        const { data: dbReceipt } = await _supabase.from('digital_receipts').select('*').eq('booking_id', bookingId).maybeSingle();
+        if (dbReceipt) {
+            receiptData = dbReceipt;
+        } else {
+            const { data: booking } = await _supabase.from('bookings').select('*').eq('id', bookingId).single();
+            const { data: listing } = await _supabase.from('listings').select('title,price,price_display,currency,address,province_id,district_id,owner_id').eq('id', booking.listing_id).single();
+            const ownerRes = listing?.owner_id ? await _supabase.from('profiles').select('full_name').eq('id', listing.owner_id).single() : { data: null };
+            let location = listing?.address || 'Rwanda';
+            try {
+                const [{ data: dist }, { data: prov }] = await Promise.all([
+                    listing?.district_id ? _supabase.from('districts').select('name').eq('id', listing.district_id).single() : { data: null },
+                    listing?.province_id ? _supabase.from('provinces').select('name').eq('id', listing.province_id).single() : { data: null },
+                ]);
+                location = [dist?.name, prov?.name].filter(Boolean).join(', ') || location;
+            } catch {}
+            const nights = Math.max(1, Math.ceil((new Date(booking.end_date) - new Date(booking.start_date)) / 86400000));
+            const totalAmount = Number(booking.total_amount || 0);
+            const priceNight  = Number(listing?.price_display || listing?.price || (nights > 0 ? totalAmount / nights : 0) || 0);
+            receiptData = {
+                receipt_number: 'RCP-' + booking.id.slice(0,8).toUpperCase(),
+                listing_title: listing?.title || 'AfriStay Property',
+                listing_address: location,
+                check_in: booking.start_date, check_out: booking.end_date, nights,
+                price_per_night: priceNight, subtotal: priceNight * nights,
+                platform_fee: Math.round(totalAmount * 0.05), total_amount: totalAmount,
+                currency: listing?.currency || 'RWF', payment_method: booking.payment_method || 'unknown',
+                guest_name: booking.guest_name || '—', guest_email: booking.guest_email || '—',
+                guest_phone: booking.guest_phone || '—', owner_name: ownerRes.data?.full_name || 'Host',
+                issued_at: booking.created_at || new Date().toISOString(),
+            };
+        }
+        // Call downloadReceipt but intercept — simpler: just call downloadReceipt and let user deal with it
+        // Instead, open a data: URL in a new tab
+        if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
+            await new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                s.onload = res; s.onerror = rej; document.head.appendChild(s);
+            });
+        }
+        // Temporarily override doc.save to capture the blob instead
+        const { jsPDF } = window.jspdf || window;
+        // We build a minimal PDF for preview — just delegate to downloadReceipt
+        // but use jsPDF's output('bloburl') to open in tab
+        // Re-use the full build by borrowing it: trick — call downloadReceipt then cancel the download
+        // Better: build inline here using the same pipeline
+        await downloadReceipt(bookingId); // fallback: just download
+    } catch(err) {
+        console.error('[RECEIPT OPEN]', err);
+        await downloadReceipt(bookingId);
+    }
+};
+
+// Make openReceiptPdf actually open in browser using jsPDF output
+// Override: use jsPDF's blob URL approach
+window.openReceiptPdf = async function(bookingId) {
+    toast('Opening receipt…', 'info');
+    try {
+        let receiptData = null;
+        const { data: dbReceipt } = await _supabase.from('digital_receipts').select('*').eq('booking_id', bookingId).maybeSingle();
+        if (dbReceipt) {
+            receiptData = dbReceipt;
+        } else {
+            const { data: booking } = await _supabase.from('bookings').select('*').eq('id', bookingId).single();
+            const { data: listing } = await _supabase.from('listings').select('title,price,price_display,currency,address,province_id,district_id,owner_id').eq('id', booking.listing_id).single();
+            const ownerRes = listing?.owner_id ? await _supabase.from('profiles').select('full_name').eq('id', listing.owner_id).single() : { data: null };
+            let location = listing?.address || 'Rwanda';
+            try {
+                const [{ data: dist }, { data: prov }] = await Promise.all([
+                    listing?.district_id ? _supabase.from('districts').select('name').eq('id', listing.district_id).single() : { data: null },
+                    listing?.province_id ? _supabase.from('provinces').select('name').eq('id', listing.province_id).single() : { data: null },
+                ]);
+                location = [dist?.name, prov?.name].filter(Boolean).join(', ') || location;
+            } catch {}
+            const nights = Math.max(1, Math.ceil((new Date(booking.end_date) - new Date(booking.start_date)) / 86400000));
+            const totalAmount = Number(booking.total_amount || 0);
+            const priceNight  = Number(listing?.price_display || listing?.price || (nights > 0 ? totalAmount / nights : 0) || 0);
+            receiptData = {
+                receipt_number: 'RCP-' + booking.id.slice(0,8).toUpperCase(),
+                listing_title: listing?.title || 'AfriStay Property', listing_address: location,
+                check_in: booking.start_date, check_out: booking.end_date, nights,
+                price_per_night: priceNight, subtotal: priceNight * nights,
+                platform_fee: Math.round(totalAmount * 0.05), total_amount: totalAmount,
+                currency: listing?.currency || 'RWF', payment_method: booking.payment_method || 'unknown',
+                guest_name: booking.guest_name || '—', guest_email: booking.guest_email || '—',
+                guest_phone: booking.guest_phone || '—', owner_name: ownerRes.data?.full_name || 'Host',
+                issued_at: booking.created_at || new Date().toISOString(),
+            };
+        }
+
+        if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
+            await new Promise((res, rej) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                s.onload = res; s.onerror = rej; document.head.appendChild(s);
+            });
+        }
+        const { jsPDF } = window.jspdf || window;
+        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+        const W = doc.internal.pageSize.width;
+        const M = 18;
+        let y = 0;
+        const fmt   = d => d ? new Date(d + (d.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' }) : '—';
+        const money = n => Number(n||0).toLocaleString('en-RW') + ' ' + receiptData.currency;
+        const pmLabel = String(receiptData.payment_method||'').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+        const isCancelledReceipt = !!receiptData.cancelled_at;
+
+        doc.setFillColor(235, 103, 83); doc.rect(0, 0, W, 38, 'F');
+        doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(22);
+        doc.text('AfriStay', M, 16);
+        doc.setFontSize(9); doc.setFont('helvetica','normal');
+        doc.text("Rwanda's Premier Property Marketplace", M, 23);
+        doc.setFont('helvetica','bold'); doc.setFontSize(11);
+        doc.text('BOOKING RECEIPT', W-M, 16, { align:'right' });
+        doc.setFont('helvetica','normal'); doc.setFontSize(9);
+        doc.text(receiptData.receipt_number, W-M, 23, { align:'right' });
+        doc.text('Issued: ' + fmt(receiptData.issued_at || new Date().toISOString()), W-M, 29, { align:'right' });
+        y = 50;
+
+        if (isCancelledReceipt) { doc.setFillColor(254,226,226); doc.roundedRect(M,y-5,W-M*2,14,3,3,'F'); doc.setTextColor(185,28,28); }
+        else { doc.setFillColor(240,253,244); doc.roundedRect(M,y-5,W-M*2,14,3,3,'F'); doc.setTextColor(22,163,74); }
+        doc.setFont('helvetica','bold'); doc.setFontSize(10);
+        doc.text(isCancelledReceipt ? 'CANCELLED' : 'PAYMENT CONFIRMED', W/2, y+3, { align:'center' });
+        y += 18;
+
+        doc.setTextColor(22,22,22); doc.setFont('helvetica','bold'); doc.setFontSize(14);
+        doc.text(receiptData.listing_title, M, y); y+=6;
+        doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(120,120,120);
+        doc.text(receiptData.listing_address||'Rwanda', M, y); y+=12;
+
+        doc.setFillColor(250,250,250); doc.setDrawColor(232,232,232); doc.roundedRect(M,y,W-M*2,36,3,3,'FD');
+        const col1=M+8, col2=W/2+4;
+        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(180,180,180);
+        doc.text('CHECK-IN',col1,y+8); doc.text('CHECK-OUT',col2,y+8);
+        doc.text('DURATION',col1,y+22); doc.text('PAYMENT METHOD',col2,y+22);
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(22,22,22);
+        doc.text(fmt(receiptData.check_in),col1,y+15); doc.text(fmt(receiptData.check_out),col2,y+15);
+        doc.text(receiptData.nights+' night'+(receiptData.nights!==1?'s':''),col1,y+29);
+        doc.text(pmLabel,col2,y+29); y+=46;
+
+        doc.setFillColor(255,255,255); doc.setDrawColor(232,232,232); doc.roundedRect(M,y,W-M*2,54,3,3,'FD');
+        const unitLabel = receiptData.nights===1?'night':'nights';
+        const drawLine=(label,value,yy,bold=false,color=[22,22,22])=>{
+            doc.setFont('helvetica',bold?'bold':'normal'); doc.setFontSize(bold?10:9);
+            doc.setTextColor(...(bold?[22,22,22]:[100,100,100]));
+            doc.text(label,col1,yy); doc.setTextColor(...color);
+            doc.text(value,W-M-6,yy,{align:'right'});
+        };
+        drawLine('Rate per night', money(receiptData.price_per_night), y+12);
+        drawLine('x '+receiptData.nights+' '+unitLabel,'',y+12);
+        drawLine('Subtotal',money(receiptData.subtotal),y+22);
+        doc.setDrawColor(235,103,83); doc.setLineWidth(0.5); doc.line(col1,y+28,W-M-6,y+28);
+        drawLine('TOTAL AMOUNT',money(receiptData.total_amount),y+37,true,[235,103,83]);
+        y+=54;
+
+        const boxH=36;
+        doc.setDrawColor(232,232,232); doc.setLineWidth(0.3);
+        doc.roundedRect(M,y,(W-M*2)/2-4,boxH,3,3,'D'); doc.roundedRect(W/2+1,y,(W-M*2)/2-4,boxH,3,3,'D');
+        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(180,180,180);
+        doc.text('GUEST',M+6,y+9); doc.text('HOST',W/2+7,y+9);
+        doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(22,22,22);
+        doc.text(receiptData.guest_name||'—',M+6,y+17); doc.text(receiptData.owner_name||'—',W/2+7,y+17);
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(130,130,130);
+        doc.text(receiptData.guest_email||'—',M+6,y+24); doc.text(receiptData.guest_phone||'—',M+6,y+30);
+        y+=boxH+14;
+
+        if (isCancelledReceipt) {
+            const cancelFmt = receiptData.cancelled_at ? new Date(receiptData.cancelled_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+            const cancelLine = ['Cancelled by: '+(receiptData.cancelled_by||'Admin'), cancelFmt, receiptData.cancellation_note?'Reason: '+receiptData.cancellation_note:null].filter(Boolean).join('  ·  ');
+            if (y+18 < doc.internal.pageSize.height-22) {
+                doc.setFillColor(254,226,226); doc.roundedRect(M,y,W-M*2,14,3,3,'F');
+                doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(185,28,28);
+                doc.text(cancelLine,W/2,y+8,{align:'center'});
+            }
+            doc.setFont('helvetica','bold'); doc.setFontSize(68); doc.setTextColor(230,120,120);
+            doc.text('CANCELLED',W/2,doc.internal.pageSize.height/2+20,{align:'center',angle:45});
+        }
+
+        const pageH = doc.internal.pageSize.height;
+        doc.setFillColor(248,248,248); doc.rect(0,pageH-18,W,18,'F');
+        doc.setDrawColor(235,235,235); doc.line(0,pageH-18,W,pageH-18);
+        doc.setTextColor(170,170,170); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+        doc.text('Official AfriStay receipt · © '+new Date().getFullYear()+' AfriStay Ltd · afristay.rw', W/2, pageH-8, {align:'center'});
+
+        // Open in browser tab instead of downloading
+        const blob = doc.output('blob');
+        const url  = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        toast('Receipt opened in new tab.', 'success');
+    } catch(err) {
+        console.error('[RECEIPT OPEN]', err);
+        toast('Falling back to download…', 'info');
+        await downloadReceipt(bookingId);
+    }
+};
+
+/* ── Export receipts list as CSV or PDF ── */
+window.exportReceiptsList = async function(format) {
+    if (CURRENT_ROLE !== 'admin') return;
+    toast('Preparing export…', 'info');
+
+    try {
+        // Fetch all paid bookings with receipt info
+        const { data: rows, error } = await _supabase
+            .from('bookings')
+            .select(`
+                id, booking_reference, guest_name, guest_email,
+                total_amount, currency, created_at, status,
+                listings(title),
+                digital_receipts(receipt_number, issued_at, cancelled_at, cancelled_by, cancellation_note)
+            `)
+            .in('status', ['paid', 'confirmed', 'approved', 'completed'])
+            .order('created_at', { ascending: false })
+            .limit(2000);
+
+        if (error) throw error;
+
+        const results = (rows || []).map(b => {
+            const dr = Array.isArray(b.digital_receipts) ? b.digital_receipts[0] : b.digital_receipts;
+            return {
+                receipt_number:    dr?.receipt_number    || 'RCP-' + b.id.slice(0,8).toUpperCase(),
+                booking_reference: b.booking_reference   || b.id.slice(0,8).toUpperCase(),
+                guest_name:        b.guest_name          || '—',
+                guest_email:       b.guest_email         || '—',
+                listing_title:     b.listings?.title     || '—',
+                issued_date:       (dr?.issued_at || b.created_at || '').slice(0, 10),
+                total_amount:      Number(b.total_amount || 0),
+                currency:          b.currency            || 'RWF',
+                booking_status:    b.status              || '—',
+                receipt_status:    dr?.cancelled_at ? 'Cancelled' : 'Active',
+                cancelled_by:      dr?.cancelled_by      || '',
+                cancellation_note: dr?.cancellation_note || '',
+                booking_id:        b.id,
+            };
+        });
+
+        const dateStr = new Date().toISOString().slice(0, 10);
+
+        if (format === 'csv') {
+            const headers = ['Receipt #','Booking Ref','Guest Name','Guest Email','Property','Date Issued','Amount','Currency','Booking Status','Receipt Status','Cancelled By','Cancellation Note','Booking ID'];
+            const csvRows = [
+                headers.join(','),
+                ...results.map(r => [
+                    r.receipt_number, r.booking_reference, r.guest_name, r.guest_email,
+                    r.listing_title, r.issued_date, r.total_amount, r.currency,
+                    r.booking_status, r.receipt_status, r.cancelled_by, r.cancellation_note, r.booking_id,
+                ].map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvRows], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'AfriStay-Receipts-' + dateStr + '.csv';
+            a.click();
+            URL.revokeObjectURL(a.href);
+            toast('CSV exported!', 'success');
+
+        } else {
+            // PDF list
+            if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
+                await new Promise((res, rej) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+                });
+            }
+            if (typeof window.jspdf?.plugin?.autotable === 'undefined') {
+                await new Promise((res, rej) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+                    s.onload = res; s.onerror = rej; document.head.appendChild(s);
+                });
+            }
+            const { jsPDF } = window.jspdf || window;
+            const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+            const W = doc.internal.pageSize.width;
+
+            // Header band
+            doc.setFillColor(235, 103, 83); doc.rect(0, 0, W, 20, 'F');
+            doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(14);
+            doc.text('AfriStay — Receipts Export', 14, 13);
+            doc.setFont('helvetica','normal'); doc.setFontSize(9);
+            doc.text('Generated: ' + new Date().toLocaleDateString('en-US', { weekday:'short', month:'long', day:'numeric', year:'numeric' }), W-14, 13, { align:'right' });
+
+            doc.autoTable({
+                startY: 26,
+                head: [['Receipt #','Booking Ref','Guest','Email','Property','Date','Amount','Status','Booking Status']],
+                body: results.map(r => [
+                    r.receipt_number,
+                    r.booking_reference,
+                    r.guest_name,
+                    r.guest_email,
+                    r.listing_title,
+                    r.issued_date,
+                    Number(r.total_amount).toLocaleString('en-RW') + ' ' + r.currency,
+                    r.receipt_status,
+                    r.booking_status,
+                ]),
+                styles: { fontSize: 8, cellPadding: 3 },
+                headStyles: { fillColor: [235, 103, 83], textColor: 255, fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [250, 250, 250] },
+                didParseCell: (data) => {
+                    if (data.section === 'body' && data.column.index === 7) {
+                        const val = data.cell.raw;
+                        if (val === 'Cancelled') data.cell.styles.textColor = [185, 28, 28];
+                        else data.cell.styles.textColor = [22, 163, 74];
+                    }
+                },
+            });
+
+            doc.save('AfriStay-Receipts-' + dateStr + '.pdf');
+            toast('PDF exported!', 'success');
+        }
+    } catch(err) {
+        console.error('[EXPORT RECEIPTS]', err);
+        toast('Export failed: ' + err.message, 'error');
+    }
+};
+
+/* ═══════════════════════════════════════════════════════════════
    RECEIPT DOWNLOAD — pulls from digital_receipts table first,
    falls back to generating from booking data
    ═══════════════════════════════════════════════════════════════ */
@@ -4147,9 +4986,14 @@ window.downloadReceipt = async function(bookingId) {
 
             // Try to generate via Edge Function (will also save it)
             try {
+                const { data: { session: rSession } } = await _supabase.auth.getSession();
                 const res = await fetch(CONFIG.FUNCTIONS_BASE + '/generate-receipt', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type':  'application/json',
+                        'Authorization': 'Bearer ' + (rSession?.access_token || ''),
+                        'apikey':        CONFIG.SUPABASE_KEY,
+                    },
                     body: JSON.stringify({ booking_id: bookingId }),
                 });
                 const data = await res.json();
@@ -4161,7 +5005,7 @@ window.downloadReceipt = async function(bookingId) {
             // Fallback: build from raw booking data
             if (!receiptData) {
                 const { data: booking }  = await _supabase.from('bookings').select('*').eq('id', bookingId).single();
-                const { data: listing }  = await _supabase.from('listings').select('title,price,currency,address,province_id,district_id,owner_id').eq('id', booking.listing_id).single();
+                const { data: listing }  = await _supabase.from('listings').select('title,price,price_display,currency,address,province_id,district_id,owner_id').eq('id', booking.listing_id).single();
                 const ownerRes = listing?.owner_id
                     ? await _supabase.from('profiles').select('full_name,email,phone').eq('id', listing.owner_id).single()
                     : { data: null };
@@ -4176,9 +5020,9 @@ window.downloadReceipt = async function(bookingId) {
                     location = [dist?.name, prov?.name].filter(Boolean).join(', ') || location;
                 } catch {}
 
-                const nights      = Math.ceil((new Date(booking.end_date) - new Date(booking.start_date)) / 86400000);
+                const nights      = Math.max(1, Math.ceil((new Date(booking.end_date) - new Date(booking.start_date)) / 86400000));
                 const totalAmount = Number(booking.total_amount || 0);
-                const priceNight  = Number(listing?.price || totalAmount / nights || 0);
+                const priceNight  = Number(listing?.price_display || listing?.price || (nights > 0 ? totalAmount / nights : 0) || 0);
                 const platformFee = Math.round(totalAmount * 0.05);
 
                 receiptData = {
@@ -4200,6 +5044,32 @@ window.downloadReceipt = async function(bookingId) {
                     owner_name:      owner?.full_name || 'Host',
                     issued_at:       booking.created_at || new Date().toISOString(),
                 };
+
+                // Persist to digital_receipts so admin search tab can find it
+                _supabase.from('digital_receipts').upsert({
+                    booking_id:      bookingId,
+                    receipt_number:  receiptData.receipt_number,
+                    guest_id:        booking.user_id || null,
+                    listing_id:      booking.listing_id || null,
+                    listing_title:   receiptData.listing_title,
+                    listing_address: receiptData.listing_address,
+                    check_in:        receiptData.check_in,
+                    check_out:       receiptData.check_out,
+                    nights:          receiptData.nights,
+                    price_per_night: receiptData.price_per_night,
+                    subtotal:        receiptData.subtotal,
+                    platform_fee:    receiptData.platform_fee,
+                    total_amount:    receiptData.total_amount,
+                    currency:        receiptData.currency,
+                    payment_method:  receiptData.payment_method,
+                    guest_name:      receiptData.guest_name,
+                    guest_email:     receiptData.guest_email,
+                    guest_phone:     receiptData.guest_phone,
+                    owner_name:      receiptData.owner_name,
+                    issued_at:       receiptData.issued_at,
+                    user_id:         booking.user_id || null,
+                }, { onConflict: 'booking_id', ignoreDuplicates: true })
+                    .then(({ error: uErr }) => { if (uErr) console.warn('[RECEIPT] Save skipped:', uErr.message); });
             }
         }
 
@@ -4246,13 +5116,20 @@ window.downloadReceipt = async function(bookingId) {
         doc.text('Issued: ' + fmt(receiptData.issued_at || new Date().toISOString()), W - M, 29, { align: 'right' });
         y = 50;
 
-        // ── Green status badge ────────────────────────────────────
-        doc.setFillColor(240, 253, 244);
-        doc.roundedRect(M, y - 5, W - M * 2, 14, 3, 3, 'F');
-        doc.setTextColor(22, 163, 74);
+        // ── Status badge (green = confirmed, red = cancelled) ─────
+        const isCancelledReceipt = !!receiptData.cancelled_at;
+        if (isCancelledReceipt) {
+            doc.setFillColor(254, 226, 226);
+            doc.roundedRect(M, y - 5, W - M * 2, 14, 3, 3, 'F');
+            doc.setTextColor(185, 28, 28);
+        } else {
+            doc.setFillColor(240, 253, 244);
+            doc.roundedRect(M, y - 5, W - M * 2, 14, 3, 3, 'F');
+            doc.setTextColor(22, 163, 74);
+        }
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
-        doc.text('✓  PAYMENT CONFIRMED', W / 2, y + 3, { align: 'center' });
+        doc.text(isCancelledReceipt ? 'CANCELLED' : 'PAYMENT CONFIRMED', W / 2, y + 3, { align: 'center' });
         y += 18;
 
         // ── Property info ─────────────────────────────────────────
@@ -4296,8 +5173,9 @@ window.downloadReceipt = async function(bookingId) {
             doc.setTextColor(...color);
             doc.text(value, W - M - 6, yy, { align: 'right' });
         };
+        const unitLabel = receiptData.nights === 1 ? 'night' : 'nights';
         drawLine('Rate per night',  money(receiptData.price_per_night),  y + 12);
-        drawLine('× ' + receiptData.nights + ' nights', '',              y + 12); // already shown
+        drawLine('x ' + receiptData.nights + ' ' + unitLabel, '',        y + 12);
         drawLine('Subtotal',     money(receiptData.subtotal),        y + 22);
 
         // Divider
@@ -4331,6 +5209,33 @@ window.downloadReceipt = async function(bookingId) {
         doc.setDrawColor(235,235,235); doc.line(0, pageH - 18, W, pageH - 18);
         doc.setTextColor(170,170,170); doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
         doc.text('Official AfriStay receipt · © ' + new Date().getFullYear() + ' AfriStay Ltd · afristay.rw · support@afristay.rw', W / 2, pageH - 8, { align: 'center' });
+
+        // ── Cancelled: add info note + diagonal stamp ─────────────
+        if (isCancelledReceipt) {
+            const cancelFmt = receiptData.cancelled_at
+                ? new Date(receiptData.cancelled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : '';
+            const cancelLine = [
+                'Cancelled by: ' + (receiptData.cancelled_by || 'Admin'),
+                cancelFmt,
+                receiptData.cancellation_note ? 'Reason: ' + receiptData.cancellation_note : null,
+            ].filter(Boolean).join('  ·  ');
+
+            if (y + 18 < pageH - 22) {
+                doc.setFillColor(254, 226, 226);
+                doc.roundedRect(M, y, W - M * 2, 14, 3, 3, 'F');
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(185, 28, 28);
+                doc.text(cancelLine, W / 2, y + 8, { align: 'center' });
+            }
+
+            // Diagonal CANCELLED stamp across the page
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(68);
+            doc.setTextColor(230, 120, 120);
+            doc.text('CANCELLED', W / 2, doc.internal.pageSize.height / 2 + 20, { align: 'center', angle: 45 });
+        }
 
         doc.save('AfriStay-Receipt-' + receiptData.receipt_number + '.pdf');
         toast('📄 Receipt downloaded!', 'success');
@@ -4833,7 +5738,7 @@ window.drawRevenueChart = function() {
 /* ═══════════════════════════════════════════════════════════════
    CSV EXPORTS — Users & Bookings
    ═══════════════════════════════════════════════════════════════ */
-window.exportUsers = async function() {
+window.exportUsers = async function(format = 'csv') {
     if (CURRENT_ROLE !== 'admin') { toast('Admin only', 'error'); return; }
     toast('Preparing users export…', 'info', 2000);
     try {
@@ -4847,28 +5752,49 @@ window.exportUsers = async function() {
         const headers = ['#', 'Name', 'Email', 'Phone', 'Role', 'Banned', 'Joined'];
         const rows = (data || []).map((u, i) => [
             i + 1,
-            '"' + (u.full_name || '').replace(/"/g, '""') + '"',
+            u.full_name || '',
             u.email || '',
             u.phone || '',
             u.role || '',
             u.banned ? 'Yes' : 'No',
             (u.created_at || '').slice(0, 10),
         ]);
-        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'AfriStay-Users-' + new Date().toISOString().slice(0, 10) + '.csv';
-        a.click(); URL.revokeObjectURL(url);
-        toast('Users CSV exported!', 'success');
-        logAudit({ action: 'export_users_csv', entityType: 'profile', description: `Exported ${(data||[]).length} users as CSV` });
+        const dateStr = new Date().toISOString().slice(0, 10);
+
+        if (format === 'pdf') {
+            if (!window.jspdf) { toast('PDF library not loaded', 'error'); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape' });
+            doc.setFontSize(14);
+            doc.text('AfriStay — Users Export (' + dateStr + ')', 14, 15);
+            doc.autoTable({
+                head: [headers],
+                body: rows,
+                startY: 22,
+                styles: { fontSize: 8, cellPadding: 2 },
+                headStyles: { fillColor: [22, 163, 74] },
+            });
+            doc.save('AfriStay-Users-' + dateStr + '.pdf');
+            toast('Users PDF exported!', 'success');
+            logAudit({ action: 'export_users_pdf', entityType: 'profile', description: `Exported ${(data||[]).length} users as PDF` });
+        } else {
+            const csvRows = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(','));
+            const csv = [headers.join(','), ...csvRows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'AfriStay-Users-' + dateStr + '.csv';
+            a.click(); URL.revokeObjectURL(url);
+            toast('Users CSV exported!', 'success');
+            logAudit({ action: 'export_users_csv', entityType: 'profile', description: `Exported ${(data||[]).length} users as CSV` });
+        }
     } catch(err) {
         toast('Export failed: ' + err.message, 'error');
-        logAudit({ action: 'export_users_csv', description: 'CSV export error: ' + err.message, isError: true });
+        logAudit({ action: 'export_users_' + format, description: 'Export error: ' + err.message, isError: true });
     }
 };
 
-window.exportBookings = async function() {
+window.exportBookings = async function(format = 'csv') {
     if (CURRENT_ROLE !== 'admin') { toast('Admin only', 'error'); return; }
     toast('Preparing bookings export…', 'info', 2000);
     try {
@@ -4883,8 +5809,8 @@ window.exportBookings = async function() {
         const rows = (data || []).map((b, i) => [
             i + 1,
             b.id,
-            b.listing_id,
-            '"' + (b.guest_name || '').replace(/"/g, '""') + '"',
+            b.listing_id || '',
+            b.guest_name || '',
             b.guest_email || '',
             b.start_date || '',
             b.end_date || '',
@@ -4893,17 +5819,39 @@ window.exportBookings = async function() {
             (b.payment_method || '').replace(/_/g, ' '),
             (b.created_at || '').slice(0, 10),
         ]);
-        const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url; a.download = 'AfriStay-Bookings-' + new Date().toISOString().slice(0, 10) + '.csv';
-        a.click(); URL.revokeObjectURL(url);
-        toast('Bookings CSV exported!', 'success');
-        logAudit({ action: 'export_bookings_csv', entityType: 'booking', description: `Exported ${(data||[]).length} bookings as CSV` });
+        const dateStr = new Date().toISOString().slice(0, 10);
+
+        if (format === 'pdf') {
+            if (!window.jspdf) { toast('PDF library not loaded', 'error'); return; }
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape' });
+            doc.setFontSize(14);
+            doc.text('AfriStay — Bookings Export (' + dateStr + ')', 14, 15);
+            doc.autoTable({
+                head: [headers],
+                body: rows,
+                startY: 22,
+                styles: { fontSize: 7, cellPadding: 2 },
+                headStyles: { fillColor: [22, 163, 74] },
+                columnStyles: { 1: { cellWidth: 28 }, 2: { cellWidth: 28 } },
+            });
+            doc.save('AfriStay-Bookings-' + dateStr + '.pdf');
+            toast('Bookings PDF exported!', 'success');
+            logAudit({ action: 'export_bookings_pdf', entityType: 'booking', description: `Exported ${(data||[]).length} bookings as PDF` });
+        } else {
+            const csvRows = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(','));
+            const csv = [headers.join(','), ...csvRows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'AfriStay-Bookings-' + dateStr + '.csv';
+            a.click(); URL.revokeObjectURL(url);
+            toast('Bookings CSV exported!', 'success');
+            logAudit({ action: 'export_bookings_csv', entityType: 'booking', description: `Exported ${(data||[]).length} bookings as CSV` });
+        }
     } catch(err) {
         toast('Export failed: ' + err.message, 'error');
-        logAudit({ action: 'export_bookings_csv', description: 'CSV export error: ' + err.message, isError: true });
+        logAudit({ action: 'export_bookings_' + format, description: 'Export error: ' + err.message, isError: true });
     }
 };
 
@@ -5095,6 +6043,7 @@ window.triggerPayout = async function() {
     try {
         const { error } = await _supabase.from('payouts').insert({
             owner_id:       ownerId,
+            gross_amount:   amount,
             payout_amount:  amount,
             currency:       'RWF',
             status:         'pending',

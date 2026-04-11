@@ -514,3 +514,56 @@ window.syncPendingFavorites = async function(userId) {
         console.error('❌ [FAV] Sync failed:', result.error.message);
     }
 };
+
+/* ─────────────────────────────────────────
+   GLOBAL ERROR REPORTING
+   Sends unhandled errors + rejections to error_reports table
+   so admins see them in the Attention tab.
+   ───────────────────────────────────────── */
+(function setupGlobalErrorReporting() {
+    let _errThrottle = 0; // prevent flooding on rapid errors
+
+    async function _sendErrorReport(page, action, errorMsg, stack) {
+        const now = Date.now();
+        if (now - _errThrottle < 3000) return; // max 1 report per 3s
+        _errThrottle = now;
+
+        const sb = window.supabaseClient;
+        if (!sb) return;
+
+        const { data: { user } } = await sb.auth.getUser().catch(() => ({ data: { user: null } }));
+        const profile = window.CURRENT_PROFILE || null;
+
+        try {
+            await sb.from('error_reports').insert({
+                user_id:    user?.id   || null,
+                user_name:  profile?.full_name || user?.email || null,
+                user_role:  profile?.role || 'user',
+                page:       page || window.location.pathname,
+                action:     action || null,
+                error_msg:  String(errorMsg).slice(0, 500),
+                stack:      stack ? String(stack).slice(0, 1000) : null,
+                user_agent: navigator.userAgent.slice(0, 200),
+            });
+        } catch (_) { /* silently fail — don't loop */ }
+    }
+
+    // Expose for manual reporting from any page
+    window.reportSiteError = function(action, errorMsg, stack) {
+        _sendErrorReport(window.location.pathname, action, errorMsg, stack);
+    };
+
+    // Catch unhandled JS errors
+    window.addEventListener('error', (e) => {
+        if (!e.error || e.filename?.includes('extension')) return; // skip browser extension errors
+        _sendErrorReport(window.location.pathname, 'unhandled_error', e.message, e.error?.stack);
+    });
+
+    // Catch unhandled Promise rejections
+    window.addEventListener('unhandledrejection', (e) => {
+        const msg = e.reason?.message || String(e.reason);
+        const stack = e.reason?.stack || null;
+        if (!msg || msg === 'undefined') return;
+        _sendErrorReport(window.location.pathname, 'unhandled_rejection', msg, stack);
+    });
+})();

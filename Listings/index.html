@@ -13,6 +13,11 @@
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="description" content="Browse verified homes, properties and vehicles available for rent across Rwanda. Filter by province, district and category.">
+    <link rel="preconnect" href="https://xuxzeinufjpplxkerlsd.supabase.co">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Oleo+Script+Swash+Caps:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/Style/style.css">
@@ -669,6 +674,19 @@
         const countEl = document.getElementById('resultsCount');
         const heading = document.getElementById('gridHeading');
         let activeCat = '';
+
+        // ── In-memory location name caches (persist for page lifetime) ──
+        const _pvNameCache = {};
+        const _dtNameCache = {};
+
+        // ── sessionStorage cache helpers ──
+        const SS_TTL = 60 * 60 * 1000; // 1 hour
+        function ssGet(key) {
+            try { const r = sessionStorage.getItem(key); if (!r) return null; const { ts, d } = JSON.parse(r); return (Date.now() - ts < SS_TTL) ? d : null; } catch(e) { return null; }
+        }
+        function ssSet(key, d) {
+            try { sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), d })); } catch(e) {}
+        }
     
         function esc(s) { return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     
@@ -737,10 +755,11 @@
             }
         } catch(e) { console.warn('Auth check failed', e); }
     
-        // provinces
+        // provinces (cached)
         const flProv = document.getElementById('flProvince');
-        const { data: provs } = await sb.from('provinces').select('id,name').order('name');
-        (provs||[]).forEach(p => { const o = document.createElement('option'); o.value = p.id; o.text = p.name; flProv.appendChild(o); });
+        let provs = ssGet('afristay_provs');
+        if (!provs) { const { data } = await sb.from('provinces').select('id,name').order('name'); provs = data || []; ssSet('afristay_provs', provs); }
+        provs.forEach(p => { _pvNameCache[p.id] = p.name; const o = document.createElement('option'); o.value = p.id; o.text = p.name; flProv.appendChild(o); });
     
         window.onProvinceChange = async () => {
             const pvId = flProv.value;
@@ -750,8 +769,10 @@
             flS.innerHTML = '<option value="">All Sectors</option>';
             flS.disabled = true;
             if (pvId) {
-                const { data: ds } = await sb.from('districts').select('id,name').eq('province_id', pvId).order('name');
-                (ds||[]).forEach(d => { const o = document.createElement('option'); o.value = d.id; o.text = d.name; flD.appendChild(o); });
+                const cacheKey = 'afristay_dists_' + pvId;
+                let ds = ssGet(cacheKey);
+                if (!ds) { const { data } = await sb.from('districts').select('id,name').eq('province_id', pvId).order('name'); ds = data || []; ssSet(cacheKey, ds); }
+                ds.forEach(d => { _dtNameCache[d.id] = d.name; const o = document.createElement('option'); o.value = d.id; o.text = d.name; flD.appendChild(o); });
                 flD.disabled = false;
             } else { flD.disabled = true; }
             applyFilters();
@@ -959,14 +980,19 @@
             if (page === 0) countEl.textContent = total + ' result' + (total !== 1 ? 's' : '');
             _hasMore = (start + data.length) < total;
 
-            // batch images + locations
+            // batch images + locations (use in-memory cache, only fetch what's missing)
             const ids = data.map(l => l.id);
             const imgMap = await resolveImages(ids);
             const pvIds = [...new Set(data.map(l => l.province_id).filter(Boolean))];
             const dtIds = [...new Set(data.map(l => l.district_id).filter(Boolean))];
-            const pvMap = {}, dtMap = {};
-            if (pvIds.length) { const { data: ps } = await sb.from('provinces').select('id,name').in('id', pvIds); (ps||[]).forEach(p => pvMap[p.id] = p.name); }
-            if (dtIds.length) { const { data: ds } = await sb.from('districts').select('id,name').in('id', dtIds); (ds||[]).forEach(d => dtMap[d.id] = d.name); }
+            const pvMap = Object.assign({}, _pvNameCache);
+            const dtMap = Object.assign({}, _dtNameCache);
+            const missingPv = pvIds.filter(id => !pvMap[id]);
+            const missingDt = dtIds.filter(id => !dtMap[id]);
+            await Promise.all([
+                missingPv.length ? sb.from('provinces').select('id,name').in('id', missingPv).then(({ data: ps }) => { (ps||[]).forEach(p => { pvMap[p.id] = p.name; _pvNameCache[p.id] = p.name; }); }) : Promise.resolve(),
+                missingDt.length ? sb.from('districts').select('id,name').in('id', missingDt).then(({ data: ds }) => { (ds||[]).forEach(d => { dtMap[d.id] = d.name; _dtNameCache[d.id] = d.name; }); }) : Promise.resolve(),
+            ]);
 
             if (!append) grid.innerHTML = '';
 

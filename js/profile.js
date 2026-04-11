@@ -54,6 +54,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (urlTab && TAB_LOADERS[urlTab]) {
         switchTab(urlTab);
     }
+
+    // Signal that the profile is ready (used by notification badge loader)
+    document.dispatchEvent(new Event('afristay:profileReady'));
 });
 
 /* ══════════════════════════════════════════════
@@ -409,6 +412,34 @@ function prefillProfileForm() {
     setVal('pfEmail',    _profile.email     || _user.email || '');
     setVal('pfPhone',    _profile.phone     || '');
     setVal('pfBio',      _profile.bio       || '');
+
+    // Live phone-availability check on blur
+    const phoneInput = document.getElementById('pfPhone');
+    if (phoneInput && !phoneInput._phoneCheckWired) {
+        phoneInput._phoneCheckWired = true;
+        phoneInput.addEventListener('blur', async () => {
+            const val = phoneInput.value.trim();
+            if (!val || val === (_profile.phone || '')) return; // unchanged — skip
+            const { data: available } = await _sb.rpc('check_phone_available', {
+                p_phone: val,
+                p_user_id: _user.id,
+            });
+            let hint = document.getElementById('pfPhoneHint');
+            if (!hint) {
+                hint = document.createElement('p');
+                hint.id = 'pfPhoneHint';
+                hint.style.cssText = 'font-size:12px;margin:4px 0 0 2px;font-weight:600;';
+                phoneInput.insertAdjacentElement('afterend', hint);
+            }
+            if (available === false) {
+                hint.style.color = '#c0392b';
+                hint.innerHTML = '<i class="fa-solid fa-circle-xmark" style="margin-right:4px;"></i>That number is already linked to another account.';
+            } else {
+                hint.style.color = '#27ae60';
+                hint.innerHTML = '<i class="fa-solid fa-circle-check" style="margin-right:4px;"></i>Number is available.';
+            }
+        });
+    }
 }
 
 window.saveProfile = async function() {
@@ -427,7 +458,15 @@ window.saveProfile = async function() {
             .from('profiles')
             .update({ full_name, phone, bio })
             .eq('id', _user.id);
-        if (pErr) throw pErr;
+        if (pErr) {
+            if (pErr.code === '23505' || pErr.message?.toLowerCase().includes('unique') || pErr.message?.toLowerCase().includes('duplicate')) {
+                toast('That phone number is already linked to another account. Please use a different number.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Changes';
+                return;
+            }
+            throw pErr;
+        }
 
         // Update email in auth if changed
         if (newEmail && newEmail !== _user.email) {
@@ -539,13 +578,23 @@ window.deleteAccount = async function() {
     const confirmed = prompt('This will permanently delete your account. Type DELETE to confirm:');
     if (confirmed !== 'DELETE') { toast('Cancelled.', 'info'); return; }
 
-    toast('Archiving and deleting account...', 'info');
+    toast('Deleting your account...', 'info');
     try {
-        // Archive profile data + soft-delete (anonymise) — keeps bookings/reviews intact
-        await _sb.rpc('archive_deleted_account', { p_user_id: _user.id, p_reason: 'self_deleted' });
+        const { data: { session } } = await _sb.auth.getSession();
+        const res = await fetch(`${CONFIG.SUPABASE_URL}/functions/v1/delete-account`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session?.access_token}`,
+            },
+            body: JSON.stringify({ userId: _user.id }),
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(result.error || 'Failed to delete account');
+        // User is now deleted from auth — sign out client-side and redirect
         await _sb.auth.signOut();
-        toast('Account deleted.', 'success');
-        setTimeout(() => window.location.href = '/', 1800);
+        toast('Account permanently deleted.', 'success');
+        setTimeout(() => window.location.href = '/', 1500);
     } catch (err) {
         toast('Failed to delete: ' + err.message, 'error');
     }
@@ -554,9 +603,6 @@ window.deleteAccount = async function() {
 /* ══════════════════════════════════════════════
    DOWNLOAD RECEIPT (PDF via jsPDF)
    ══════════════════════════════════════════════ */
-/* ══════════════════════════════════════════════
-   DOWNLOAD RECEIPT (PDF via jsPDF) + ANTI-SPAM
-   ══════════════════════════════════════════════ */
 window.downloadReceipt = async function(bookingId) {
     toast('Authenticating receipt...', 'info');
     try {
@@ -564,28 +610,9 @@ window.downloadReceipt = async function(bookingId) {
         const { data: b } = await _sb.from('bookings').select('*').eq('id', bookingId).single();
         if (!b) throw new Error("Booking not found");
 
-        // 2. Anti-Spam & Traffic Control via `digital_receipts` table
-        let { data: receipt } = await _sb.from('digital_receipts').select('*').eq('booking_id', bookingId).maybeSingle();
-        const receiptNo = receipt ? receipt.receipt_no : 'RCP-' + b.id.substring(0, 8).toUpperCase();
-
-        if (!receipt) {
-            // First time downloading: Create the record
-            const { data: newReceipt, error: insErr } = await _sb.from('digital_receipts').insert({
-                booking_id: b.id,
-                user_id: b.user_id,
-                receipt_no: receiptNo,
-                download_count: 1
-            }).select().single();
-            if (!insErr) receipt = newReceipt;
-        } else {
-            // Enforcement: Max 5 downloads per receipt to prevent trafficking/bot abuse
-            if (receipt.download_count >= 5) {
-                toast('Download limit reached to prevent abuse. Please contact support.', 'error');
-                return;
-            }
-            // Increment the counter
-            await _sb.from('digital_receipts').update({ download_count: receipt.download_count + 1 }).eq('id', receipt.id);
-        }
+        // 2. Look up existing receipt (created by generate-receipt edge fn after payment)
+        const { data: receipt } = await _sb.from('digital_receipts').select('receipt_number').eq('booking_id', bookingId).maybeSingle();
+        const receiptNo = receipt?.receipt_number || ('RCP-' + b.id.substring(0, 8).toUpperCase());
 
         toast('Generating PDF...', 'info');
 
@@ -865,22 +892,41 @@ async function loadOwnerApplicationStatus() {
         form._wired = true;
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const btn = document.getElementById('ownerAppBtn');
-            const motivation = document.getElementById('appMotivation')?.value.trim();
-            const phone = document.getElementById('appPhone')?.value.trim();
-            const propertyType = document.getElementById('appPropertyType')?.value;
+            const btn           = document.getElementById('ownerAppBtn');
+            const phone         = document.getElementById('appPhone')?.value.trim();
+            const listingType   = document.getElementById('appListingType')?.value;
+            const listingCount  = document.getElementById('appListingCount')?.value;
+            const hostingExp    = document.getElementById('appHostingExp')?.value;
+            const hasDocs       = document.getElementById('appHasDocs')?.value;
+            const expIncome     = document.getElementById('appExpectedIncome')?.value;
+            const description   = document.getElementById('appDescription')?.value.trim();
+            const motivation    = document.getElementById('appMotivation')?.value.trim();
 
-            if (!motivation) { alert('Please tell us why you want to list on AfriStay.'); return; }
             if (!phone || phone.length < 8) { alert('Please enter a valid phone number.'); return; }
+            if (!listingType)  { alert('Please select what type of listing you want to add.'); return; }
+            if (!description)  { alert('Please describe your listing.'); return; }
+            if (!motivation)   { alert('Please tell us why you want to join AfriStay.'); return; }
 
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Submitting…'; }
 
+            const answers = {
+                listing_type:    listingType   || null,
+                listing_count:   listingCount  || null,
+                hosting_exp:     hostingExp    || null,
+                has_docs:        hasDocs       || null,
+                expected_income: expIncome     || null,
+                description,
+            };
+
             const { error } = await _sb.from('owner_applications').insert([{
-                user_id: _user.id,
+                user_id:       _user.id,
+                full_name:     _profile?.full_name || null,
+                email:         _profile?.email || _user.email || null,
                 motivation,
-                phone: '+250' + phone,
-                property_type: propertyType || null,
-                status: 'pending',
+                phone:         '+250' + phone,
+                property_type: listingType || null,
+                answers,
+                status:        'pending',
             }]);
 
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Application'; }
@@ -897,109 +943,22 @@ async function loadOwnerApplicationStatus() {
 }
 
 /* ══════════════════════════════════════════════
-   BOOKING RECEIPT PDF — guest profile page
-   Uses jsPDF (loaded lazily on demand)
-   ══════════════════════════════════════════════ */
-window.downloadReceipt = async function(bookingId) {
-    showToast('Preparing receipt…', 'info');
-    try {
-        // Fetch booking + listing data
-        const { data: b } = await _sb
-            .from('bookings')
-            .select('*, listings(title, province_id, district_id, category_slug)')
-            .eq('id', bookingId)
-            .single();
-        if (!b) { showToast('Booking not found.', 'error'); return; }
-
-        const listing  = b.listings || {};
-        const nights   = Math.max(1, Math.ceil((new Date(b.end_date) - new Date(b.start_date)) / 86400000));
-        const unit     = listing.category_slug === 'vehicle' ? 'day' : 'night';
-        const fmtDate  = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-        const fmtMoney = n => Number(n||0).toLocaleString('en-RW') + ' ' + (b.currency || 'RWF');
-
-        // Load jsPDF lazily
-        if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
-            await new Promise((res, rej) => {
-                const s = document.createElement('script');
-                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-                s.onload = res; s.onerror = rej;
-                document.head.appendChild(s);
-            });
-        }
-        const { jsPDF } = window.jspdf || window;
-        const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-        const W = doc.internal.pageSize.getWidth();
-
-        // Header bar
-        doc.setFillColor(235, 103, 83);
-        doc.rect(0, 0, W, 28, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18); doc.setTextColor(255, 255, 255);
-        doc.text('AfriStay Rwanda', 15, 18);
-        doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-        doc.text('Booking Receipt', W - 15, 18, { align: 'right' });
-
-        // Booking ID
-        doc.setTextColor(60, 60, 60);
-        doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-        doc.text('Booking ID: ' + bookingId.slice(0, 8).toUpperCase(), 15, 38);
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-        doc.text('Generated: ' + new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }), W - 15, 38, { align: 'right' });
-
-        // Guest info
-        doc.setFontSize(10); doc.setTextColor(100, 100, 100);
-        doc.text('Guest:', 15, 52);
-        doc.setTextColor(30, 30, 30); doc.setFont('helvetica', 'bold');
-        doc.text((_profile?.full_name || _user?.email || 'Guest'), 40, 52);
-
-        // Details table
-        const rows = [
-            ['Listing',         listing.title || 'N/A'],
-            ['Check-in',        fmtDate(b.start_date)],
-            ['Check-out',       fmtDate(b.end_date)],
-            ['Duration',        nights + ' ' + unit + (nights > 1 ? 's' : '')],
-            ['Status',          (b.status || '').toUpperCase()],
-            ['Payment Method',  (b.payment_method || '—').replace(/_/g,' ')],
-            ['Total Amount',    fmtMoney(b.total_amount)],
-        ];
-        let y = 62;
-        rows.forEach(([k, v], i) => {
-            if (i % 2 === 0) { doc.setFillColor(248, 248, 248); doc.rect(12, y - 5, W - 24, 8, 'F'); }
-            doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
-            doc.text(k, 15, y);
-            doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30);
-            doc.text(String(v), 75, y);
-            y += 10;
-        });
-
-        // Footer
-        doc.setFontSize(8); doc.setTextColor(150, 150, 150);
-        doc.text('Thank you for choosing AfriStay Rwanda! For support: support@afristay.rw', W / 2, 280, { align: 'center' });
-
-        doc.save('AfriStay-Receipt-' + bookingId.slice(0, 8) + '.pdf');
-        showToast('Receipt downloaded!', 'success');
-    } catch (err) {
-        showToast('Failed to generate receipt: ' + err.message, 'error');
-    }
-};
-
-/* ══════════════════════════════════════════════
    NOTIFICATIONS TAB
    ══════════════════════════════════════════════ */
 async function loadNotifications() {
     const el = document.getElementById('notifList');
     if (!el) return;
-    if (!window._profileSupabase || !window._profileUser) {
+    if (!_sb || !_user) {
         el.innerHTML = '<p style="text-align:center;color:#bbb;padding:40px;font-size:14px;"><i class="fa-regular fa-bell" style="font-size:32px;display:block;margin-bottom:12px;"></i>Sign in to view notifications.</p>';
         return;
     }
 
     el.innerHTML = '<div style="text-align:center;padding:30px;color:#bbb;"><i class="fa-solid fa-circle-notch fa-spin" style="font-size:22px;"></i></div>';
     try {
-        const { data, error } = await window._profileSupabase
+        const { data, error } = await _sb
             .from('notifications')
             .select('id, type, title, message, link, read, created_at')
-            .eq('user_id', window._profileUser.id)
+            .eq('user_id', _user.id)
             .order('created_at', { ascending: false })
             .limit(50);
 
@@ -1061,8 +1020,8 @@ function _timeAgo(iso) {
 }
 
 window.markNotifRead = async function(id, rowEl) {
-    if (!window._profileSupabase) return;
-    await window._profileSupabase.from('notifications').update({ read: true }).eq('id', id);
+    if (!_sb) return;
+    await _sb.from('notifications').update({ read: true }).eq('id', id);
     if (rowEl) {
         rowEl.style.background = '';
         rowEl.style.borderLeft = '';
@@ -1080,19 +1039,18 @@ window.markNotifRead = async function(id, rowEl) {
 };
 
 window.markAllNotifsRead = async function() {
-    if (!window._profileSupabase || !window._profileUser) return;
-    await window._profileSupabase.from('notifications').update({ read: true })
-        .eq('user_id', window._profileUser.id).eq('read', false);
+    if (!_sb || !_user) return;
+    await _sb.from('notifications').update({ read: true })
+        .eq('user_id', _user.id).eq('read', false);
     loadNotifications();
 };
 
-// Hook into tab switching — load notifications when tab is opened
+// Pre-load notification badge count after profile boots
 document.addEventListener('afristay:profileReady', () => {
-    // Pre-load badge count
-    if (!window._profileSupabase || !window._profileUser) return;
-    window._profileSupabase.from('notifications')
+    if (!_sb || !_user) return;
+    _sb.from('notifications')
         .select('id', { count: 'exact', head: true })
-        .eq('user_id', window._profileUser.id)
+        .eq('user_id', _user.id)
         .eq('read', false)
         .then(({ count }) => {
             const badge = document.getElementById('notifBadge');

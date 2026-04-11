@@ -33,6 +33,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     CURRENT_USER  = authResult.data?.user || null;
     REVIEWS_OPEN  = configResult.data?.value === 'true';
+
+    // Fetch profile to check banned flag
+    if (CURRENT_USER) {
+        const { data: prof } = await _supabase.from('profiles').select('banned').eq('id', CURRENT_USER.id).single();
+        if (prof?.banned) {
+            CURRENT_USER = null; // treat as logged-out so they can't book
+            await _supabase.auth.signOut();
+            const msg = document.createElement('div');
+            msg.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#e74c3c;color:#fff;text-align:center;padding:14px 20px;font-size:14px;font-weight:700;z-index:9999;';
+            msg.textContent = 'Your account has been suspended. You cannot make bookings.';
+            document.body.prepend(msg);
+        }
+    }
     console.log(CURRENT_USER ? `✅ [DETAIL] Logged in: ${CURRENT_USER.email}` : 'ℹ️ [DETAIL] Not logged in');
     console.log(`ℹ️ [DETAIL] Reviews open: ${REVIEWS_OPEN}`);
 
@@ -666,10 +679,29 @@ async function initBookingForm() {
         gcDiv.innerHTML = '<label style="font-size:13px;color:#666;font-weight:600;display:block;margin-bottom:6px;">' +
             (isVeh ? 'Passengers' : 'Guests') + (maxG ? ' <span style="color:#bbb;font-weight:400;">(max ' + maxG + ')</span>' : '') + '</label>' +
             '<input type="number" id="bookingGuestCount" min="1" max="' + maxG + '" value="1" ' +
-            'style="width:100%;padding:11px 14px;border:1px solid #ddd;border-radius:8px;font-family:\'Inter\',sans-serif;font-size:14px;">';
+            'style="width:100%;padding:11px 14px;border:1px solid #ddd;border-radius:8px;font-family:\'Inter\',sans-serif;font-size:14px;">' +
+            '<p id="guestCountError" style="display:none;color:#e74c3c;font-size:12px;margin:4px 0 0;"></p>';
         // Insert before the total div
         const totalEl = document.getElementById('bookingTotal');
         if (totalEl) totalEl.before(gcDiv);
+
+        // Clamp manual input to [1, maxG]
+        const gcInput = document.getElementById('bookingGuestCount');
+        const gcError = document.getElementById('guestCountError');
+        gcInput.addEventListener('input', () => {
+            let v = parseInt(gcInput.value, 10);
+            if (isNaN(v) || v < 1) {
+                gcInput.value = 1;
+                gcError.style.display = 'none';
+            } else if (v > maxG) {
+                gcInput.value = maxG;
+                gcError.textContent = 'Maximum ' + maxG + (isVeh ? ' passenger' : ' guest') + (maxG === 1 ? '' : 's') + ' allowed.';
+                gcError.style.display = 'block';
+                setTimeout(() => { gcError.style.display = 'none'; }, 3000);
+            } else {
+                gcError.style.display = 'none';
+            }
+        });
     }
 
     function calcTotal() {
@@ -721,6 +753,11 @@ async function initBookingForm() {
 }
 
 function goToCheckout() {
+    if (!CURRENT_USER) {
+        const statusEl = document.getElementById('bookingStatus');
+        if (statusEl) { statusEl.style.color = '#e74c3c'; statusEl.textContent = 'Please sign in to book.'; }
+        return;
+    }
     const startDate = document.getElementById('bookingStartDate')?.value;
     const endDate = document.getElementById('bookingEndDate')?.value;
     const statusEl = document.getElementById('bookingStatus');
@@ -735,7 +772,13 @@ function goToCheckout() {
         : (CURRENT_LISTING?.price_display || CURRENT_LISTING?.price || 0);
     const totalAmount = days * selectedPrice;
     const currency = CURRENT_LISTING?.currency || 'RWF';
-    const guests = parseInt(document.getElementById('bookingGuestCount')?.value) || 1;
+    const maxG = CURRENT_LISTING?.max_guests || CURRENT_LISTING?.max_passengers || Infinity;
+    let guests = parseInt(document.getElementById('bookingGuestCount')?.value) || 1;
+    if (guests < 1) guests = 1;
+    if (guests > maxG) {
+        if (statusEl) { statusEl.style.color = '#e74c3c'; statusEl.textContent = 'Maximum ' + maxG + (isVeh ? ' passenger' : ' guest') + (maxG === 1 ? '' : 's') + ' allowed for this listing.'; }
+        return;
+    }
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Redirecting...'; }
     const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: selectedPrice, currency, total: totalAmount, category: CURRENT_LISTING?.category_slug || 'property', price_zone: selectedZone, guests });
     window.location.href = '/Listings/Checkout/?' + params.toString();

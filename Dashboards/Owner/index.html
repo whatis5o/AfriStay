@@ -417,8 +417,8 @@
             </div>
             <div class="fg"><label>Description *</label><textarea class="fi" id="listDesc" style="min-height:80px;resize:vertical;" required></textarea></div>
 
-            <!-- Listing Specs -->
-            <div style="margin-bottom:16px;">
+            <!-- Property Specs (hidden for vehicles) -->
+            <div id="propSpecsSection" style="margin-bottom:16px;">
                 <label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:10px;">Property Specs <span style="color:#aaa;font-weight:400;font-size:12px;">(optional)</span></label>
                 <div class="g3">
                     <div class="fg" style="margin-bottom:0;"><label>Bedrooms</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listRooms',-1)">−</button><input type="number" class="fi step-inp" id="listRooms" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listRooms',1)">+</button></div></div>
@@ -428,6 +428,23 @@
                 <div class="g2" style="margin-top:10px;">
                     <div class="fg" style="margin-bottom:0;"><label>Max Guests</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listMaxGuests',-1)">−</button><input type="number" class="fi step-inp" id="listMaxGuests" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listMaxGuests',1)">+</button></div></div>
                     <div class="fg" style="margin-bottom:0;"><label>Floor Area (m²)</label><input type="number" class="fi" id="listFloorArea" min="0" placeholder="e.g. 75"></div>
+                </div>
+            </div>
+
+            <!-- Vehicle Specs (shown only for vehicles) -->
+            <div id="vehicleSpecsSection" style="margin-bottom:16px;display:none;">
+                <label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:10px;">Vehicle Specs <span style="color:#aaa;font-weight:400;font-size:12px;">(optional)</span></label>
+                <div class="g2">
+                    <div class="fg" style="margin-bottom:0;"><label>Make</label><input type="text" class="fi" id="vMake" placeholder="e.g. Toyota"></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Model</label><input type="text" class="fi" id="vModel" placeholder="e.g. Land Cruiser"></div>
+                </div>
+                <div class="g3" style="margin-top:10px;">
+                    <div class="fg" style="margin-bottom:0;"><label>Year</label><input type="number" class="fi" id="vYear" placeholder="e.g. 2020" min="1990" max="2035"></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Fuel Type</label><select class="fi" id="vFuel"><option value="">Select…</option><option value="petrol">Petrol</option><option value="diesel">Diesel</option><option value="electric">Electric</option><option value="hybrid">Hybrid</option><option value="lpg">LPG</option></select></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Transmission</label><select class="fi" id="vTransmission"><option value="">Select…</option><option value="automatic">Automatic</option><option value="manual">Manual</option></select></div>
+                </div>
+                <div class="g2" style="margin-top:10px;">
+                    <div class="fg" style="margin-bottom:0;"><label>Max Passengers</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('vMaxPassengers',-1)">−</button><input type="number" class="fi step-inp" id="vMaxPassengers" value="" min="1" max="50" placeholder="0"><button type="button" class="step-btn" onclick="stepField('vMaxPassengers',1)">+</button></div></div>
                 </div>
             </div>
 
@@ -481,6 +498,33 @@ function prefillOwnerProfile(){
     const sv=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
     sv('ownerFullName',p.full_name);sv('ownerPhone',p.phone);
     sv('ownerEmail',p.email);sv('ownerBio',p.bio);
+
+    // Live phone-availability check on blur
+    const phoneInput=document.getElementById('ownerPhone');
+    if(phoneInput&&!phoneInput._phoneCheckWired){
+        phoneInput._phoneCheckWired=true;
+        phoneInput.addEventListener('blur',async()=>{
+            const val=phoneInput.value.trim();
+            if(!val||val===(window.CURRENT_PROFILE?.phone||''))return;
+            const _s=window.supabaseClient;
+            if(!_s||!window.CURRENT_USER)return;
+            const{data:available}=await _s.rpc('check_phone_available',{p_phone:val,p_user_id:window.CURRENT_USER.id});
+            let hint=document.getElementById('ownerPhoneHint');
+            if(!hint){
+                hint=document.createElement('p');
+                hint.id='ownerPhoneHint';
+                hint.style.cssText='font-size:12px;margin:4px 0 0 2px;font-weight:600;';
+                phoneInput.insertAdjacentElement('afterend',hint);
+            }
+            if(available===false){
+                hint.style.color='#c0392b';
+                hint.innerHTML='<i class="fa-solid fa-circle-xmark" style="margin-right:4px;"></i>That number is already linked to another account.';
+            } else {
+                hint.style.color='#27ae60';
+                hint.innerHTML='<i class="fa-solid fa-circle-check" style="margin-right:4px;"></i>Number is available.';
+            }
+        });
+    }
 }
 
 async function saveOwnerProfile(){
@@ -494,7 +538,16 @@ async function saveOwnerProfile(){
     const em=document.getElementById('ownerEmail').value.trim();
     try{
         const{error}=await _s.from('profiles').update({full_name:nm,phone:ph,bio:bi}).eq('id',window.CURRENT_USER.id);
-        if(error)throw error;
+        if(error){
+            // Unique constraint on phone — someone else already has this number
+            if(error.code==='23505'||error.message?.toLowerCase().includes('unique')||error.message?.toLowerCase().includes('duplicate')){
+                window.toast('That phone number is already linked to another account. Use a different number.','error');
+            } else {
+                throw error;
+            }
+            btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-floppy-disk"></i> Save Profile';
+            return;
+        }
         if(em&&em!==window.CURRENT_USER.email){
             const{error:ee}=await _s.auth.updateUser({email:em});
             if(ee)throw ee;
@@ -725,6 +778,8 @@ async function loadEarnings() {
         </p>`;
     }
 }
+// Override dashboard.js version — this page-specific version properly waits for auth
+window.loadEarnings = loadEarnings;
 </script>
 </body>
 </html>

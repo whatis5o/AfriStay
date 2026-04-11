@@ -19,6 +19,22 @@
         :root{--primary:#EB6753;--ps:#fff0ee;--sw:260px;}
         *{box-sizing:border-box;}
         body{margin:0;background:#f5f6fa;font-family:'Inter',sans-serif;display:flex;min-height:100vh;}
+
+        /* ── Admin PIN overlay ── */
+        #adminPinOverlay{position:fixed;inset:0;background:rgba(15,10,8,.65);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);display:flex;align-items:center;justify-content:center;z-index:99999;}
+        #adminPinOverlay.hidden{display:none;}
+        .apin-box{background:#fff;border-radius:24px;padding:40px 36px;max-width:400px;width:calc(100% - 40px);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.28);}
+        .apin-logo{font-size:12px;color:#aaa;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:18px;}
+        .apin-icon{width:64px;height:64px;background:#fff0ee;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:28px;color:var(--primary);margin-bottom:16px;}
+        .apin-box h3{font-size:20px;font-weight:800;color:#1a1a1a;margin:0 0 8px;}
+        .apin-box p{font-size:13px;color:#888;margin:0 0 20px;line-height:1.6;}
+        .apin-input{width:100%;font-size:24px;padding:14px;border:2px solid #e8e8e8;border-radius:12px;text-align:center;letter-spacing:10px;font-weight:700;outline:none;transition:border-color .2s;font-family:'Inter',sans-serif;}
+        .apin-input:focus{border-color:var(--primary);}
+        .apin-error{color:#e74c3c;font-size:13px;font-weight:600;min-height:20px;margin:8px 0 0;}
+        .apin-btns{display:flex;gap:10px;margin-top:20px;}
+        .apin-leave{flex:1;padding:14px;border:1.5px solid #e0e0e0;background:#fff;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;color:#666;font-family:'Inter',sans-serif;}
+        .apin-unlock{flex:2;padding:14px;background:var(--primary);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;font-family:'Inter',sans-serif;transition:opacity .2s;}
+        .apin-unlock:hover{opacity:.88;}
         #sidebar{width:var(--sw);background:#fff;box-shadow:2px 0 20px rgba(0,0,0,.06);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform .3s;overflow-y:auto;}
         .sb-logo{padding:24px 20px 16px;border-bottom:1px solid #f0f0f0;}
         .sb-logo img{height:30px;}
@@ -193,6 +209,22 @@
 </head>
 <body>
 
+<!-- ═══ ADMIN PIN OVERLAY ═══ -->
+<div id="adminPinOverlay">
+  <div class="apin-box">
+    <div class="apin-logo">AfriStay</div>
+    <div class="apin-icon"><i class="fa-solid fa-shield-halved"></i></div>
+    <h3>Admin Access</h3>
+    <p>Enter your 4-digit admin PIN to continue.</p>
+    <input id="adminPinInput" class="apin-input" type="password" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" />
+    <div id="adminPinError" class="apin-error"></div>
+    <div class="apin-btns">
+      <button class="apin-leave" onclick="window.location.replace('/')">Leave</button>
+      <button id="adminPinOkBtn" class="apin-unlock">Unlock</button>
+    </div>
+  </div>
+</div>
+
 <div id="sidebarOverlay"></div>
 
 <aside id="sidebar">
@@ -213,6 +245,7 @@
         <button class="nav-btn" data-tab="broadcast"><i class="fa-solid fa-paper-plane"></i> Broadcast</button>
         <div class="nav-sec">Finance</div>
         <button class="nav-btn" data-tab="financial"><i class="fa-solid fa-chart-line"></i> Financial</button>
+        <button class="nav-btn" data-tab="receipts"><i class="fa-solid fa-receipt"></i> Receipts</button>
         <div class="nav-sec">Content</div>
         <button class="nav-btn" data-tab="events"><i class="fa-solid fa-calendar-days"></i> Events</button>
         <button class="nav-btn" data-tab="promotions"><i class="fa-solid fa-tag"></i> Promotions</button>
@@ -264,7 +297,8 @@
                     <h2>All Users</h2>
                     <div style="display:flex;gap:8px;align-items:center;">
                         <button class="btn-s" id="fetchUsersBtn"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
-                        <button class="btn-s" onclick="exportUsers()"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                        <button class="btn-s" onclick="exportUsers('csv')"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                        <button class="btn-s" onclick="exportUsers('pdf')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                     </div>
                 </div>
                 <div class="sec-body">
@@ -314,7 +348,8 @@
                             <input type="text" id="bookingSearchInput" placeholder="Guest name, email, listing...">
                         </div>
                         <button class="btn-s" onclick="loadBookingsTable(0)"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
-                        <button class="btn-s" onclick="exportBookings()"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                        <button class="btn-s" onclick="exportBookings('csv')"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                        <button class="btn-s" onclick="exportBookings('pdf')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
                     </div>
                 </div>
                 <div style="overflow-x:auto;">
@@ -352,11 +387,30 @@
             <div class="data-section">
                 <div class="sec-head">
                     <h2><i class="fa-solid fa-bell" style="color:var(--primary);margin-right:8px;"></i>Attention Required</h2>
-                    <button class="btn-s" onclick="loadAttentionItems()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn-s" onclick="loadAttentionItems()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                        <button class="btn-s" onclick="exportAttention('csv')"><i class="fa-solid fa-file-csv"></i> CSV</button>
+                        <button class="btn-s" onclick="exportAttention('pdf')"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                    </div>
                 </div>
                 <div class="sec-body">
-                    <p style="font-size:13px;color:#aaa;margin:0 0 16px;">Owners missing phone numbers, pending applications, and other items needing action.</p>
+                    <p style="font-size:13px;color:#aaa;margin:0 0 16px;">User errors, owner issues, pending applications, and anything needing action — all in one place.</p>
                     <div id="attentionContainer"></div>
+                </div>
+            </div>
+
+            <!-- Site Health Graph -->
+            <div class="data-section" style="margin-top:20px;">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-chart-line" style="color:var(--primary);margin-right:8px;"></i>Site Health — Error Trend (Last 30 days)</h2>
+                    <button class="btn-s" onclick="loadSiteHealthGraph()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                </div>
+                <div class="sec-body">
+                    <p style="font-size:13px;color:#aaa;margin:0 0 16px;">Number of user-reported errors per day across all pages and roles.</p>
+                    <div style="position:relative;height:260px;">
+                        <canvas id="siteHealthChart"></canvas>
+                    </div>
+                    <div id="siteHealthStats" style="display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;"></div>
                 </div>
             </div>
         </div>
@@ -516,6 +570,80 @@
             </div>
         </div>
 
+        <!-- RECEIPTS -->
+        <div class="content-panel" id="receiptsPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-receipt" style="color:var(--primary);margin-right:8px;"></i>Receipt Search</h2>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn-s" onclick="exportReceiptsList('csv')"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+                        <button class="btn-s" onclick="exportReceiptsList('pdf')"><i class="fa-solid fa-file-pdf"></i> Export PDF</button>
+                    </div>
+                </div>
+                <div class="sec-body">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+                        <div>
+                            <label style="font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Receipt # / Ref / Guest</label>
+                            <input type="text" class="fi" id="rcptSearch" placeholder="Receipt #, booking ref, guest name or email…" style="padding:9px 14px;font-size:13px;">
+                        </div>
+                        <div>
+                            <label style="font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Date Issued</label>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <input type="date" class="fi" id="rcptDateFrom" style="flex:1;padding:9px 10px;font-size:13px;">
+                                <span style="color:#aaa;font-size:12px;white-space:nowrap;">to</span>
+                                <input type="date" class="fi" id="rcptDateTo" style="flex:1;padding:9px 10px;font-size:13px;">
+                            </div>
+                        </div>
+                        <div>
+                            <label style="font-size:11px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Amount Range (RWF)</label>
+                            <div style="display:flex;gap:6px;align-items:center;">
+                                <input type="number" class="fi" id="rcptMinAmt" placeholder="Min" min="0" style="flex:1;padding:9px 10px;font-size:13px;">
+                                <span style="color:#aaa;font-size:12px;">–</span>
+                                <input type="number" class="fi" id="rcptMaxAmt" placeholder="Max" min="0" style="flex:1;padding:9px 10px;font-size:13px;">
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center;margin-bottom:22px;flex-wrap:wrap;">
+                        <select class="fi" id="rcptStatus" style="width:auto;padding:9px 14px;font-size:13px;min-width:160px;">
+                            <option value="all">All Receipts</option>
+                            <option value="active">Active Only</option>
+                            <option value="cancelled">Cancelled Only</option>
+                        </select>
+                        <button class="btn-p" onclick="loadReceiptsSearch(0)"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+                        <button class="btn-s" onclick="
+                            document.getElementById('rcptSearch').value='';
+                            document.getElementById('rcptDateFrom').value='';
+                            document.getElementById('rcptDateTo').value='';
+                            document.getElementById('rcptMinAmt').value='';
+                            document.getElementById('rcptMaxAmt').value='';
+                            document.getElementById('rcptStatus').value='all';
+                            loadReceiptsSearch(0);
+                        "><i class="fa-solid fa-xmark"></i> Clear</button>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="dt" id="rcptTable">
+                            <thead>
+                                <tr>
+                                    <th>Receipt #</th>
+                                    <th>Booking Ref</th>
+                                    <th>Guest</th>
+                                    <th>Property</th>
+                                    <th>Issued</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rcptTableBody">
+                                <tr><td colspan="8" style="text-align:center;padding:36px;color:#aaa;font-size:13px;">Use the filters above and click Search</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="rcptPagination" style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- MESSAGES -->
         <div class="content-panel" id="messagesPanel">
             <div class="data-section" style="overflow:hidden;border-radius:16px;">
@@ -601,6 +729,17 @@
                 </div>
 
                 <div class="data-section">
+                    <div class="sec-head"><h2><i class="fa-solid fa-lock" style="color:var(--primary);margin-right:8px;"></i>Admin PIN</h2></div>
+                    <div class="sec-body" style="max-width:400px;">
+                        <p style="font-size:13px;color:#888;margin:0 0 16px;">Change the 4-digit PIN required to access this dashboard. Default PIN is <strong>0000</strong>.</p>
+                        <div class="fg"><label>Current PIN</label><input type="password" class="fi" id="pinCurrent" inputmode="numeric" maxlength="4" placeholder="Current 4-digit PIN"></div>
+                        <div class="fg"><label>New PIN</label><input type="password" class="fi" id="pinNew" inputmode="numeric" maxlength="4" placeholder="New 4-digit PIN"></div>
+                        <div class="fg"><label>Confirm New PIN</label><input type="password" class="fi" id="pinConfirm" inputmode="numeric" maxlength="4" placeholder="Repeat new PIN"></div>
+                        <button class="btn-p" onclick="changeAdminPin()"><i class="fa-solid fa-key"></i> Update PIN</button>
+                    </div>
+                </div>
+
+                <div class="data-section">
                     <div class="sec-head"><h2 style="color:#e74c3c;"><i class="fa-solid fa-triangle-exclamation" style="margin-right:8px;"></i>Danger Zone</h2></div>
                     <div class="sec-body">
                         <div style="border:1.5px solid #fde8e8;border-radius:12px;padding:20px;">
@@ -661,8 +800,8 @@
             </div>
             <div class="fg"><label>Description *</label><textarea class="fi" id="listDesc" required></textarea></div>
 
-            <!-- Listing Specs -->
-            <div style="margin-bottom:16px;">
+            <!-- Property Specs (hidden for vehicles) -->
+            <div id="propSpecsSection" style="margin-bottom:16px;">
                 <label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:10px;">Property Specs <span style="color:#aaa;font-weight:400;font-size:12px;">(optional)</span></label>
                 <div class="g3">
                     <div class="fg" style="margin-bottom:0;"><label>Bedrooms</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listRooms',-1)">−</button><input type="number" class="fi step-inp" id="listRooms" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listRooms',1)">+</button></div></div>
@@ -672,6 +811,23 @@
                 <div class="g2" style="margin-top:10px;">
                     <div class="fg" style="margin-bottom:0;"><label>Max Guests</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('listMaxGuests',-1)">−</button><input type="number" class="fi step-inp" id="listMaxGuests" value="" min="0" placeholder="0"><button type="button" class="step-btn" onclick="stepField('listMaxGuests',1)">+</button></div></div>
                     <div class="fg" style="margin-bottom:0;"><label>Floor Area (m²)</label><input type="number" class="fi" id="listFloorArea" min="0" placeholder="e.g. 75"></div>
+                </div>
+            </div>
+
+            <!-- Vehicle Specs (shown only for vehicles) -->
+            <div id="vehicleSpecsSection" style="margin-bottom:16px;display:none;">
+                <label style="font-size:13px;font-weight:700;color:#1a1a1a;display:block;margin-bottom:10px;">Vehicle Specs <span style="color:#aaa;font-weight:400;font-size:12px;">(optional)</span></label>
+                <div class="g2">
+                    <div class="fg" style="margin-bottom:0;"><label>Make</label><input type="text" class="fi" id="vMake" placeholder="e.g. Toyota"></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Model</label><input type="text" class="fi" id="vModel" placeholder="e.g. Land Cruiser"></div>
+                </div>
+                <div class="g3" style="margin-top:10px;">
+                    <div class="fg" style="margin-bottom:0;"><label>Year</label><input type="number" class="fi" id="vYear" placeholder="e.g. 2020" min="1990" max="2035"></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Fuel Type</label><select class="fi" id="vFuel"><option value="">Select…</option><option value="petrol">Petrol</option><option value="diesel">Diesel</option><option value="electric">Electric</option><option value="hybrid">Hybrid</option><option value="lpg">LPG</option></select></div>
+                    <div class="fg" style="margin-bottom:0;"><label>Transmission</label><select class="fi" id="vTransmission"><option value="">Select…</option><option value="automatic">Automatic</option><option value="manual">Manual</option></select></div>
+                </div>
+                <div class="g2" style="margin-top:10px;">
+                    <div class="fg" style="margin-bottom:0;"><label>Max Passengers</label><div class="stepper-wrap"><button type="button" class="step-btn" onclick="stepField('vMaxPassengers',-1)">−</button><input type="number" class="fi step-inp" id="vMaxPassengers" value="" min="1" max="50" placeholder="0"><button type="button" class="step-btn" onclick="stepField('vMaxPassengers',1)">+</button></div></div>
                 </div>
             </div>
 
@@ -708,7 +864,7 @@ const PTITLES={
     bookingsPanel:'Bookings','listing-requestsPanel':'Listing Requests',
     attentionPanel:'Attention','owner-applicationsPanel':'Owner Applications',
     broadcastPanel:'Broadcast Notification',
-    financialPanel:'Financial',eventsPanel:'Events',promotionsPanel:'Promotions',
+    financialPanel:'Financial',receiptsPanel:'Receipts',eventsPanel:'Events',promotionsPanel:'Promotions',
     messagesPanel:'Messages',archivePanel:'Archive / Trash',settingsPanel:'Settings'
 };
 
@@ -720,6 +876,7 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
         if(el)el.textContent=PTITLES[tab+'Panel']||PTITLES[tab]||tab;
         if(tab==='settings'){setTimeout(prefillAdminProfile,200);setTimeout(loadPlatformConfig,300);}
         if(tab==='financial'){setTimeout(loadFinancialData,100);setTimeout(loadPayoutOwners,200);}
+        if(tab==='receipts'){setTimeout(loadReceiptsSearch,100);}
     });
 });
 
@@ -766,6 +923,94 @@ window.handleCreateListing=async function(){
 };
 
 // Sidebar toggle handled by initSidebarToggle() in dashboard.js
+
+/* ══════════════════════════════════════════════
+   ADMIN PIN — SHA-256 hash, lockout, sessionStorage unlock
+   Default PIN: 0000
+   ══════════════════════════════════════════════ */
+(function() {
+    const PIN_HASH_KEY    = 'afristay_admin_pin_hash';
+    const ATTEMPTS_KEY    = 'afristay_admin_pin_attempts';
+    const LOCKOUT_KEY     = 'afristay_admin_pin_lock';
+    const SESSION_KEY     = 'afristay_admin_unlocked';
+    const DEFAULT_HASH    = '9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0'; // SHA-256 of "0000"
+    const MAX_ATTEMPTS    = 5;
+    const LOCKOUT_MS      = 3 * 60 * 1000; // 3 minutes
+
+    const overlay  = document.getElementById('adminPinOverlay');
+    const input    = document.getElementById('adminPinInput');
+    const errEl    = document.getElementById('adminPinError');
+    const okBtn    = document.getElementById('adminPinOkBtn');
+
+    async function sha256(str) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    function storedHash()   { return localStorage.getItem(PIN_HASH_KEY) || DEFAULT_HASH; }
+    function attempts()     { return parseInt(localStorage.getItem(ATTEMPTS_KEY) || '0', 10); }
+    function lockUntil()    { return parseInt(localStorage.getItem(LOCKOUT_KEY)  || '0', 10); }
+    function isLocked()     { return Date.now() < lockUntil(); }
+    function remainingSec() { return Math.ceil((lockUntil() - Date.now()) / 1000); }
+
+    function showErr(msg) { errEl.textContent = msg || ''; }
+
+    function unlock() {
+        overlay.classList.add('hidden');
+    }
+
+    async function tryUnlock() {
+        if (isLocked()) { showErr('Too many attempts. Try again in ' + remainingSec() + 's.'); return; }
+        const val = (input.value || '').trim();
+        if (!/^\d{4}$/.test(val)) { showErr('Enter a 4-digit PIN.'); return; }
+        showErr('');
+        const hashed = await sha256(val);
+        if (hashed === storedHash()) {
+            localStorage.removeItem(ATTEMPTS_KEY);
+            localStorage.removeItem(LOCKOUT_KEY);
+            unlock();
+        } else {
+            const n = attempts() + 1;
+            localStorage.setItem(ATTEMPTS_KEY, n);
+            if (n >= MAX_ATTEMPTS) {
+                localStorage.setItem(LOCKOUT_KEY, Date.now() + LOCKOUT_MS);
+                showErr('Too many attempts. Locked for 3 minutes.');
+            } else {
+                showErr('Incorrect PIN. ' + n + '/' + MAX_ATTEMPTS + ' attempts.');
+            }
+            input.value = '';
+            input.focus();
+        }
+    }
+
+    // Require PIN on every page load
+    if (isLocked()) showErr('Too many attempts. Try again in ' + remainingSec() + 's.');
+    setTimeout(() => input.focus(), 80);
+
+    okBtn.addEventListener('click', tryUnlock);
+    input.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); tryUnlock(); } });
+
+    // Expose for settings panel
+    window._adminPinUtils = { sha256, storedHash, storedHashKey: PIN_HASH_KEY };
+})();
+
+async function changeAdminPin() {
+    const cur     = document.getElementById('pinCurrent').value.trim();
+    const newPin  = document.getElementById('pinNew').value.trim();
+    const confirm = document.getElementById('pinConfirm').value.trim();
+    if (!/^\d{4}$/.test(cur))    { window.toast('Current PIN must be 4 digits.', 'error'); return; }
+    if (!/^\d{4}$/.test(newPin)) { window.toast('New PIN must be 4 digits.', 'error'); return; }
+    if (newPin !== confirm)      { window.toast('New PINs do not match.', 'error'); return; }
+    const utils = window._adminPinUtils;
+    const curHash = await utils.sha256(cur);
+    if (curHash !== utils.storedHash()) { window.toast('Current PIN is incorrect.', 'error'); return; }
+    const newHash = await utils.sha256(newPin);
+    localStorage.setItem(utils.storedHashKey, newHash);
+    window.toast('Admin PIN updated successfully!', 'success');
+    document.getElementById('pinCurrent').value = '';
+    document.getElementById('pinNew').value = '';
+    document.getElementById('pinConfirm').value = '';
+}
 </script>
 </body>
 </html>
