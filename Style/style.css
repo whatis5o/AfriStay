@@ -815,4 +815,42 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
     /* Checkout success screen: center layout */
     .checkout-success { padding: 32px 16px !important; }
+
+    /* Onboarding hero: reduce padding on phones */
+    .ob-hero { padding: 36px 24px !important; }
+    .ob-hero h1 { font-size: 24px !important; }
+    .ob-hero p  { font-size: 14px !important; }
+    .ob-page    { padding: 80px 16px 60px !important; }
+
+    /* Events hero */
+    .events-hero { padding: 40px 20px !important; }
+    .events-hero h1 { font-size: 26px !important; }
+
+    /* Contact boxes: single column stack */
+    .box { flex-direction: column !important; }
+    .box-left, .box-right { width: 100% !important; min-height: unset !important; }
+
+    /* Result / retry checkout pages: tighter */
+    .ref-box { padding: 20px 16px !important; }
+    .ref-box .big-icon { font-size: 44px !important; }
+
+    /* Detail page: smaller thumb images */
+    .thumb { width: 68px !important; height: 52px !important; }
+
+    /* Auth page: reduce box padding */
+    .auth-box, .box.auth-box { padding: 28px 20px !important; }
+
+    /* Favorites: tighter header */
+    .page-header { padding: 16px !important; }
+    .page-header h1 { font-size: 20px !important; }
+
+    /* Table horizontal scroll label */
+    .table-wrap::before {
+        content: '← Scroll to see more →';
+        display: block;
+        font-size: 11px;
+        color: #aaa;
+        text-align: center;
+        padding: 4px 0 8px;
+    }
 }

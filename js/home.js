@@ -168,6 +168,7 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
     initCarousel();
 
     if (window.refreshFavHearts) window.refreshFavHearts();
+    if (window.refreshScrollAnimations) window.refreshScrollAnimations();
 }
 
 function renderFallback() {

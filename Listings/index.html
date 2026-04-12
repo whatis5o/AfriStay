@@ -671,6 +671,7 @@
     <script src="/js/config.js"></script>
     <script src="/js/utils.js"></script>
     <script src="/js/maintenance.js"></script>
+    <script src="/js/scroll-animations.js"></script>
     <script src="/js/script.js"></script>
     <script>
     (async () => {
@@ -1060,6 +1061,7 @@
                     '</div>';
                 grid.appendChild(card);
             });
+            if (window.refreshScrollAnimations) window.refreshScrollAnimations();
         }
     
         showSkeletons(6);

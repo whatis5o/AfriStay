@@ -5562,7 +5562,7 @@ window.exportFinancial = function(format) {
     }
 
     if (format === 'csv') {
-        const headers = ['#', 'Booking ID', 'Listing', 'Guest', 'Email', 'Check-in', 'Check-out', 'Nights', 'Owner Earns (RWF)', 'AfriStay Fee (RWF)', 'Total (RWF)', 'Status', 'Payment Method'];
+        const headers = ['#', 'Booking ID', 'Listing', 'Guest', 'Email', 'Check-in', 'Check-out', 'Nights', 'Commission Fee/Night (RWF)', 'Owner Earns (RWF)', 'AfriStay Earnings (RWF)', 'Total Paid (RWF)', 'Status', 'Payment Method'];
         const rows = _finData.map((r, i) => [
             i + 1,
             r.id,
@@ -5572,6 +5572,7 @@ window.exportFinancial = function(format) {
             r.start_date || '',
             r.end_date || '',
             r.nights,
+            Math.round(r.fee || 0),
             Math.round(r.ownerEarns),
             Math.round(r.afristayEarns),
             Math.round(r.total),
@@ -5599,13 +5600,15 @@ window.exportFinancial = function(format) {
             doc.setFontSize(9); doc.setFont('helvetica', 'normal');
             doc.text('Generated: ' + new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }), 14, 22);
 
-            const cols = ['#', 'Listing', 'Guest', 'Check-in', 'Check-out', 'Owner (RWF)', 'Fee (RWF)', 'Total (RWF)', 'Status'];
+            const cols = ['#', 'Listing', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Fee/Night', 'Owner Earns', 'AfriStay Earnings', 'Total Paid', 'Status'];
             const rows = _finData.map((r, i) => [
                 i + 1,
                 (r.lst_title || '—').substring(0, 22),
                 (r.guest_name || '—').substring(0, 18),
                 r.start_date || '—',
                 r.end_date || '—',
+                r.nights,
+                Math.round(r.fee || 0).toLocaleString(),
                 Math.round(r.ownerEarns).toLocaleString(),
                 Math.round(r.afristayEarns).toLocaleString(),
                 Math.round(r.total).toLocaleString(),
@@ -5620,8 +5623,8 @@ window.exportFinancial = function(format) {
             const html = `<html><head><title>AfriStay Financial Report</title>
             <style>body{font-family:sans-serif;font-size:12px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;}th{background:#EB6753;color:#fff;}tr:nth-child(even){background:#f9f9f9;}h2{color:#EB6753;}</style></head>
             <body><h2>AfriStay Financial Report</h2><p>Generated: ${new Date().toLocaleDateString()}</p>
-            <table><thead><tr><th>#</th><th>Listing</th><th>Guest</th><th>Check-in</th><th>Check-out</th><th>Owner Earns</th><th>AfriStay Fee</th><th>Total</th><th>Status</th></tr></thead><tbody>
-            ${_finData.map((r, i) => `<tr><td>${i+1}</td><td>${r.lst_title||'—'}</td><td>${r.guest_name||'—'}</td><td>${r.start_date||'—'}</td><td>${r.end_date||'—'}</td><td>${Math.round(r.ownerEarns).toLocaleString()} RWF</td><td>${Math.round(r.afristayEarns).toLocaleString()} RWF</td><td>${Math.round(r.total).toLocaleString()} RWF</td><td>${r.status}</td></tr>`).join('')}
+            <table><thead><tr><th>#</th><th>Listing</th><th>Guest</th><th>Check-in</th><th>Check-out</th><th>Nights</th><th>Fee/Night</th><th>Owner Earns</th><th>AfriStay Earnings</th><th>Total Paid</th><th>Status</th></tr></thead><tbody>
+            ${_finData.map((r, i) => `<tr><td>${i+1}</td><td>${r.lst_title||'—'}</td><td>${r.guest_name||'—'}</td><td>${r.start_date||'—'}</td><td>${r.end_date||'—'}</td><td>${r.nights}</td><td>${Math.round(r.fee||0).toLocaleString()} RWF</td><td>${Math.round(r.ownerEarns).toLocaleString()} RWF</td><td>${Math.round(r.afristayEarns).toLocaleString()} RWF</td><td>${Math.round(r.total).toLocaleString()} RWF</td><td>${r.status}</td></tr>`).join('')}
             </tbody></table></body></html>`;
             const w = window.open('', '_blank');
             w.document.write(html);
@@ -5828,20 +5831,38 @@ window.exportBookings = async function(format = 'csv') {
             .limit(10000);
         if (error) throw error;
 
-        const headers = ['#', 'Booking ID', 'Listing ID', 'Guest', 'Email', 'Check-in', 'Check-out', 'Amount (RWF)', 'Status', 'Payment', 'Created'];
-        const rows = (data || []).map((b, i) => [
-            i + 1,
-            b.id,
-            b.listing_id || '',
-            b.guest_name || '',
-            b.guest_email || '',
-            b.start_date || '',
-            b.end_date || '',
-            Math.round(b.total_amount || 0),
-            b.status || '',
-            (b.payment_method || '').replace(/_/g, ' '),
-            (b.created_at || '').slice(0, 10),
-        ]);
+        // Batch fetch listing pricing for audit columns
+        const lids = [...new Set((data || []).map(b => b.listing_id).filter(Boolean))];
+        const lstMap = {};
+        if (lids.length) {
+            const { data: ls } = await _supabase.from('listings').select('id,title,price,price_display,price_afristay_fee').in('id', lids);
+            (ls || []).forEach(l => lstMap[l.id] = l);
+        }
+
+        const headers = ['#', 'Booking ID', 'Listing', 'Guest', 'Email', 'Check-in', 'Check-out', 'Nights', 'Owner Price/Night (RWF)', 'Commission Fee/Night (RWF)', 'Guest Price/Night (RWF)', 'Total Paid (RWF)', 'Status', 'Payment', 'Created'];
+        const rows = (data || []).map((b, i) => {
+            const lst = lstMap[b.listing_id] || {};
+            const nights = b.start_date && b.end_date
+                ? Math.max(1, Math.round((new Date(b.end_date) - new Date(b.start_date)) / 86400000))
+                : 1;
+            return [
+                i + 1,
+                b.id,
+                lst.title || b.listing_id || '',
+                b.guest_name || '',
+                b.guest_email || '',
+                b.start_date || '',
+                b.end_date || '',
+                nights,
+                Math.round(lst.price || 0),
+                Math.round(lst.price_afristay_fee || 0),
+                Math.round(lst.price_display || lst.price || 0),
+                Math.round(b.total_amount || 0),
+                b.status || '',
+                (b.payment_method || '').replace(/_/g, ' '),
+                (b.created_at || '').slice(0, 10),
+            ];
+        });
         const dateStr = new Date().toISOString().slice(0, 10);
 
         if (format === 'pdf') {
@@ -5850,13 +5871,16 @@ window.exportBookings = async function(format = 'csv') {
             const doc = new jsPDF({ orientation: 'landscape' });
             doc.setFontSize(14);
             doc.text('AfriStay — Bookings Export (' + dateStr + ')', 14, 15);
+            // PDF uses condensed columns (landscape fits ~12 cols at 7pt)
+            const pdfCols = ['#', 'Booking ID', 'Listing', 'Guest', 'Check-in', 'Check-out', 'Nights', 'Owner/Night', 'Fee/Night', 'Guest/Night', 'Total (RWF)', 'Status'];
+            const pdfRows = rows.map(r => [r[0], r[1].slice(0,10), (r[2]||'').substring(0,18), (r[3]||'').substring(0,14), r[5], r[6], r[7], r[8].toLocaleString(), r[9].toLocaleString(), r[10].toLocaleString(), r[11].toLocaleString(), r[12]]);
             doc.autoTable({
-                head: [headers],
-                body: rows,
+                head: [pdfCols],
+                body: pdfRows,
                 startY: 22,
                 styles: { fontSize: 7, cellPadding: 2 },
                 headStyles: { fillColor: [22, 163, 74] },
-                columnStyles: { 1: { cellWidth: 28 }, 2: { cellWidth: 28 } },
+                columnStyles: { 1: { cellWidth: 22 } },
             });
             doc.save('AfriStay-Bookings-' + dateStr + '.pdf');
             toast('Bookings PDF exported!', 'success');
@@ -5991,14 +6015,15 @@ window.impersonateUser = async function(userId, userEmail) {
     toast('Generating impersonation link…', 'info', 4000);
     try {
         const { data: { session } } = await _supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('No active session — please log in again');
         const res = await fetch(CONFIG.FUNCTIONS_BASE + '/impersonate-user', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session?.access_token },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
             body: JSON.stringify({ user_id: userId }),
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error || 'Edge function error');
-        if (!json.url) throw new Error('No URL returned');
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || json.msg || json.message || `Server error (${res.status})`);
+        if (!json.url) throw new Error('No URL returned from edge function');
 
         logAudit({ action: 'impersonate_user', entityType: 'profile', entityId: userId, description: `Admin impersonated ${userEmail}` });
         window.open(json.url, '_blank');

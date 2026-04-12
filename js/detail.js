@@ -937,7 +937,10 @@ async function loadSimilarListings(provinceId, categorySlug) {
     section.appendChild(grid);
 
     const contentEl = document.getElementById('contentEl');
-    if (contentEl) contentEl.appendChild(section);
+    if (contentEl) {
+        contentEl.appendChild(section);
+        if (window.refreshScrollAnimations) window.refreshScrollAnimations();
+    }
 }
 
 function setEl(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
