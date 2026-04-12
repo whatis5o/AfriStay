@@ -2,7 +2,7 @@
  * HOME PAGE — home.js  →  /js/home.js
  */
 
-const STORAGE_BASE = 'https://xuxzeinufjpplxkerlsd.supabase.co/storage/v1/object/public/listing_images';
+const STORAGE_BASE = 'https://xuxzeinufjpplxkerlsd.supabase.co/storage/v1/object/public/listing-images';
 const FEATURED_CACHE_KEY = 'afristay_featured_v1';
 const FEATURED_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -32,7 +32,7 @@ async function resolveImages(sb, ids) {
         await Promise.all(missing.map(async (id) => {
             try {
                 const { data: files } = await sb.storage
-                    .from('listing_images')
+                    .from('listing-images')
                     .list(id, { limit: 1 });
                 const file = (files || []).find(f => f.name && !f.id?.endsWith('/'));
                 if (file) imgMap[id] = `${STORAGE_BASE}/${id}/${file.name}`;
@@ -186,13 +186,21 @@ function initCarousel() {
     const prevBtn = document.querySelector('.prev-btn');
     const nextBtn = document.querySelector('.next-btn');
     function visible() { const w = window.innerWidth; return w >= 1024 ? 3 : w >= 768 ? 2 : 1; }
+    function getCardWidth() {
+        const cards = track.querySelectorAll('.property-card');
+        if (!cards.length) return 0;
+        // Prefer getBoundingClientRect for accurate post-layout width
+        const rect = cards[0].getBoundingClientRect();
+        return rect.width || cards[0].offsetWidth;
+    }
     window.slideCarousel = function(dir) {
         const cards = track.querySelectorAll('.property-card');
         if (!cards.length) return;
         const max = Math.max(0, cards.length - visible());
         current = Math.min(Math.max(current + dir, 0), max);
         const gap = parseInt(getComputedStyle(track).gap) || 25;
-        const offset = current * (cards[0].offsetWidth + gap);
+        const cardW = getCardWidth();
+        const offset = cardW > 0 ? current * (cardW + gap) : 0;
         requestAnimationFrame(() => {
             track.style.webkitTransform = 'translateX(-' + offset + 'px)';
             track.style.transform = 'translateX(-' + offset + 'px)';
@@ -200,7 +208,9 @@ function initCarousel() {
         if (prevBtn) prevBtn.disabled = current === 0;
         if (nextBtn) nextBtn.disabled = current >= max;
     };
-    window.addEventListener('resize', () => { current = 0; track.style.transform = 'translateX(0)'; });
+    // Initialize after layout settles (cards may have offsetWidth=0 immediately after append)
+    requestAnimationFrame(() => window.slideCarousel(0));
+    window.addEventListener('resize', () => { current = 0; requestAnimationFrame(() => window.slideCarousel(0)); });
     let tx = 0;
     track.addEventListener('touchstart', e => { tx = e.changedTouches[0].screenX; }, { passive: true });
     track.addEventListener('touchend', e => { const d = tx - e.changedTouches[0].screenX; if (Math.abs(d) > 50) slideCarousel(d > 0 ? 1 : -1); });

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>if(!localStorage.getItem('sb-xuxzeinufjpplxkerlsd-auth-token')){window.location.replace('/Auth/?redirect='+encodeURIComponent(window.location.href));}</script>
     <title>Admin Dashboard — AfriStay</title>
     <meta property="og:title" content="Admin Dashboard — AfriStay">
     <meta property="og:description" content="AfriStay admin control panel for managing listings, bookings, users, and platform settings.">
@@ -785,6 +786,14 @@
                 </div>
                 <div class="fg"><label id="priceLabel">Price per Night (RWF) *</label><input type="number" class="fi" id="listPrice" placeholder="e.g. 50000" min="0" required></div>
             </div>
+            <!-- Admin: commission fee field -->
+            <div class="fg" id="adminFeeGroup" style="background:#fff8f0;border:1.5px solid #f5cba7;border-radius:12px;padding:14px 16px;margin-bottom:2px;">
+                <label style="color:#e67e22;font-weight:700;font-size:13px;">AfriStay Commission Fee (RWF) *</label>
+                <input type="number" class="fi" id="adminListFee" placeholder="e.g. 5000" min="0" style="margin-top:6px;">
+                <p style="font-size:12px;color:#aaa;margin-top:5px;line-height:1.5;">
+                    Fee added on top. Guest sees total: <strong id="adminFeeTotalPreview" style="color:#e67e22;">—</strong> RWF
+                </p>
+            </div>
             <div class="fg" id="vehiclePricingGroup" style="display:none;">
                 <label>Price Outside Kigali (RWF/day) — optional</label>
                 <input type="number" class="fi" id="listPriceOutside" placeholder="e.g. 75000" min="0">
@@ -857,6 +866,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="/js/config.js"></script>
 <script src="/js/utils.js"></script>
+    <script src="/js/maintenance.js"></script>
 <script src="/js/dashboard.js?v=4"></script>
 <script>
 const PTITLES={
@@ -874,11 +884,20 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
         if(!tab||tab==='logout')return;
         const el=document.getElementById('panelTitle');
         if(el)el.textContent=PTITLES[tab+'Panel']||PTITLES[tab]||tab;
-        if(tab==='settings'){setTimeout(prefillAdminProfile,200);setTimeout(loadPlatformConfig,300);}
+        if(tab==='settings'){waitForProfile(prefillAdminProfile);setTimeout(loadPlatformConfig,300);}
         if(tab==='financial'){setTimeout(loadFinancialData,100);setTimeout(loadPayoutOwners,200);}
         if(tab==='receipts'){setTimeout(loadReceiptsSearch,100);}
     });
 });
+
+function waitForProfile(fn, maxMs = 6000) {
+    const start = Date.now();
+    (function check() {
+        if (window.CURRENT_PROFILE) { fn(); return; }
+        if (Date.now() - start > maxMs) return;
+        setTimeout(check, 200);
+    })();
+}
 
 function prefillAdminProfile(){
     if(!window.CURRENT_PROFILE)return;
@@ -910,16 +929,33 @@ async function saveAdminProfile(){
     btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-floppy-disk"></i> Save Profile';
 }
 
-// Auto-approve admin-created listings
+// Live preview: base price + commission fee = guest total
+function _updateFeePreview() {
+    const base = Number(document.getElementById('listPrice')?.value) || 0;
+    const fee  = Number(document.getElementById('adminListFee')?.value) || 0;
+    const prev = document.getElementById('adminFeeTotalPreview');
+    if (prev) prev.textContent = (base > 0 || fee > 0) ? (base + fee).toLocaleString('en-RW') : '—';
+}
+document.getElementById('listPrice')?.addEventListener('input', _updateFeePreview);
+document.getElementById('adminListFee')?.addEventListener('input', _updateFeePreview);
+
+// Auto-approve admin-created listings + set price_display and price_afristay_fee
 const origCreate=window.handleCreateListing;
 window.handleCreateListing=async function(){
     await origCreate?.();
-    // Mark newly created listing as approved (admin bypass)
-    // dashboard.js sets status:'pending' — we update it after
     const _s=window.supabaseClient;
     if(!_s||!window.CURRENT_PROFILE)return;
-    const{data}=await _s.from('listings').select('id').eq('owner_id',window.CURRENT_PROFILE.id).eq('status','pending').order('created_at',{ascending:false}).limit(1);
-    if(data&&data[0]){await _s.from('listings').update({status:'approved'}).eq('id',data[0].id);}
+    const fee       = Number(document.getElementById('adminListFee')?.value) || 0;
+    const basePrice = Number(document.getElementById('listPrice')?.value) || 0;
+    const{data}=await _s.from('listings').select('id,price').eq('owner_id',window.CURRENT_PROFILE.id).eq('status','pending').order('created_at',{ascending:false}).limit(1);
+    if(data&&data[0]){
+        const priceDisplay = (data[0].price || basePrice) + fee;
+        await _s.from('listings').update({
+            status:'approved',
+            price_afristay_fee: fee,
+            price_display: priceDisplay,
+        }).eq('id',data[0].id);
+    }
 };
 
 // Sidebar toggle handled by initSidebarToggle() in dashboard.js

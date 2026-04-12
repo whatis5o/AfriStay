@@ -153,8 +153,15 @@ window.toast = toast;
    INITIALIZATION
    =========================== */
 document.addEventListener('DOMContentLoaded', async () => {
+    // Instant auth guard: redirect unauthenticated users before any UI renders
+    const _authToken = localStorage.getItem('sb-xuxzeinufjpplxkerlsd-auth-token');
+    if (!_authToken) {
+        window.location.replace('/Auth/?redirect=' + encodeURIComponent(window.location.href));
+        return;
+    }
+
     console.log("📱 [ADMIN] DOM loaded, initializing...");
-    
+
     // Step 0: Get Supabase client
     if (window.supabaseClient) {
         _supabase = window.supabaseClient;
@@ -922,11 +929,15 @@ async function loadAmenityCheckboxes() {
         //   'vehicle'  → only show for vehicle listings
         //   'property' → only show for non-vehicle listings
         //   'all'      → show for both
+        const seenSlugs = new Set();
         const list = _amenityCache.filter(a => {
             const lt = (a.listing_type || 'all').toLowerCase();
-            if (lt === 'vehicle')  return isVehicle;
-            if (lt === 'property') return !isVehicle;
-            return true; // 'all'
+            if (lt === 'vehicle')  { if (!isVehicle) return false; }
+            else if (lt === 'property') { if (isVehicle) return false; }
+            // Deduplicate by slug (handles duplicate DB rows)
+            if (seenSlugs.has(a.slug)) return false;
+            seenSlugs.add(a.slug);
+            return true;
         });
 
         if (!list.length) {
@@ -1419,7 +1430,7 @@ async function loadListingsGrid(filters = {}, page = 0) {
 
     let q = _supabase
         .from('listings')
-        .select('id,title,price,currency,availability_status,status,owner_id,province_id,district_id,sector_id,category_slug,created_at', { count: 'exact' })
+        .select('id,title,price,price_display,currency,availability_status,status,owner_id,province_id,district_id,sector_id,category_slug,created_at', { count: 'exact' })
         .order('created_at', { ascending: false })
         .range(start, end);
 
@@ -1468,7 +1479,7 @@ async function loadListingsGrid(filters = {}, page = 0) {
             <div style="padding:14px;flex:1;display:flex;flex-direction:column;gap:6px;">
                 <a href="/Listings/Detail/?id=${l.id}" style="text-decoration:none;"><h4 style="margin:0;font-size:15px;font-weight:600;color:#222;">${escapeHtml(l.title)}</h4></a>
                 <p style="margin:0;color:#888;font-size:13px;">${l.category_slug || ''} • ${ownerMap[l.owner_id] || 'Unknown'}</p>
-                <p style="margin:0;color:var(--primary,#EB6753);font-weight:700;font-size:14px;">${Number(l.price).toLocaleString()} ${l.currency || 'RWF'}</p>
+                <p style="margin:0;color:var(--primary,#EB6753);font-weight:700;font-size:14px;">${Number(l.price_display||l.price||0).toLocaleString()} ${l.currency || 'RWF'}</p>
                 <div style="display:flex;gap:6px;margin-top:auto;padding-top:10px;flex-wrap:wrap;">
                     ${CURRENT_ROLE === 'admin' ? `
                         ${l.availability_status === 'available'
@@ -2039,13 +2050,17 @@ async function loadMessagesPreview() {
         const el = document.createElement('div');
         el.className = 'chat-user-item' + (i === 0 ? ' active' : '');
         el.dataset.id = m.id;
-        const initial = (m.name || 'U')[0].toUpperCase();
+        // Fall back to email username if name is missing or looks like a raw number
+        const displayName = (m.name && !/^\d+$/.test(m.name.trim()))
+            ? m.name
+            : (m.email ? m.email.split('@')[0] : 'Unknown');
+        const initial = displayName[0].toUpperCase();
         const preview = (m.message || '').slice(0, 55) + ((m.message || '').length > 55 ? '…' : '');
         const timeStr = m.created_at ? _fmtMsgTime(m.created_at) : '';
         el.innerHTML = `
             <div class="chat-user-avatar">${escapeHtml(initial)}</div>
             <div class="chat-user-info">
-                <h4>${escapeHtml(m.name || 'Unknown')}</h4>
+                <h4>${escapeHtml(displayName)}</h4>
                 <p>${escapeHtml(preview)}</p>
             </div>
             <span class="chat-user-time">${timeStr}</span>
@@ -2076,9 +2091,12 @@ function showMessageDetail(m) {
     const area = $('#chatMessagesArea');
     if (!area) return;
     const date = m.created_at ? new Date(m.created_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }) : '';
-    const initial = escapeHtml((m.name || 'U')[0].toUpperCase());
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(m.email || '')}&su=${encodeURIComponent('Re: Your message to AfriStay')}&body=${encodeURIComponent('Hi ' + (m.name || '') + ',\n\nThank you for reaching out to AfriStay!\n\n')}`;
-    const mailtoUrl = `mailto:${encodeURIComponent(m.email || '')}?subject=${encodeURIComponent('Re: Your message to AfriStay')}&body=${encodeURIComponent('Hi ' + (m.name || '') + ',\n\n')}`;
+    const displayName = (m.name && !/^\d+$/.test(m.name.trim()))
+        ? m.name
+        : (m.email ? m.email.split('@')[0] : 'Unknown');
+    const initial = escapeHtml(displayName[0].toUpperCase());
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(m.email || '')}&su=${encodeURIComponent('Re: Your message to AfriStay')}&body=${encodeURIComponent('Hi ' + displayName + ',\n\nThank you for reaching out to AfriStay!\n\n')}`;
+    const mailtoUrl = `mailto:${encodeURIComponent(m.email || '')}?subject=${encodeURIComponent('Re: Your message to AfriStay')}&body=${encodeURIComponent('Hi ' + displayName + ',\n\n')}`;
 
     // Update header
     const win = area.closest('.chat-window');
@@ -2092,7 +2110,7 @@ function showMessageDetail(m) {
         hdr.innerHTML = `
             <div class="chat-win-avatar">${initial}</div>
             <div>
-                <div class="chat-win-name">${escapeHtml(m.name || 'Unknown')}</div>
+                <div class="chat-win-name">${escapeHtml(displayName)}</div>
                 <div class="chat-win-sub">${escapeHtml(m.email || '')}</div>
             </div>
         `;
@@ -2535,16 +2553,15 @@ async function populatePromoListings() {
 
 
 async function handleLogout() {
-    console.log("🚪 [AUTH] Logging out...");
-    
     try {
         await _supabase.auth.signOut();
-        console.log("✅ [AUTH] Logged out successfully");
-        window.location.href = "/";
     } catch (err) {
         console.error("❌ [AUTH] Error logging out:", err);
-        location.reload();
     }
+    // Always clear local state and redirect, even if signOut threw
+    localStorage.removeItem('afriStay_role');
+    localStorage.removeItem('afriStay_firstName');
+    window.location.href = '/Auth/';
 }
 
 /* ===========================
@@ -3232,7 +3249,7 @@ async function loadListingRequests(searchTerm = '') {
     try {
         let rq = _supabase
             .from('listings')
-            .select('id,title,price,currency,category_slug,province_id,district_id,owner_id,created_at,status')
+            .select('id,title,price,price_display,currency,category_slug,province_id,district_id,owner_id,created_at,status')
             .in('status', ['pending'])
             .order('created_at', { ascending: false });
         if (searchTerm) rq = rq.ilike('title', `%${searchTerm}%`);
@@ -3269,7 +3286,7 @@ async function loadListingRequests(searchTerm = '') {
                 '<div style="flex:1;min-width:200px;">' +
                 '<h4 style="font-size:16px;font-weight:700;color:#1a1a1a;margin:0 0 4px;">' + escapeHtml(l.title) + '</h4>' +
                 '<p style="font-size:13px;color:#888;margin:0;"><i class="fa-solid fa-location-dot" style="color:#EB6753;"></i> ' + escapeHtml(loc) + ' &nbsp;|&nbsp; ' +
-                '<i class="fa-solid fa-tag" style="color:#EB6753;"></i> ' + Number(l.price||0).toLocaleString('en-RW') + ' ' + (l.currency||'RWF') + '</p></div>' +
+                '<i class="fa-solid fa-tag" style="color:#EB6753;"></i> ' + Number(l.price_display||l.price||0).toLocaleString('en-RW') + ' ' + (l.currency||'RWF') + '</p></div>' +
                 '<div style="min-width:180px;">' +
                 '<p style="font-size:13px;color:#555;margin:0;font-weight:600;">' + escapeHtml(owner.full_name||'Unknown') + '</p>' +
                 '<p style="font-size:12px;color:#aaa;margin:2px 0 0;">' + escapeHtml(owner.email||'') + '</p></div>' +
@@ -3914,7 +3931,7 @@ async function loadDashPendingListings() {
     try {
         let q = _supabase
             .from('listings')
-            .select('id,title,price,currency,category_slug,province_id,district_id,owner_id,created_at')
+            .select('id,title,price,price_display,currency,category_slug,province_id,district_id,owner_id,created_at')
             .neq('status', 'approved')
             .order('created_at', { ascending: false })
             .limit(15);
@@ -3962,7 +3979,7 @@ async function loadDashPendingListings() {
             const owner = ownerMap[l.owner_id] || {};
             const loc   = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
             const unit  = l.category_slug === 'vehicle' ? '/day' : '/night';
-            const priceFmt = Number(l.price||0).toLocaleString('en-RW');
+            const priceFmt = Number(l.price_display||l.price||0).toLocaleString('en-RW');
 
             const row = document.createElement('div');
             row.id = 'dplRow_' + l.id;
@@ -4516,7 +4533,7 @@ window.loadReceiptsSearch = async function(page = 0) {
                 listings(title),
                 digital_receipts(receipt_number, issued_at, cancelled_at, cancelled_by, cancellation_note)
             `, { count: 'exact' })
-            .in('status', ['paid', 'confirmed', 'approved', 'completed'])
+            .in('status', ['confirmed', 'approved', 'completed'])
             .order('created_at', { ascending: false });
 
         // Server-side filters on bookings columns
@@ -4846,7 +4863,7 @@ window.exportReceiptsList = async function(format) {
                 listings(title),
                 digital_receipts(receipt_number, issued_at, cancelled_at, cancelled_by, cancellation_note)
             `)
-            .in('status', ['paid', 'confirmed', 'approved', 'completed'])
+            .in('status', ['confirmed', 'approved', 'completed'])
             .order('created_at', { ascending: false })
             .limit(2000);
 
@@ -5459,16 +5476,18 @@ async function loadFinancialData(page = 0, searchTerm = '') {
         }
 
         // Store for export
+        const DEFAULT_COMMISSION = 0.10; // 10% fallback when no flat fee is set
         _finData = data.map(b => {
             const lst = lstMap[b.listing_id] || {};
-            const fee = lst.price_afristay_fee || 0;
             const total = Number(b.total_amount || 0);
             const nights = b.start_date && b.end_date
                 ? Math.max(1, Math.round((new Date(b.end_date) - new Date(b.start_date)) / 86400000))
                 : 1;
-            const afristayEarns = fee * nights;
+            const flatFee = Number(lst.price_afristay_fee || 0);
+            // If a flat fee was configured, use it per night; otherwise fall back to 10% of total
+            const afristayEarns = flatFee > 0 ? flatFee * nights : Math.round(total * DEFAULT_COMMISSION);
             const ownerEarns = total - afristayEarns;
-            return { ...b, lst_title: lst.title || '—', fee, nights, afristayEarns, ownerEarns, total };
+            return { ...b, lst_title: lst.title || '—', fee: flatFee, nights, afristayEarns, ownerEarns, total };
         });
 
         // Stats
@@ -5725,9 +5744,13 @@ window.drawRevenueChart = function() {
                 label: ctx => Number(ctx.parsed.y).toLocaleString('en-RW') + ' RWF'
             }}},
             scales: {
-                y: { beginAtZero: true, grid: { color: '#f0f0f0' }, ticks: {
+                y: { beginAtZero: true, min: 0, grid: { color: '#f0f0f0' }, ticks: {
                     font: { size: 11 },
-                    callback: v => v === 0 ? '0' : (v >= 1000 ? Math.round(v/1000) + 'K' : v)
+                    callback: v => {
+                        if (!Number.isInteger(v)) return ''; // hide decimal auto-scale ticks
+                        if (v >= 1000) return Math.round(v / 1000) + 'K';
+                        return v;
+                    }
                 }},
                 x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 45 } }
             }

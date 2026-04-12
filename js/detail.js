@@ -871,7 +871,7 @@ async function loadSimilarListings(provinceId, categorySlug) {
     // Fetch up to 3 similar listings (same province + same category, excluding current)
     let query = _supabase
         .from('listings')
-        .select('id, title, price, currency, category_slug, province_id, district_id, availability_status')
+        .select('id, title, price, price_display, currency, category_slug, province_id, district_id, availability_status')
         .neq('id', LISTING_ID)
         .eq('availability_status', 'available')
         .limit(3);
@@ -913,7 +913,7 @@ async function loadSimilarListings(provinceId, categorySlug) {
     similar.forEach(l => {
         const img   = imgMap[l.id] || '';
         const loc   = pvMap[l.province_id] || 'Rwanda';
-        const price = Number(l.price).toLocaleString('en-RW');
+        const price = Number(l.price_display || l.price).toLocaleString('en-RW');
         const cur   = l.currency || 'RWF';
         const unit  = l.category_slug === 'vehicle' ? '/day' : '/night';
 

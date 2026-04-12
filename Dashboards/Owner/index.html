@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>if(!localStorage.getItem('sb-xuxzeinufjpplxkerlsd-auth-token')){window.location.replace('/Auth/?redirect='+encodeURIComponent(window.location.href));}</script>
     <title>Owner Dashboard — AfriStay</title>
     <meta property="og:title" content="Owner Dashboard — AfriStay">
     <meta property="og:description" content="Manage your AfriStay listings, bookings, earnings, and property settings.">
@@ -402,9 +403,21 @@
                 </div>
                 <div class="fg"><label id="priceLabel">Price per Night (RWF) *</label><input type="number" class="fi" id="listPrice" placeholder="e.g. 50000" min="0" required></div>
             </div>
+            <!-- Admin-only: commission fee field (hidden for owners) -->
+            <div class="fg" id="adminFeeGroup" style="display:none;background:#fff8f0;border:1.5px solid #f5cba7;border-radius:12px;padding:14px 16px;margin-bottom:2px;">
+                <label style="color:#e67e22;font-weight:700;font-size:13px;">AfriStay Commission Fee (RWF) *</label>
+                <input type="number" class="fi" id="adminListFee" placeholder="e.g. 5000" min="0" style="margin-top:6px;">
+                <p style="font-size:12px;color:#aaa;margin-top:5px;line-height:1.5;">
+                    This fee is added on top of the listing price. Guest will see: <strong id="adminFeeTotalPreview" style="color:#e67e22;">—</strong> RWF total.
+                </p>
+            </div>
             <div class="fg" id="vehiclePricingGroup" style="display:none;">
                 <label>Price Outside Kigali (RWF/day) — optional</label>
                 <input type="number" class="fi" id="listPriceOutside" placeholder="e.g. 75000" min="0">
+                <p style="font-size:12px;color:#aaa;margin-top:5px;line-height:1.5;">
+                    Set a different daily rate when this vehicle is rented for trips outside Kigali (e.g. upcountry travel).
+                    Leave blank to use the same price everywhere.
+                </p>
             </div>
             <div class="fg" style="position:relative;" class="location-box">
                 <label>Location</label>
@@ -471,6 +484,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>
 <script src="/js/utils.js"></script>
+    <script src="/js/maintenance.js"></script>
 <script src="/js/dashboard.js?v=4"></script>
 <script>
 const PTITLES={dashboardPanel:'Dashboard',listingsPanel:'My Listings',bookingsPanel:'Bookings',promotionsPanel:'Promotions',earningsPanel:'Earnings',settingsPanel:'Settings'};
@@ -484,13 +498,22 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
             setTimeout(()=>{
                 if(typeof loadOwnerWallet==='function')loadOwnerWallet();
                 if(typeof loadPayoutHistory==='function')loadPayoutHistory();
-                prefillOwnerProfile();
             },150);
+            waitForProfile(prefillOwnerProfile);
         }
         if(tab==='promotions') setTimeout(()=>{ if(typeof loadOwnerPromotions==='function')loadOwnerPromotions(); },100);
-        if(tab==='earnings') setTimeout(()=>{ if(typeof loadEarnings==='function')loadEarnings(); },100);
+        if(tab==='earnings') waitForProfile(loadEarnings);
     });
 });
+
+function waitForProfile(fn, maxMs = 6000) {
+    const start = Date.now();
+    (function check() {
+        if (window.CURRENT_PROFILE) { fn(); return; }
+        if (Date.now() - start > maxMs) return;
+        setTimeout(check, 200);
+    })();
+}
 
 function prefillOwnerProfile(){
     if(!window.CURRENT_PROFILE)return;
@@ -691,10 +714,17 @@ async function loadEarnings() {
     const section = document.getElementById('earningsPayoutSection');
     const fmtMoney = n => Number(n||0).toLocaleString('en-RW') + ' RWF';
 
-    // If profile isn't ready yet, retry once after a short wait
+    // Wait up to 6 s for profile to load (async auth)
     if (!_s || !window.CURRENT_PROFILE) {
-        await new Promise(r => setTimeout(r, 1200));
-        if (!window.CURRENT_PROFILE) {
+        const ready = await new Promise(resolve => {
+            const start = Date.now();
+            (function check() {
+                if (window.CURRENT_PROFILE) { resolve(true); return; }
+                if (Date.now() - start > 6000) { resolve(false); return; }
+                setTimeout(check, 200);
+            })();
+        });
+        if (!ready) {
             _set('earningsBalance',  '0 RWF');
             _set('earningsPaid',     '0 RWF');
             _set('earningsBookings', '0');

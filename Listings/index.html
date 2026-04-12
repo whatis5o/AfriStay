@@ -545,18 +545,22 @@
         </div>
         <div class="amenity-chips-bar">
             <div class="amenity-chips" id="amenityChips">
-                <button class="am-chip" data-am="wifi"><i class="fa-solid fa-wifi"></i> WiFi</button>
-                <button class="am-chip" data-am="pool"><i class="fa-solid fa-water-ladder"></i> Pool</button>
-                <button class="am-chip" data-am="parking"><i class="fa-solid fa-square-parking"></i> Parking</button>
-                <button class="am-chip" data-am="air_conditioning"><i class="fa-solid fa-snowflake"></i> A/C</button>
-                <button class="am-chip" data-am="kitchen"><i class="fa-solid fa-kitchen-set"></i> Kitchen</button>
-                <button class="am-chip" data-am="generator"><i class="fa-solid fa-bolt"></i> Generator</button>
-                <button class="am-chip" data-am="tv"><i class="fa-solid fa-tv"></i> TV</button>
-                <button class="am-chip" data-am="gym"><i class="fa-solid fa-dumbbell"></i> Gym</button>
-                <button class="am-chip" data-am="laundry"><i class="fa-solid fa-jug-detergent"></i> Laundry</button>
-                <button class="am-chip" data-am="balcony"><i class="fa-solid fa-person-shelter"></i> Balcony</button>
-                <button class="am-chip" data-am="security"><i class="fa-solid fa-shield-halved"></i> Security</button>
-                <button class="am-chip" data-am="breakfast"><i class="fa-solid fa-mug-hot"></i> Breakfast</button>
+                <!-- data-listing-type: "all" shows always, "property" hides for vehicles, "vehicle" hides for properties -->
+                <button class="am-chip" data-am="wifi"             data-listing-type="property"><i class="fa-solid fa-wifi"></i> WiFi</button>
+                <button class="am-chip" data-am="pool"             data-listing-type="property"><i class="fa-solid fa-water-ladder"></i> Pool</button>
+                <button class="am-chip" data-am="parking"          data-listing-type="all"><i class="fa-solid fa-square-parking"></i> Parking</button>
+                <button class="am-chip" data-am="air_conditioning"  data-listing-type="all"><i class="fa-solid fa-snowflake"></i> A/C</button>
+                <button class="am-chip" data-am="kitchen"          data-listing-type="property"><i class="fa-solid fa-kitchen-set"></i> Kitchen</button>
+                <button class="am-chip" data-am="generator"        data-listing-type="property"><i class="fa-solid fa-bolt"></i> Generator</button>
+                <button class="am-chip" data-am="tv"               data-listing-type="property"><i class="fa-solid fa-tv"></i> TV</button>
+                <button class="am-chip" data-am="gym"              data-listing-type="property"><i class="fa-solid fa-dumbbell"></i> Gym</button>
+                <button class="am-chip" data-am="laundry"          data-listing-type="property"><i class="fa-solid fa-jug-detergent"></i> Laundry</button>
+                <button class="am-chip" data-am="balcony"          data-listing-type="property"><i class="fa-solid fa-person-shelter"></i> Balcony</button>
+                <button class="am-chip" data-am="security"         data-listing-type="all"><i class="fa-solid fa-shield-halved"></i> Security</button>
+                <button class="am-chip" data-am="breakfast"        data-listing-type="property"><i class="fa-solid fa-mug-hot"></i> Breakfast</button>
+                <button class="am-chip" data-am="bluetooth"        data-listing-type="vehicle"><i class="fa-brands fa-bluetooth"></i> Bluetooth</button>
+                <button class="am-chip" data-am="gps"              data-listing-type="vehicle"><i class="fa-solid fa-location-dot"></i> GPS</button>
+                <button class="am-chip" data-am="sunroof"          data-listing-type="vehicle"><i class="fa-solid fa-sun"></i> Sunroof</button>
             </div>
         </div>
         <!-- PRICE RANGE SLIDER -->
@@ -666,6 +670,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/js/config.js"></script>
     <script src="/js/utils.js"></script>
+    <script src="/js/maintenance.js"></script>
     <script src="/js/script.js"></script>
     <script>
     (async () => {
@@ -696,7 +701,7 @@
             if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
             const clean = raw.replace(/^\//, '');
             if (clean.startsWith('listing_images/') || clean.startsWith('listing-images/')) return STORAGE_BASE + '/' + clean;
-            return STORAGE_BASE + '/listing_images/' + clean;
+            return STORAGE_BASE + '/listing-images/' + clean;
         }
     
         // Resolve images: table first, then storage folder fallback
@@ -791,12 +796,16 @@
         };
     
         function _applyCatUI(cat) {
-            const isVeh = cat === 'vehicle';
-            // Amenity chips: hide house-specific ones for vehicles
+            const isVeh  = cat === 'vehicle';
+            const isProp = cat === 'real_estate';
+            // Amenity chips: show only chips relevant to the selected category
             document.querySelectorAll('.am-chip').forEach(c => {
-                const houseOnly = ['kitchen','washer','dryer','workspace','fireplace'].includes(c.dataset.am);
-                c.style.display = (isVeh && houseOnly) ? 'none' : '';
-                if (isVeh && houseOnly) { c.classList.remove('active'); }
+                const lt = c.dataset.listingType || 'all'; // 'all' | 'property' | 'vehicle'
+                let hidden = false;
+                if (isVeh  && lt === 'property') hidden = true;
+                if (isProp && lt === 'vehicle')  hidden = true;
+                c.style.display = hidden ? 'none' : '';
+                if (hidden) c.classList.remove('active');
             });
             // Price slider: adjust max and step for vehicles vs real estate
             const minEl = document.getElementById('priceMin');
@@ -826,6 +835,13 @@
                 const labels = { '': 'All Listings', 'real_estate': 'Real Estate', 'vehicle': 'Vehicles' };
                 heading.textContent = labels[activeCat] || 'All Listings';
                 _applyCatUI(activeCat);
+                // Clear amenity selections that are now hidden (not applicable to new category)
+                document.querySelectorAll('.am-chip').forEach(c => {
+                    if (c.style.display === 'none' && c.classList.contains('active')) {
+                        c.classList.remove('active');
+                        _activeAmenities = _activeAmenities.filter(a => a !== c.dataset.am);
+                    }
+                });
                 applyFilters();
             });
         });
@@ -908,7 +924,7 @@
             _scrollObs.observe(_sentinel);
         };
 
-        async function loadListings({ qtext='', province='', district='', sector='', category='', amenities=[], priceMin=0, priceMax=500000, page=0, append=false } = {}) {
+        async function loadListings({ qtext='', province='', district='', sector='', category='', amenities=[], priceMin=0, priceMax=5000000, page=0, append=false } = {}) {
             if (_isLoading) return;
             _isLoading = true;
             if (_loader) _loader.style.display = 'block';
@@ -1005,7 +1021,7 @@
                 const catIcon = isVeh ? 'fa-car' : 'fa-house';
                 const loc     = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
                 const unit    = isVeh ? '/day' : '/night';
-                const price   = Number(l.price).toLocaleString();
+                const price   = Number(l.price_display || l.price).toLocaleString('en-RW');
 
                 // Badges
                 const ageMs    = now - new Date(l.created_at).getTime();
