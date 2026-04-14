@@ -1045,7 +1045,7 @@
                         '<div class="cat-label">' + catLbl + '</div>' +
                         badge +
                         '<div class="card-heart" data-lid="' + l.id + '" onclick="event.preventDefault();event.stopPropagation();window.toggleFavorite(event,this,\'' + l.id + '\')"><i class="fa-regular fa-heart"></i></div>' +
-                        '<div class="avail-strip ' + avail + '">' + (avail === 'available' ? '&#9679; Available' : '&#9679; ' + avail) + '</div>' +
+                        (avail !== 'available' ? '<div class="avail-strip ' + avail + '">&#9679; ' + avail + '</div>' : '') +
                     '</div>' +
                     '<div class="card-content">' +
                         '<h3>' + esc(l.title) + '</h3>' +

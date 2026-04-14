@@ -317,11 +317,76 @@ body { background: var(--light-bg); color: var(--text-dark); display:flex; min-h
 
 
 /* buttons */
-.btn-small { padding:7px 12px; font-size:13px; font-weight:600; border-radius:8px; cursor:pointer; border:1px solid transparent; display:inline-flex; align-items:center; justify-content:center; gap:5px; font-family:'Inter',sans-serif; transition:filter .15s,transform .1s; }
-.btn-small:hover { filter:brightness(0.95); transform:translateY(-1px); }
-.btn-small:active { transform:translateY(0); filter:brightness(0.9); }
+.btn-small { padding:8px 13px; font-size:12.5px; font-weight:700; border-radius:10px; cursor:pointer; border:1px solid transparent; display:inline-flex; align-items:center; justify-content:center; gap:5px; font-family:'Inter',sans-serif; transition:filter .15s,transform .15s,box-shadow .15s; white-space:nowrap; }
+.btn-small:hover { filter:brightness(0.93); transform:translateY(-1px); box-shadow:0 3px 10px rgba(0,0,0,0.08); }
+.btn-small:active { transform:translateY(0); filter:brightness(0.88); box-shadow:none; }
 .btn-danger { background:#fde8e8; color:#e74c3c; border-color:#f5c6c6; }
 .btn-primary { background:var(--primary); color:white; border:none; padding:10px 14px; border-radius:50px; cursor:pointer; }
+
+/* Listing cards grid */
+#listingsGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; }
+.listing-card { background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 2px 14px rgba(0,0,0,0.07); display:flex; flex-direction:column; transition:box-shadow .22s, transform .22s; }
+.listing-card:hover { box-shadow:0 8px 32px rgba(0,0,0,0.13); transform:translateY(-3px); }
+.listing-card .lc-img { height:185px; background:#f3f4f6; overflow:hidden; position:relative; flex-shrink:0; }
+.listing-card .lc-img img { width:100%; height:100%; object-fit:cover; transition:transform .35s; }
+.listing-card:hover .lc-img img { transform:scale(1.04); }
+.listing-card .lc-body { padding:14px 16px 16px; flex:1; display:flex; flex-direction:column; }
+.listing-card .lc-title { margin:0 0 3px; font-size:14.5px; font-weight:700; color:#1a1a1a; line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.listing-card .lc-meta { margin:0 0 8px; color:#aaa; font-size:12px; }
+.listing-card .lc-price { margin:0; color:var(--primary,#EB6753); font-weight:800; font-size:15px; }
+.listing-card .lc-actions { margin-top:auto; padding-top:12px; display:flex; flex-direction:column; gap:6px; }
+.lc-btn { width:100%; padding:9px 10px; border-radius:10px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid transparent; transition:filter .15s,transform .15s,box-shadow .15s; }
+.lc-btn:hover { filter:brightness(0.92); transform:translateY(-1px); box-shadow:0 3px 10px rgba(0,0,0,0.09); }
+.lc-btn:active { transform:translateY(0); box-shadow:none; filter:brightness(0.86); }
+.lc-btn-edit   { background:#eef2ff; color:#3b5bdb; border-color:#c5cef8; }
+.lc-btn-disable{ background:#fff8ec; color:#d68910; border-color:#f8d7a0; }
+.lc-btn-enable { background:#edfaf3; color:#1e8449; border-color:#a9dfbf; }
+.lc-btn-delete { background:#fef2f2; color:#c0392b; border-color:#fccaca; }
+.lc-btn-pending{ background:#fffbeb; color:#92400e; border-color:#fde68a; cursor:default; pointer-events:none; }
+.lc-btn-cancel { background:#fef2f2; color:#c0392b; border-color:#fccaca; }
+
+/* ── Skeleton loaders ─────────────────────────────── */
+@keyframes skshimmer {
+    0%   { background-position:-600px 0; }
+    100% { background-position: 600px 0; }
+}
+.sk { background:linear-gradient(90deg,#f0f0f0 25%,#e6e6e6 50%,#f0f0f0 75%); background-size:600px 100%; animation:skshimmer 1.5s infinite linear; border-radius:8px; }
+.sk-card { background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 2px 14px rgba(0,0,0,0.06); }
+.sk-img  { height:185px; }
+.sk-line { height:14px; margin-bottom:8px; }
+.sk-line-sm { height:11px; width:60%; }
+
+/* ── Empty states ────────────────────────────────── */
+.empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; text-align:center; color:#ccc; grid-column:1/-1; }
+.empty-state svg { margin-bottom:18px; opacity:.55; }
+.empty-state h3 { font-size:16px; font-weight:700; color:#bbb; margin:0 0 6px; }
+.empty-state p  { font-size:13px; color:#ccc; margin:0; max-width:280px; line-height:1.5; }
+
+/* ── Unified booking/listing status badges ──────── */
+.sb { display:inline-flex; align-items:center; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; gap:4px; white-space:nowrap; }
+.sb-green  { background:#edfaf3; color:#1e8449; }
+.sb-amber  { background:#fff8ec; color:#c97b10; }
+.sb-red    { background:#fef2f2; color:#c0392b; }
+.sb-blue   { background:#eef2ff; color:#3b5bdb; }
+.sb-purple { background:#f5f3ff; color:#7c3aed; }
+.sb-gray   { background:#f5f5f5; color:#888; }
+
+/* ── Offline banner ──────────────────────────────── */
+#offlineBanner { position:fixed; top:0; left:0; right:0; z-index:99999; background:#1a1a1a; color:#fff; padding:10px 20px; display:flex; align-items:center; justify-content:center; gap:10px; font-size:13px; font-weight:600; font-family:'Inter',sans-serif; transform:translateY(-100%); transition:transform .35s ease; box-shadow:0 4px 20px rgba(0,0,0,0.25); }
+#offlineBanner.visible { transform:translateY(0); }
+#offlineBanner i { color:#f39c12; font-size:15px; }
+#offlineBanner .ob-back { background:#2ecc71; color:#fff; border:none; border-radius:6px; padding:4px 12px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+
+/* ── Sparkline trend pill ────────────────────────── */
+.spark-trend { display:inline-flex; align-items:center; gap:3px; font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; margin-top:5px; }
+.spark-up   { background:#edfaf3; color:#1e8449; }
+.spark-down { background:#fef2f2; color:#c0392b; }
+.spark-flat { background:#f5f5f5; color:#888; }
+
+/* ── Toast mobile: bottom-center ────────────────── */
+@media (max-width:640px) {
+    #toastContainer { top:auto !important; bottom:20px !important; right:50% !important; transform:translateX(50%); left:auto !important; }
+}
 
 /* Modal: fixed to viewport and centered regardless of scrolling */
 .form-modal, .modal {

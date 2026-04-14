@@ -112,3 +112,109 @@ CREATE POLICY "Users can view own bookings"
         AND profiles.role = 'admin'
     )
   );
+
+-- ── 6. Listings UPDATE RLS ─────────────────────────────
+-- Run these if RLS is enabled on the listings table.
+-- Drop existing update policies first to avoid conflicts:
+DROP POLICY IF EXISTS "Owners can update own listings" ON listings;
+DROP POLICY IF EXISTS "Admins can update any listing" ON listings;
+
+CREATE POLICY "Owners can update own listings"
+ON listings FOR UPDATE
+TO authenticated
+USING (owner_id = auth.uid())
+WITH CHECK (owner_id = auth.uid());
+
+CREATE POLICY "Admins can update any listing"
+ON listings FOR UPDATE
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  )
+);
+
+-- ── 7. Trigger: prevent owners from changing featured/fee ─
+-- Owners cannot change featured status or price_afristay_fee directly.
+CREATE OR REPLACE FUNCTION listings_owner_guard()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  -- Only block non-admins
+  IF EXISTS (
+    SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'
+  ) THEN
+    RETURN NEW;
+  END IF;
+  -- Prevent owner from toggling featured
+  IF NEW.featured IS DISTINCT FROM OLD.featured THEN
+    RAISE EXCEPTION 'Only admins can change the featured status';
+  END IF;
+  -- Prevent owner from changing commission fee
+  IF NEW.price_afristay_fee IS DISTINCT FROM OLD.price_afristay_fee THEN
+    RAISE EXCEPTION 'Only admins can change the commission fee';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_listings_owner_guard ON listings;
+CREATE TRIGGER trg_listings_owner_guard
+BEFORE UPDATE ON listings
+FOR EACH ROW EXECUTE FUNCTION listings_owner_guard();
+
+-- ── 8. amenity_definitions — allow authenticated reads ──
+-- (VS Code T-SQL linter will flag these; they are valid PostgreSQL)
+ALTER TABLE amenity_definitions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Authenticated users can read amenities" ON amenity_definitions;
+CREATE POLICY "Authenticated users can read amenities"
+ON amenity_definitions FOR SELECT
+TO authenticated
+USING (true);
+
+-- ── 9. listing_edit_requests table ─────────────────────
+CREATE TABLE IF NOT EXISTS listing_edit_requests (
+  id          uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  listing_id  uuid REFERENCES listings(id) ON DELETE CASCADE NOT NULL,
+  owner_id    uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  proposed_changes jsonb NOT NULL,
+  status      text DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  created_at  timestamptz DEFAULT now(),
+  reviewed_at timestamptz,
+  reviewed_by uuid REFERENCES profiles(id)
+);
+
+ALTER TABLE listing_edit_requests ENABLE ROW LEVEL SECURITY;
+
+-- Owners: view and insert their own; delete pending only
+DROP POLICY IF EXISTS "Owners view own edit requests" ON listing_edit_requests;
+CREATE POLICY "Owners view own edit requests"
+ON listing_edit_requests FOR SELECT TO authenticated
+USING (owner_id = auth.uid());
+
+DROP POLICY IF EXISTS "Owners insert own edit requests" ON listing_edit_requests;
+CREATE POLICY "Owners insert own edit requests"
+ON listing_edit_requests FOR INSERT TO authenticated
+WITH CHECK (owner_id = auth.uid());
+
+DROP POLICY IF EXISTS "Owners delete own pending edit requests" ON listing_edit_requests;
+CREATE POLICY "Owners delete own pending edit requests"
+ON listing_edit_requests FOR DELETE TO authenticated
+USING (owner_id = auth.uid() AND status = 'pending');
+
+-- Admins: full access
+DROP POLICY IF EXISTS "Admins manage edit requests" ON listing_edit_requests;
+CREATE POLICY "Admins manage edit requests"
+ON listing_edit_requests FOR ALL TO authenticated
+USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'))
+WITH CHECK (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin'));
+
+-- Index for fast lookups
+CREATE INDEX IF NOT EXISTS idx_edit_requests_listing ON listing_edit_requests(listing_id, status);
+CREATE INDEX IF NOT EXISTS idx_edit_requests_owner   ON listing_edit_requests(owner_id, status);

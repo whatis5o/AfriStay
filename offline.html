@@ -3,25 +3,133 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AfriStay — You're Offline</title>
+<title>You're Offline · AfriStay</title>
 <link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:Inter,sans-serif;background:#fff8f6;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;text-align:center;}
-  .wrap{max-width:420px;}
-  .icon{font-size:64px;margin-bottom:24px;}
-  h1{font-size:24px;font-weight:800;color:#1a1a1a;margin-bottom:10px;}
-  p{font-size:15px;color:#666;line-height:1.6;margin-bottom:28px;}
-  .btn{display:inline-block;padding:14px 32px;background:#EB6753;color:#fff;border-radius:12px;font-size:15px;font-weight:700;text-decoration:none;cursor:pointer;border:none;}
-  .btn:hover{background:#d45742;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:#f8fafc;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;overflow:hidden;}
+.wrap{text-align:center;max-width:440px;position:relative;z-index:1;}
+
+/* ── background ── */
+.bg-circle{position:fixed;border-radius:50%;pointer-events:none;}
+.bc1{width:600px;height:600px;background:radial-gradient(circle,#e8f4fd 0%,transparent 70%);top:-200px;right:-200px;animation:pulse 6s ease-in-out infinite;}
+.bc2{width:500px;height:500px;background:radial-gradient(circle,#fff3cd 0%,transparent 70%);bottom:-200px;left:-200px;animation:pulse 6s ease-in-out infinite;animation-delay:3s;}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+
+/* ── wifi illustration ── */
+.wifi-wrap{display:flex;align-items:center;justify-content:center;margin:0 auto 32px;width:120px;height:120px;background:#fff;border-radius:50%;box-shadow:0 8px 40px rgba(0,0,0,0.08);}
+.wifi-svg{animation:wobble 2.5s ease-in-out infinite;}
+@keyframes wobble{0%,100%{transform:rotate(-4deg);}50%{transform:rotate(4deg);}}
+
+/* ── signal rings ── */
+.ring{position:absolute;border-radius:50%;border:3px solid #e0e0e0;opacity:0;animation:ripple 2.8s ease-out infinite;}
+.ring:nth-child(1){width:140px;height:140px;animation-delay:0s;}
+.ring:nth-child(2){width:180px;height:180px;animation-delay:.7s;}
+.ring:nth-child(3){width:220px;height:220px;animation-delay:1.4s;}
+.wifi-outer{position:relative;display:flex;align-items:center;justify-content:center;width:120px;height:120px;margin:0 auto 32px;}
+@keyframes ripple{0%{opacity:.5;transform:scale(.85);}100%{opacity:0;transform:scale(1.4);}}
+
+/* ── text ── */
+h1{font-size:26px;font-weight:800;color:#1a1a1a;margin:0 0 10px;}
+p{font-size:15px;color:#888;line-height:1.6;margin:0 0 32px;}
+
+/* ── dots loader ── */
+.dots{display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:28px;}
+.dot{width:9px;height:9px;border-radius:50%;background:#EB6753;animation:dotBounce 1.4s ease-in-out infinite;}
+.dot:nth-child(2){animation-delay:.16s;background:#f5a623;}
+.dot:nth-child(3){animation-delay:.32s;background:#EB6753;opacity:.6;}
+@keyframes dotBounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-10px);}}
+
+/* ── button ── */
+.btn{display:inline-flex;align-items:center;gap:9px;padding:13px 30px;border-radius:50px;font-size:15px;font-weight:700;border:none;background:#EB6753;color:#fff;cursor:pointer;font-family:'Inter',sans-serif;box-shadow:0 6px 20px rgba(235,103,83,.3);transition:all .2s;}
+.btn:hover{background:#d45742;transform:translateY(-2px);box-shadow:0 8px 24px rgba(235,103,83,.4);}
+.btn svg{transition:transform .3s;}
+.btn:hover svg{transform:rotate(180deg);}
+
+/* ── status badge ── */
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 14px;border-radius:20px;background:#fef2f2;color:#c0392b;margin-bottom:20px;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#e74c3c;animation:blink 1.2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.2;}}
 </style>
 </head>
 <body>
+<div class="bg-circle bc1"></div>
+<div class="bg-circle bc2"></div>
+
 <div class="wrap">
-  <div class="icon">🌍</div>
-  <h1>You're Offline</h1>
-  <p>No internet connection right now. Check your connection and try again — AfriStay will be waiting!</p>
-  <button class="btn" onclick="window.location.reload()">Try Again</button>
+    <!-- Animated wifi icon with ripple rings -->
+    <div style="position:relative;display:flex;align-items:center;justify-content:center;margin:0 auto 36px;width:220px;height:220px;">
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="wifi-wrap">
+            <div class="wifi-svg">
+                <svg width="56" height="46" viewBox="0 0 56 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Wifi arcs (grayed out / broken) -->
+                    <path d="M4 16C13 7 43 7 52 16" stroke="#ddd" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M11 23C18 17 38 17 45 23" stroke="#ddd" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M18.5 30C22 27 34 27 37.5 30" stroke="#ddd" stroke-width="4" stroke-linecap="round"/>
+                    <!-- Dot at bottom — colored to indicate partial -->
+                    <circle cx="28" cy="40" r="4" fill="#EB6753"/>
+                    <!-- X cross over the wifi -->
+                    <line x1="8" y1="4" x2="48" y2="44" stroke="#EB6753" stroke-width="3.5" stroke-linecap="round"/>
+                    <line x1="48" y1="4" x2="8" y2="44" stroke="#EB6753" stroke-width="3.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <span class="status"><span class="status-dot"></span>No Connection</span>
+
+    <h1>You're offline</h1>
+    <p>AfriStay needs an internet connection to load. Check your Wi-Fi or mobile data and try again.</p>
+
+    <div class="dots">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+    </div>
+
+    <button class="btn" id="retryBtn" onclick="handleRetry()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Try Again
+    </button>
+    <p id="stillOfflineMsg" style="display:none;margin-top:16px;font-size:13px;color:#e74c3c;font-weight:600;">Still offline — check your Wi-Fi or data and try again.</p>
 </div>
+
+<script>
+// The service worker serves this page's content at the original URL the user
+// was trying to reach, so window.location.href is already the right destination.
+const returnUrl = window.location.href;
+
+function handleRetry() {
+    if (navigator.onLine) {
+        goBack();
+    } else {
+        const msg = document.getElementById('stillOfflineMsg');
+        if (msg) {
+            msg.style.display = 'block';
+            setTimeout(() => { msg.style.display = 'none'; }, 3000);
+        }
+    }
+}
+
+function goBack() {
+    const btn = document.getElementById('retryBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg> Back online! Loading…';
+        btn.style.background = '#2ecc71';
+        btn.style.boxShadow = '0 6px 20px rgba(46,204,113,.35)';
+    }
+    setTimeout(() => window.location.replace(returnUrl), 600);
+}
+
+// Auto-redirect the moment connection is restored
+window.addEventListener('online', goBack);
+</script>
 </body>
 </html>

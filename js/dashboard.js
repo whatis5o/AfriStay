@@ -149,6 +149,167 @@ function toast(message, type = 'success', duration = 3500) {
 }
 window.toast = toast;
 
+/* ═══════════════════════════════════════════════════════
+   USER-FRIENDLY ERROR SANITIZER
+   Maps raw DB / network errors to safe, readable messages.
+   ═══════════════════════════════════════════════════════ */
+function sanitizeError(err) {
+    const raw = (err?.message || err?.error_description || String(err) || '').toLowerCase();
+    if (!raw || raw === 'undefined') return 'Something went wrong. Please try again.';
+    if (raw.includes('failed to fetch') || raw.includes('networkerror') || raw.includes('net::err') || raw.includes('load failed')) return 'No internet connection. Check your network and try again.';
+    if (raw.includes('jwt') || raw.includes('token') || raw.includes('session') || raw.includes('not authenticated')) return 'Your session expired. Please refresh the page.';
+    if (raw.includes('permission') || raw.includes('42501') || raw.includes('rls') || raw.includes('row-level')) return "You don't have permission to do that.";
+    if (raw.includes('unique') || raw.includes('23505') || raw.includes('duplicate')) return 'This already exists. No duplicate allowed.';
+    if (raw.includes('foreign key') || raw.includes('23503')) return 'Related data is missing or invalid.';
+    if (raw.includes('could not find') || raw.includes('schema cache') || raw.includes('relation') || raw.includes('does not exist')) return 'A required feature is not set up yet. Please contact support.';
+    if (raw.includes('timeout') || raw.includes('timed out')) return 'The request timed out. Please try again.';
+    if (raw.includes('date') || raw.includes('overlap') || raw.includes('dates_unavailable')) return 'Those dates are already booked. Please choose different dates.';
+    if (raw.includes('max') || raw.includes('limit')) return 'You have reached the maximum limit for this action.';
+    return 'Something went wrong. Please try again.';
+}
+window.sanitizeError = sanitizeError;
+
+/* ═══════════════════════════════════════════════════════
+   SKELETON LOADER HELPERS
+   ═══════════════════════════════════════════════════════ */
+function skeletonCards(count = 6) {
+    return Array.from({ length: count }, () =>
+        `<div class="listing-card sk-card">
+            <div class="sk sk-img" style="border-radius:0;"></div>
+            <div style="padding:14px 16px 16px;">
+                <div class="sk sk-line" style="width:80%;"></div>
+                <div class="sk sk-line sk-line-sm"></div>
+                <div class="sk sk-line" style="width:45%;height:16px;margin-top:4px;"></div>
+                <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px;">
+                    <div class="sk sk-line" style="height:36px;border-radius:10px;"></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <div class="sk sk-line" style="height:34px;border-radius:10px;margin:0;"></div>
+                        <div class="sk sk-line" style="height:34px;border-radius:10px;margin:0;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>`
+    ).join('');
+}
+
+/** Sets a timeout that replaces any still-loading container with an error state.
+ *  Call clearTimeout(id) as soon as real content (or an error) is rendered.  */
+function skeletonGuard(container, ms = 12000) {
+    return setTimeout(() => {
+        if (!container) return;
+        const stillLoading = container.querySelector('.sk-card') ||
+            container.textContent.includes('Loading');
+        if (stillLoading) {
+            container.innerHTML = emptyState('⏱️', 'Taking too long', 'Check your connection and refresh the page.');
+        }
+    }, ms);
+}
+
+function emptyState(icon, title, msg) {
+    return `<div class="empty-state">
+        <svg width="88" height="88" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="44" cy="44" r="44" fill="#f5f5f5"/>
+            <text x="44" y="58" text-anchor="middle" font-size="36" font-family="sans-serif">${icon}</text>
+        </svg>
+        <h3>${title}</h3>
+        <p>${msg}</p>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SPARKLINE HELPERS  (stat-card trend graphs)
+   ═══════════════════════════════════════════════════════ */
+function makeSparkline(values, color = '#EB6753') {
+    if (!values || values.length < 2) return '';
+    const w = 72, h = 28;
+    const min = Math.min(...values), max = Math.max(...values);
+    const range = max - min || 1;
+    const pts = values.map((v, i) => ({
+        x: +((i / (values.length - 1)) * w).toFixed(1),
+        y: +((h - 4) - ((v - min) / range) * (h - 10) + 2).toFixed(1)
+    }));
+    const lineD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+    const areaD = `${lineD} L${pts[pts.length-1].x},${h} L0,${h} Z`;
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible;">
+        <path d="${areaD}" fill="${color}" opacity="0.12"/>
+        <path d="${lineD}" stroke="${color}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="${pts[pts.length-1].x}" cy="${pts[pts.length-1].y}" r="2.5" fill="${color}"/>
+    </svg>`;
+}
+
+function injectStatSparkline(selector, sparkSvg, current, previous) {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    const card = el.closest('.stat-card');
+    if (!card || card.dataset.sparkInjected) return;
+    card.dataset.sparkInjected = '1';
+    card.style.position = 'relative';
+    const pct = previous > 0 ? Math.round((current - previous) / previous * 100) : null;
+    const trendCls = pct === null ? 'spark-flat' : pct > 0 ? 'spark-up' : pct < 0 ? 'spark-down' : 'spark-flat';
+    const trendTxt = pct === null ? '—' : `${pct > 0 ? '↑' : pct < 0 ? '↓' : ''}${Math.abs(pct)}% vs last week`;
+    const lbl = card.querySelector('.stat-lbl');
+    if (lbl) lbl.insertAdjacentHTML('afterend', `<span class="spark-trend ${trendCls}">${trendTxt}</span>`);
+    if (sparkSvg) card.insertAdjacentHTML('beforeend', `<div style="position:absolute;bottom:16px;right:16px;opacity:.75;">${sparkSvg}</div>`);
+}
+
+async function loadSparklines() {
+    if (!_supabase || !CURRENT_ROLE || CURRENT_ROLE === 'user') return;
+    try {
+        const today = new Date();
+        const d14 = new Date(today); d14.setDate(d14.getDate() - 14);
+        let q = _supabase.from('bookings').select('created_at,total_amount').gte('created_at', d14.toISOString()).in('status', ['confirmed','approved','completed']);
+        if (CURRENT_ROLE === 'owner') {
+            const ids = await cOwnerIds();
+            if (ids.length) q = q.in('listing_id', ids); else return;
+        }
+        const { data: bRows } = await q;
+        if (!bRows) return;
+        // Build 14-slot day buckets
+        const bookD = {}, revD = {};
+        for (let i = 0; i < 14; i++) {
+            const d = new Date(today); d.setDate(d.getDate() - (13 - i));
+            const k = d.toISOString().slice(0, 10);
+            bookD[k] = 0; revD[k] = 0;
+        }
+        bRows.forEach(r => {
+            const k = r.created_at?.slice(0, 10);
+            if (bookD[k] !== undefined) { bookD[k]++; revD[k] += Number(r.total_amount || 0); }
+        });
+        const days  = Object.keys(bookD).sort();
+        const bVals = days.map(d => bookD[d]);
+        const rVals = days.map(d => revD[d]);
+        const bThis = bVals.slice(7).reduce((a,b) => a+b, 0), bLast = bVals.slice(0,7).reduce((a,b) => a+b, 0);
+        const rThis = rVals.slice(7).reduce((a,b) => a+b, 0), rLast = rVals.slice(0,7).reduce((a,b) => a+b, 0);
+        injectStatSparkline('#totalBookings', makeSparkline(bVals.slice(7), '#EB6753'), bThis, bLast);
+        injectStatSparkline('#totalRevenue',  makeSparkline(rVals.slice(7), '#27ae60'), rThis, rLast);
+    } catch(e) { console.warn('Sparklines skipped:', e.message); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   OFFLINE DETECTION BANNER
+   ═══════════════════════════════════════════════════════ */
+(function initOfflineBanner() {
+    function getBanner() {
+        let b = document.getElementById('offlineBanner');
+        if (!b) {
+            b = document.createElement('div');
+            b.id = 'offlineBanner';
+            b.innerHTML = `<i class="fa-solid fa-wifi-slash"></i><span>You're offline — some features may not work.</span><button class="ob-back" onclick="window.location.reload()">Retry</button>`;
+            document.body.prepend(b);
+        }
+        return b;
+    }
+    function show() { getBanner().classList.add('visible'); }
+    function hide() {
+        const b = document.getElementById('offlineBanner');
+        if (b) b.classList.remove('visible');
+        toast('Back online!', 'success', 2500);
+    }
+    if (!navigator.onLine) setTimeout(show, 600);
+    window.addEventListener('offline', show);
+    window.addEventListener('online', hide);
+})();
+
 /* ===========================
    INITIALIZATION
    =========================== */
@@ -1207,10 +1368,65 @@ async function deleteListing(listingId) {
     } catch (err) {
         logAudit({ action: 'listing_deleted_failed', entityType: 'listing', entityId: listingId, description: 'Failed to delete listing: ' + err.message, isError: true });
         console.error('deleteListing', err);
-        toast('Failed to delete listing: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 
+async function ownerDeleteListing(listingId) {
+    if (!confirm('Delete this listing permanently? This cannot be undone.')) return;
+    if (!_supabase || !CURRENT_PROFILE) return;
+    try {
+        // Block deletion if active bookings exist
+        const { count: activeCount } = await _supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('listing_id', listingId)
+            .in('status', ['confirmed', 'pending_payment', 'paid']);
+        if (activeCount > 0) {
+            toast('Cannot delete: there are active bookings on this listing.', 'error');
+            return;
+        }
+        // Delete media from storage
+        const [imgRes, vidRes] = await Promise.all([
+            _supabase.from('listing_images').select('image_url').eq('listing_id', listingId),
+            _supabase.from('listing_videos').select('video_url').eq('listing_id', listingId),
+        ]);
+        const imgPaths = (imgRes.data || []).map(r => { try { const u = new URL(r.image_url); return u.pathname.split('/object/public/listing-images/')[1] || null; } catch { return null; } }).filter(Boolean);
+        const vidPaths = (vidRes.data || []).map(r => { try { const u = new URL(r.video_url); return u.pathname.split('/object/public/listing-videos/')[1] || null; } catch { return null; } }).filter(Boolean);
+        if (imgPaths.length) await _supabase.storage.from('listing-images').remove(imgPaths);
+        if (vidPaths.length) await _supabase.storage.from('listing-videos').remove(vidPaths);
+        // Delete the listing (cascades to listing_images, listing_videos, edit_requests)
+        const { error } = await _supabase.from('listings').delete().eq('id', listingId).eq('owner_id', CURRENT_PROFILE.id);
+        if (error) throw error;
+        toast('Listing deleted.', 'success');
+        await filterListings();
+        await loadCounts();
+    } catch (err) {
+        console.error('ownerDeleteListing', err);
+        toast(sanitizeError(err), 'error');
+    }
+}
+window.ownerDeleteListing = ownerDeleteListing;
+
+async function cancelEditRequest(listingId) {
+    if (!confirm('Cancel the pending edit request for this listing?')) return;
+    if (!_supabase || !CURRENT_PROFILE) return;
+    try {
+        const { error } = await _supabase
+            .from('listing_edit_requests')
+            .delete()
+            .eq('listing_id', listingId)
+            .eq('owner_id', CURRENT_PROFILE.id)
+            .eq('status', 'pending');
+        if (error) throw error;
+        toast('Edit request cancelled.', 'success');
+        loadListingsGrid();
+    } catch (err) {
+        console.error('cancelEditRequest', err);
+        toast(sanitizeError(err), 'error');
+    }
+}
+window.cancelEditRequest = cancelEditRequest;
 
 function initials(name) {
     return name.split(' ').map(s => s[0]?.toUpperCase() || '').slice(0, 2).join('');
@@ -1228,7 +1444,7 @@ async function updateUserRole(userId, newRole) {
     } catch (err) {
         logAudit({ action: 'user_role_change_failed', entityType: 'user', entityId: userId, description: 'Failed to change role to "' + newRole + '": ' + err.message, isError: true });
         console.error('updateUserRole', err);
-        toast('Failed to update role: ' + (err.message || JSON.stringify(err)), 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 
@@ -1268,7 +1484,7 @@ async function deleteUser(userId) {
     } catch (err) {
         logAudit({ action: 'user_deleted_failed', entityType: 'user', entityId: userId, description: 'Failed to delete user: ' + err.message, isError: true });
         console.error('deleteUser', err);
-        toast('Failed to delete user: ' + (err.message || JSON.stringify(err)), 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 
@@ -1424,10 +1640,10 @@ async function loadListingsGrid(filters = {}, page = 0) {
     if (!container) return;
     const PAGE_SIZE = 15;
     const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
-    container.style.display = 'grid';
-    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(280px, 1fr))';
-    container.innerHTML = '<div style="padding:20px;grid-column:1/-1">Loading...</div>';
+    container.innerHTML = skeletonCards(6);
+    const _guard = skeletonGuard(container);
 
+    try {
     let q = _supabase
         .from('listings')
         .select('id,title,price,price_display,currency,availability_status,status,owner_id,province_id,district_id,sector_id,category_slug,created_at', { count: 'exact' })
@@ -1443,8 +1659,9 @@ async function loadListingsGrid(filters = {}, page = 0) {
     if (CURRENT_ROLE === 'owner') q = q.eq('owner_id', CURRENT_PROFILE.id);
 
     const { data, error, count } = await q;
-    if (error) { container.innerHTML = `<div style="padding:20px;color:red">Error: ${error.message}</div>`; return; }
-    if (!data || data.length === 0) { container.innerHTML = '<div style="padding:20px">No listings match.</div>'; return; }
+    clearTimeout(_guard);
+    if (error) { container.innerHTML = emptyState('⚠️','Could not load listings', sanitizeError(error)); return; }
+    if (!data || data.length === 0) { container.innerHTML = emptyState('🏠','No listings yet', 'Listings you add will appear here.'); return; }
 
     // Batch-fetch first image per listing (cached 2 min)
     const listingIds = data.map(l => l.id);
@@ -1458,43 +1675,67 @@ async function loadListingsGrid(filters = {}, page = 0) {
         (owners || []).forEach(o => ownerMap[o.id] = o.full_name);
     }
 
+    // Batch-fetch pending edit requests for these listings (owner sees own, admin sees all)
+    const pendingEditSet = new Set();
+    try {
+        let erQ = _supabase.from('listing_edit_requests').select('listing_id').eq('status','pending').in('listing_id', listingIds);
+        if (CURRENT_ROLE === 'owner') erQ = erQ.eq('owner_id', CURRENT_PROFILE.id);
+        const { data: erData } = await erQ;
+        (erData || []).forEach(r => pendingEditSet.add(r.listing_id));
+    } catch(_) {}
+
     container.innerHTML = '';
     for (const l of data) {
         const thumb = imageMap[l.id] || null;
         const availBadgeColor = l.availability_status === 'available' ? '#2ecc71' : l.availability_status === 'booked' ? '#e74c3c' : '#95a5a6';
         const statusBadgeColor = l.status === 'approved' ? '#2ecc71' : l.status === 'pending' ? '#f39c12' : '#95a5a6';
+        const hasPendingEdit = pendingEditSet.has(l.id);
         const card = document.createElement('div');
         card.className = 'listing-card';
-        card.style.cssText = 'background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);display:flex;flex-direction:column;';
+        // ── build action button block ───────────────────────────────────────
+        const availNotBooked = l.availability_status !== 'booked';
+        const isAvail        = l.availability_status === 'available';
+        const availBtn = availNotBooked
+            ? (isAvail
+                ? `<button class="lc-btn lc-btn-disable" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')"><i class="fa-solid fa-eye-slash"></i> ${CURRENT_ROLE==='admin'?'Disable':'Unavailable'}</button>`
+                : `<button class="lc-btn lc-btn-enable"  onclick="toggleListingAvailability('${l.id}','${l.availability_status}')"><i class="fa-solid fa-eye"></i> ${CURRENT_ROLE==='admin'?'Enable':'Available'}</button>`)
+            : '';
+        const deleteBtn = CURRENT_ROLE === 'admin'
+            ? `<button class="lc-btn lc-btn-delete" onclick="deleteListing('${l.id}')"><i class="fa-solid fa-trash"></i> Delete</button>`
+            : `<button class="lc-btn lc-btn-delete" onclick="ownerDeleteListing('${l.id}')"><i class="fa-solid fa-trash"></i> Delete</button>`;
+
+        let actionsHtml = '';
+        if (CURRENT_ROLE === 'admin' || CURRENT_ROLE === 'owner') {
+            if (hasPendingEdit && CURRENT_ROLE === 'owner') {
+                // Pending edit: row1 = [Edit pending | Cancel edit], row2 = [avail (if any) | delete]
+                actionsHtml = `
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                        <span class="lc-btn lc-btn-pending"><i class="fa-solid fa-clock"></i> Edit Pending</span>
+                        <button class="lc-btn lc-btn-cancel" onclick="cancelEditRequest('${l.id}')"><i class="fa-solid fa-xmark"></i> Cancel Edit</button>
+                    </div>
+                    ${availBtn || deleteBtn ? `<div style="display:grid;grid-template-columns:${availBtn ? '1fr 1fr' : '1fr'};gap:6px;">${availBtn}${deleteBtn}</div>` : ''}`;
+            } else {
+                // Normal: row1 = Edit (full width), row2 = [avail | delete]
+                actionsHtml = `
+                    <button class="lc-btn lc-btn-edit" onclick="openEditListingModal('${l.id}')"><i class="fa-solid fa-pen-to-square"></i> Edit Listing</button>
+                    <div style="display:grid;grid-template-columns:${availBtn ? '1fr 1fr' : '1fr'};gap:6px;">${availBtn}${deleteBtn}</div>`;
+            }
+        }
+        // ───────────────────────────────────────────────────────────────────
         card.innerHTML = `
-            <a href="/Listings/Detail/?id=${l.id}" style="text-decoration:none;color:inherit;display:block;">
-                <div style="height:180px;background:#f0f0f0;overflow:hidden;position:relative;">
-                    ${thumb
-                        ? `<img src="${thumb}" alt="${escapeHtml(l.title)}" loading="lazy" style="width:100%;height:100%;object-fit:cover;">`
-                        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:32px;color:#ccc;"></i></div>`}
-                    <span style="position:absolute;top:8px;left:8px;background:${availBadgeColor};color:#fff;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:600;">${l.availability_status || 'available'}</span>
-                    <span style="position:absolute;top:8px;right:8px;background:${statusBadgeColor};color:#fff;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:600;">${l.status || 'pending'}</span>
-                </div>
+            <a href="/Listings/Detail/?id=${l.id}" style="text-decoration:none;color:inherit;" class="lc-img">
+                ${thumb
+                    ? `<img src="${escapeHtml(thumb)}" alt="${escapeHtml(l.title)}" loading="lazy">`
+                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-image" style="font-size:36px;color:#ddd;"></i></div>`}
+                <span style="position:absolute;top:10px;right:10px;background:${statusBadgeColor};color:#fff;font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;letter-spacing:.2px;">${escapeHtml(l.status||'pending')}</span>
+                ${!isAvail ? `<span style="position:absolute;top:10px;left:10px;background:${availBadgeColor};color:#fff;font-size:10px;padding:3px 9px;border-radius:20px;font-weight:700;">${escapeHtml(l.availability_status||'')}</span>` : ''}
+                ${hasPendingEdit ? `<div style="position:absolute;bottom:0;left:0;right:0;padding:7px 12px 9px;background:linear-gradient(transparent,rgba(180,110,5,0.88));"><span style="color:#fff;font-size:11px;font-weight:700;"><i class="fa-solid fa-clock" style="margin-right:5px;"></i>Edit awaiting review</span></div>` : ''}
             </a>
-            <div style="padding:14px;flex:1;display:flex;flex-direction:column;gap:6px;">
-                <a href="/Listings/Detail/?id=${l.id}" style="text-decoration:none;"><h4 style="margin:0;font-size:15px;font-weight:600;color:#222;">${escapeHtml(l.title)}</h4></a>
-                <p style="margin:0;color:#888;font-size:13px;">${l.category_slug || ''} • ${ownerMap[l.owner_id] || 'Unknown'}</p>
-                <p style="margin:0;color:var(--primary,#EB6753);font-weight:700;font-size:14px;">${Number(l.price_display||l.price||0).toLocaleString()} ${l.currency || 'RWF'}</p>
-                <div style="display:flex;gap:6px;margin-top:auto;padding-top:10px;flex-wrap:wrap;">
-                    ${CURRENT_ROLE === 'admin' ? `
-                        ${l.availability_status === 'available'
-                            ? `<button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1;background:#fff3e0;color:#e67e22;border:1px solid #f5cba7;font-weight:600;gap:5px;"><i class="fa-solid fa-eye-slash"></i> Disable</button>`
-                            : `<button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1;background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:5px;"><i class="fa-solid fa-eye"></i> Enable</button>`
-                        }
-                        <button class="btn-small" onclick="deleteListing('${l.id}')" style="flex:1;background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;font-weight:600;gap:5px;"><i class="fa-solid fa-trash"></i> Delete</button>
-                    ` : ''}
-                    ${CURRENT_ROLE === 'owner' && l.availability_status !== 'booked' ? `
-                        ${l.availability_status === 'available'
-                            ? `<button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1;background:#fff3e0;color:#e67e22;border:1px solid #f5cba7;font-weight:600;gap:5px;"><i class="fa-solid fa-eye-slash"></i> Set Unavailable</button>`
-                            : `<button class="btn-small" onclick="toggleListingAvailability('${l.id}','${l.availability_status}')" style="flex:1;background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:5px;"><i class="fa-solid fa-eye"></i> Set Available</button>`
-                        }
-                    ` : ''}
-                </div>
+            <div class="lc-body">
+                <a href="/Listings/Detail/?id=${l.id}" style="text-decoration:none;"><p class="lc-title">${escapeHtml(l.title)}</p></a>
+                <p class="lc-meta">${escapeHtml(l.category_slug||'')}${CURRENT_ROLE==='admin'?' · '+escapeHtml(ownerMap[l.owner_id]||'Unknown'):''}</p>
+                <p class="lc-price">${Number(l.price_display||l.price||0).toLocaleString()} <span style="font-size:11px;font-weight:500;color:#bbb;">${l.currency||'RWF'}</span></p>
+                ${actionsHtml ? `<div class="lc-actions">${actionsHtml}</div>` : ''}
             </div>
         `;
         container.appendChild(card);
@@ -1507,6 +1748,10 @@ async function loadListingsGrid(filters = {}, page = 0) {
         renderPagination('dashListingsPagination', page, pageCount, totalCount, PAGE_SIZE, (newPage) => {
             loadListingsGrid(filters, newPage);
         });
+    }
+    } catch(err) {
+        clearTimeout(_guard);
+        container.innerHTML = emptyState('⚠️', 'Could not load listings', sanitizeError(err));
     }
 }
 
@@ -1526,13 +1771,11 @@ async function loadAllCountsAndTables() {
     if (CURRENT_ROLE === 'owner') {
         loadNewBookings();
     }
-    // Admin: inject listing-requests tab
+    // Admin: inject listing-requests tab + pending bookings widget
     if (CURRENT_ROLE === 'admin') {
         loadListingRequests();
-    }
-    // Admin only: pending listings widget in dashboard tab
-    if (CURRENT_ROLE === 'admin') {
         loadDashPendingListings();
+        loadNewBookings();
     }
     console.log("✅ [DATA] All data loaded");
 }
@@ -1625,6 +1868,7 @@ async function loadCounts() {
         }
         
         console.log("✅ [COUNTS] Dashboard counts updated");
+        loadSparklines();
     } catch (err) {
         console.error("❌ [COUNTS] Error loading counts:", err);
     }
@@ -2160,7 +2404,7 @@ async function approveListing(listingId) {
     } catch (err) {
         logAudit({ action: 'listing_approved_failed', entityType: 'listing', entityId: listingId, description: 'Failed to approve listing: ' + err.message, isError: true });
         console.error("❌ [ACTION] Error approving listing:", err);
-        toast('Failed to approve listing: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 
@@ -2177,7 +2421,7 @@ async function toggleListingAvailability(listingId, current) {
         await filterListings();
     } catch (err) {
         console.error("❌ [ACTION] Error toggling availability:", err);
-        toast('Failed to change availability: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 
@@ -2233,7 +2477,7 @@ async function approveBooking(bookingId) {
     } catch (err) {
         logAudit({ action: 'booking_approved_failed', entityType: 'booking', entityId: bookingId, description: 'Failed to approve booking: ' + err.message, isError: true });
         console.error('❌ [APPROVE]', err);
-        toast('Failed to approve: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 
@@ -2290,7 +2534,7 @@ async function rejectBooking(bookingId) {
     } catch (err) {
         logAudit({ action: 'booking_rejected_failed', entityType: 'booking', entityId: bookingId, description: 'Failed to reject booking: ' + err.message, isError: true });
         console.error('❌ [REJECT]', err);
-        toast('Failed to reject: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 
@@ -2536,6 +2780,535 @@ async function handleCreateListing() {
         if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create Listing'; }
     }
 }
+
+// ── Edit Listing Modal ──────────────────────────────────────────────────────
+let _editState = null;
+
+async function openEditListingModal(listingId) {
+    if (!_supabase || !CURRENT_PROFILE) return;
+    toast('Loading listing…', 'info');
+    try {
+        const [listingRes, imagesRes, videosRes, provinces, featuredRes] = await Promise.all([
+            _supabase.from('listings').select('*').eq('id', listingId).single(),
+            _supabase.from('listing_images').select('id,image_url,filename').eq('listing_id', listingId).order('id'),
+            _supabase.from('listing_videos').select('id,video_url,filename').eq('listing_id', listingId),
+            cProvinces(),
+            _supabase.from('listings').select('id', { count: 'exact', head: true }).eq('featured', true)
+        ]);
+        if (listingRes.error) throw listingRes.error;
+        const listing = listingRes.data;
+        if (CURRENT_ROLE === 'owner' && listing.owner_id !== CURRENT_PROFILE.id) {
+            toast('You can only edit your own listings.', 'error'); return;
+        }
+        _showEditModal(listing, imagesRes.data || [], videosRes.data || [], provinces || [], featuredRes.count || 0);
+    } catch (err) {
+        console.error('openEditListingModal error:', err);
+        toast(sanitizeError(err), 'error');
+    }
+}
+window.openEditListingModal = openEditListingModal;
+
+function _showEditModal(listing, images, videos, provinces, featuredCount) {
+    document.getElementById('editListingOverlay')?.remove();
+    _editState = {
+        listingId: listing.id,
+        ownerId: listing.owner_id,
+        removedImageIds: [],
+        removedVideoIds: [],
+        newImageFiles: [],
+        newVideoFiles: [],
+        _savedSectorId: listing.sector_id
+    };
+    const isAdmin = CURRENT_ROLE === 'admin';
+    const isVehicle = listing.category_slug === 'vehicle';
+    const vSpecs = listing.vehicle_specs || {};
+    const existingAmenities = Array.isArray(listing.amenities_data) ? listing.amenities_data : [];
+    const alreadyFeatured = listing.featured === true;
+    const featuredAtMax = featuredCount >= 8 && !alreadyFeatured;
+    const provOptions = provinces.map(p =>
+        `<option value="${p.id}" ${p.id === listing.province_id ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+    ).join('');
+    const imagesHtml = images.length
+        ? images.map(img => `<div id="eldImg_${img.id}" style="position:relative;width:100px;height:76px;border-radius:8px;overflow:hidden;background:#f0f0f0;flex-shrink:0;"><img src="${escapeHtml(img.image_url)}" alt="" style="width:100%;height:100%;object-fit:cover;"><button type="button" onclick="_editRemoveImage('${img.id}')" title="Remove" style="position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;background:rgba(220,38,38,0.85);border:none;color:#fff;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0;"><i class="fa-solid fa-xmark"></i></button></div>`).join('')
+        : '<span style="color:#bbb;font-size:13px;">No images yet.</span>';
+    const videosHtml = videos.length
+        ? videos.map(vid => `<div id="eldVid_${vid.id}" style="position:relative;display:flex;align-items:center;gap:8px;background:#f8f8f8;border:1px solid #eee;border-radius:8px;padding:8px 12px;"><i class="fa-solid fa-film" style="color:#888;font-size:16px;"></i><span style="font-size:13px;color:#444;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(vid.filename || 'video')}</span><button type="button" onclick="_editRemoveVideo('${vid.id}')" title="Remove" style="background:rgba(220,38,38,0.1);border:1px solid #f5c6c6;border-radius:6px;color:#e74c3c;cursor:pointer;padding:3px 8px;font-size:12px;"><i class="fa-solid fa-trash"></i></button></div>`).join('')
+        : '<span style="color:#bbb;font-size:13px;">No videos yet.</span>';
+    const overlay = document.createElement('div');
+    overlay.id = 'editListingOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:32px 16px;box-sizing:border-box;';
+    overlay.innerHTML = `
+<div style="background:#fff;border-radius:16px;width:100%;max-width:720px;box-shadow:0 8px 40px rgba(0,0,0,0.18);overflow:hidden;margin:auto;">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid #f0f0f0;background:#fafafa;">
+    <h2 style="margin:0;font-size:19px;font-weight:700;color:#222;"><i class="fa-solid fa-pen-to-square" style="color:var(--primary,#EB6753);margin-right:8px;"></i>Edit Listing</h2>
+    <button type="button" onclick="document.getElementById('editListingOverlay')?.remove()" style="background:none;border:none;font-size:20px;color:#888;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1;"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+  <div style="padding:24px;display:flex;flex-direction:column;gap:20px;">
+    <div id="eldStatus" style="display:none;padding:12px 16px;border-radius:8px;font-size:14px;"></div>
+    <div>
+      <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Title <span style="color:red">*</span></label>
+      <input id="eldTitle" type="text" value="${escapeHtml(listing.title || '')}" maxlength="120" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Category <span style="color:red">*</span></label>
+        <select id="eldCategory" onchange="_editToggleVehicleFields()" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;background:#fff;">
+          <option value="apartment" ${listing.category_slug==='apartment'?'selected':''}>Apartment</option>
+          <option value="house" ${listing.category_slug==='house'?'selected':''}>House</option>
+          <option value="villa" ${listing.category_slug==='villa'?'selected':''}>Villa</option>
+          <option value="studio" ${listing.category_slug==='studio'?'selected':''}>Studio</option>
+          <option value="guesthouse" ${listing.category_slug==='guesthouse'?'selected':''}>Guesthouse</option>
+          <option value="hotel" ${listing.category_slug==='hotel'?'selected':''}>Hotel</option>
+          <option value="office" ${listing.category_slug==='office'?'selected':''}>Office</option>
+          <option value="event_space" ${listing.category_slug==='event_space'?'selected':''}>Event Space</option>
+          <option value="vehicle" ${listing.category_slug==='vehicle'?'selected':''}>Vehicle</option>
+          <option value="other" ${listing.category_slug==='other'?'selected':''}>Other</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Price (RWF/night) <span style="color:red">*</span></label>
+        <input id="eldPrice" type="number" min="0" value="${listing.price || ''}" oninput="_editUpdatePricePreview()" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;">
+      </div>
+    </div>
+    <div id="eldOutsideKigaliGroup" style="${isVehicle?'':'display:none;'}">
+      <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Price Outside Kigali (RWF/day)</label>
+      <input id="eldPriceOutside" type="number" min="0" value="${listing.price_outside_kigali || ''}" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;">
+    </div>
+    <div>
+      <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Description <span style="color:red">*</span></label>
+      <textarea id="eldDesc" rows="4" maxlength="2000" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;">${escapeHtml(listing.description || '')}</textarea>
+    </div>
+    <div style="background:#fafafa;border:1px solid #eee;border-radius:10px;padding:16px;">
+      <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">Location</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Province</label>
+          <select id="eldProvince" onchange="_editLoadDistricts(this.value,null)" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;background:#fff;box-sizing:border-box;">
+            <option value="">-- Select Province --</option>
+            ${provOptions}
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">District</label>
+          <select id="eldDistrict" onchange="_editLoadSectors(this.value,null)" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;background:#fff;box-sizing:border-box;">
+            <option value="">-- Select District --</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Sector</label>
+          <select id="eldSector" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;background:#fff;box-sizing:border-box;">
+            <option value="">-- Select Sector --</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Address</label>
+          <input id="eldAddress" type="text" value="${escapeHtml(listing.address || '')}" maxlength="200" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+        </div>
+      </div>
+    </div>
+    <div id="eldPropSpecs" style="${isVehicle?'display:none;':''}background:#fafafa;border:1px solid #eee;border-radius:10px;padding:16px;">
+      <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">Property Details</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;">
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Rooms</label><input id="eldRooms" type="number" min="0" value="${listing.room_count ?? ''}" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Bathrooms</label><input id="eldBaths" type="number" min="0" value="${listing.bathroom_count ?? ''}" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Beds</label><input id="eldBeds" type="number" min="0" value="${listing.bed_count ?? ''}" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Max Guests</label><input id="eldMaxGuests" type="number" min="0" value="${listing.max_guests ?? ''}" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Floor Area (m²)</label><input id="eldFloorArea" type="number" min="0" value="${listing.floor_area_sqm ?? ''}" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"></div>
+      </div>
+    </div>
+    <div id="eldVehSpecs" style="${isVehicle?'':'display:none;'}background:#fafafa;border:1px solid #eee;border-radius:10px;padding:16px;">
+      <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">Vehicle Details</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Make</label><input id="eldVMake" type="text" value="${escapeHtml(vSpecs.make||'')}" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Model</label><input id="eldVModel" type="text" value="${escapeHtml(vSpecs.model||'')}" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Year</label><input id="eldVYear" type="number" min="1900" max="2100" value="${vSpecs.year||''}" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Fuel Type</label><select id="eldVFuel" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;background:#fff;box-sizing:border-box;"><option value="">--</option><option value="petrol" ${vSpecs.fuel_type==='petrol'?'selected':''}>Petrol</option><option value="diesel" ${vSpecs.fuel_type==='diesel'?'selected':''}>Diesel</option><option value="electric" ${vSpecs.fuel_type==='electric'?'selected':''}>Electric</option><option value="hybrid" ${vSpecs.fuel_type==='hybrid'?'selected':''}>Hybrid</option></select></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Transmission</label><select id="eldVTrans" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;background:#fff;box-sizing:border-box;"><option value="">--</option><option value="manual" ${vSpecs.transmission==='manual'?'selected':''}>Manual</option><option value="automatic" ${vSpecs.transmission==='automatic'?'selected':''}>Automatic</option></select></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#777;margin-bottom:5px;">Max Passengers</label><input id="eldVMaxPass" type="number" min="1" value="${listing.max_passengers||''}" style="width:100%;padding:9px 12px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"></div>
+      </div>
+    </div>
+    <div style="background:#fafafa;border:1px solid #eee;border-radius:10px;padding:16px;">
+      <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">Amenities</p>
+      <div id="eldAmenities" style="display:flex;flex-wrap:wrap;gap:8px;"><span style="color:#bbb;font-size:13px;"><i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Loading…</span></div>
+    </div>
+    <div style="background:#fafafa;border:1px solid #eee;border-radius:10px;padding:16px;">
+      <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">Images</p>
+      <div id="eldImagesContainer" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;">${imagesHtml}</div>
+      <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--primary,#EB6753);font-weight:600;padding:8px 14px;border:1.5px dashed var(--primary,#EB6753);border-radius:8px;">
+        <i class="fa-solid fa-plus"></i> Add Images
+        <input id="eldNewImages" type="file" accept="image/*" multiple style="display:none;" onchange="_editHandleNewImages(this)">
+      </label>
+      <span style="font-size:12px;color:#aaa;margin-left:10px;">Max 10 total</span>
+    </div>
+    <div style="background:#fafafa;border:1px solid #eee;border-radius:10px;padding:16px;">
+      <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;">Videos</p>
+      <div id="eldVideosContainer" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">${videosHtml}</div>
+      <label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--primary,#EB6753);font-weight:600;padding:8px 14px;border:1.5px dashed var(--primary,#EB6753);border-radius:8px;">
+        <i class="fa-solid fa-plus"></i> Add Videos
+        <input id="eldNewVideos" type="file" accept="video/*" multiple style="display:none;" onchange="_editHandleNewVideos(this)">
+      </label>
+      <span style="font-size:12px;color:#aaa;margin-left:10px;">Max 3 total</span>
+    </div>
+    ${isAdmin ? `
+    <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:10px;padding:16px;">
+      <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#7c5c00;text-transform:uppercase;letter-spacing:.5px;"><i class="fa-solid fa-shield-halved" style="margin-right:6px;"></i>Admin Settings</p>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:600;color:#444;">
+          <div style="position:relative;width:44px;height:24px;flex-shrink:0;" onclick="if(!document.getElementById('eldFeatured').disabled){document.getElementById('eldFeatured').checked=!document.getElementById('eldFeatured').checked;_editFeaturedToggleStyle();}">
+            <input type="checkbox" id="eldFeatured" ${alreadyFeatured?'checked':''} ${featuredAtMax?'disabled':''} style="position:absolute;opacity:0;width:0;height:0;">
+            <div id="eldFeaturedTrack" style="position:absolute;inset:0;border-radius:24px;background:${alreadyFeatured?'var(--primary,#EB6753)':'#ddd'};cursor:${featuredAtMax?'not-allowed':'pointer'};transition:background .2s;"></div>
+            <div id="eldFeaturedKnob" style="position:absolute;top:2px;left:${alreadyFeatured?'22px':'2px'};width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2);transition:left .2s;pointer-events:none;"></div>
+          </div>
+          Featured Listing
+          ${featuredAtMax ? '<span style="font-size:11px;color:#e67e22;font-weight:400;">(max 8 reached)</span>' : ''}
+        </label>
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Commission Fee (RWF/night)</label>
+        <input id="eldCommission" type="number" min="0" value="${listing.price_afristay_fee ?? ''}" oninput="_editUpdatePricePreview()" style="width:100%;padding:10px 14px;border:1.5px solid #ffe082;border-radius:8px;font-size:14px;box-sizing:border-box;background:#fff;">
+        <p style="margin:6px 0 0;font-size:12px;color:#888;">Guest price: <strong id="eldPricePreview">${Number((listing.price||0)+(listing.price_afristay_fee||0)).toLocaleString('en-RW')} RWF</strong></p>
+      </div>
+    </div>
+    ` : ''}
+    <div style="display:flex;justify-content:flex-end;gap:12px;padding-top:4px;">
+      <button type="button" onclick="document.getElementById('editListingOverlay')?.remove()" style="padding:11px 22px;border:1.5px solid #ddd;border-radius:8px;background:#fff;color:#555;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
+      <button type="button" id="eldSaveBtn" onclick="handleSaveEditListing()" style="padding:11px 26px;border:none;border-radius:8px;background:var(--primary,#EB6753);color:#fff;font-size:14px;font-weight:700;cursor:pointer;"><i class="fa-solid fa-floppy-disk" style="margin-right:8px;"></i>Save Changes</button>
+    </div>
+  </div>
+</div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    if (listing.province_id) _editLoadDistricts(listing.province_id, listing.district_id);
+    _editLoadAmenities(isVehicle, existingAmenities);
+}
+window._showEditModal = _showEditModal;
+
+async function _editLoadDistricts(provId, selectedDistId) {
+    const distSel = document.getElementById('eldDistrict');
+    const sectSel = document.getElementById('eldSector');
+    if (!distSel) return;
+    distSel.innerHTML = '<option value="">Loading…</option>';
+    if (sectSel) sectSel.innerHTML = '<option value="">-- Select Sector --</option>';
+    if (!provId) { distSel.innerHTML = '<option value="">-- Select District --</option>'; return; }
+    const districts = await cDistricts(provId);
+    distSel.innerHTML = '<option value="">-- Select District --</option>' +
+        districts.map(d => `<option value="${d.id}" ${d.id === selectedDistId ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('');
+    if (selectedDistId) _editLoadSectors(selectedDistId, _editState?._savedSectorId);
+}
+window._editLoadDistricts = _editLoadDistricts;
+
+async function _editLoadSectors(distId, selectedSectId) {
+    const sectSel = document.getElementById('eldSector');
+    if (!sectSel) return;
+    sectSel.innerHTML = '<option value="">Loading…</option>';
+    if (!distId) { sectSel.innerHTML = '<option value="">-- Select Sector --</option>'; return; }
+    const sectors = await cSectors(distId);
+    sectSel.innerHTML = '<option value="">-- Select Sector --</option>' +
+        sectors.map(s => `<option value="${s.id}" ${s.id === selectedSectId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
+}
+window._editLoadSectors = _editLoadSectors;
+
+function _editToggleVehicleFields() {
+    const isVehicle = document.getElementById('eldCategory')?.value === 'vehicle';
+    const propSpecs = document.getElementById('eldPropSpecs');
+    const vehSpecs  = document.getElementById('eldVehSpecs');
+    const outside   = document.getElementById('eldOutsideKigaliGroup');
+    if (propSpecs) propSpecs.style.display = isVehicle ? 'none' : '';
+    if (vehSpecs)  vehSpecs.style.display  = isVehicle ? '' : 'none';
+    if (outside)   outside.style.display   = isVehicle ? '' : 'none';
+    const currentSlugs = Array.from(document.querySelectorAll('#eldAmenities .am-chip.active')).map(c => c.dataset.am);
+    _editLoadAmenities(isVehicle, currentSlugs);
+}
+window._editToggleVehicleFields = _editToggleVehicleFields;
+
+async function _editLoadAmenities(isVehicle, selectedSlugs) {
+    const container = document.getElementById('eldAmenities');
+    if (!container) return;
+    const sb = _supabase || window.supabaseClient;
+    if (!sb) {
+        container.innerHTML = '<span style="color:#bbb;font-size:13px;">Session not ready — please wait…</span>';
+        return;
+    }
+    container.innerHTML = '<span style="color:#bbb;font-size:13px;"><i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Loading…</span>';
+    try {
+        if (!_amenityCache) {
+            const { data, error } = await sb.from('amenity_definitions').select('slug,label,icon,category,listing_type').order('label');
+            if (error) throw error;
+            _amenityCache = data || [];
+        }
+        const seenSlugs = new Set();
+        const list = _amenityCache.filter(a => {
+            const lt = (a.listing_type || 'all').toLowerCase();
+            if (lt === 'vehicle' && !isVehicle) return false;
+            if (lt === 'property' && isVehicle) return false;
+            if (seenSlugs.has(a.slug)) return false;
+            seenSlugs.add(a.slug); return true;
+        });
+        if (!list.length) { container.innerHTML = '<span style="color:#bbb;font-size:13px;">No amenities available.</span>'; return; }
+        const groups = {};
+        list.forEach(a => { const g = a.category || 'General'; if (!groups[g]) groups[g] = []; groups[g].push(a); });
+        container.innerHTML = '';
+        const selectedSet = new Set(Array.isArray(selectedSlugs) ? selectedSlugs : []);
+        const groupNames = Object.keys(groups);
+        groupNames.forEach(groupName => {
+            if (groupNames.length > 1) {
+                const lbl = document.createElement('div');
+                lbl.style.cssText = 'width:100%;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#bbb;margin:10px 0 4px;';
+                lbl.textContent = groupName;
+                container.appendChild(lbl);
+            }
+            groups[groupName].forEach(a => {
+                const icon = (typeof AMENITY_ICONS !== 'undefined' && AMENITY_ICONS[a.slug]) || a.icon || 'fa-solid fa-circle-check';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'am-chip' + (selectedSet.has(a.slug) ? ' active' : '');
+                btn.dataset.am = a.slug;
+                btn.innerHTML = `<i class="${icon}"></i> ${escapeHtml(a.label)}`;
+                btn.addEventListener('click', () => btn.classList.toggle('active'));
+                container.appendChild(btn);
+            });
+        });
+    } catch (err) {
+        container.innerHTML = `<span style="color:#e74c3c;font-size:13px;">Failed to load amenities: ${escapeHtml(err.message||String(err))} — <a href="#" onclick="_editLoadAmenities(${isVehicle},${JSON.stringify(selectedSlugs||[])});return false;" style="color:#e74c3c;">Retry</a></span>`;
+        console.error('_editLoadAmenities error:', err);
+    }
+}
+
+function _editRemoveImage(imgId) {
+    if (!_editState) return;
+    _editState.removedImageIds.push(imgId);
+    const el = document.getElementById('eldImg_' + imgId);
+    if (el) { el.style.opacity = '0.3'; el.style.pointerEvents = 'none'; el.title = 'Will be deleted on save'; }
+}
+window._editRemoveImage = _editRemoveImage;
+
+function _editRemoveVideo(vidId) {
+    if (!_editState) return;
+    _editState.removedVideoIds.push(vidId);
+    const el = document.getElementById('eldVid_' + vidId);
+    if (el) { el.style.opacity = '0.3'; el.style.pointerEvents = 'none'; el.title = 'Will be deleted on save'; }
+}
+window._editRemoveVideo = _editRemoveVideo;
+
+function _editHandleNewImages(input) {
+    if (!_editState || !input.files) return;
+    _editState.newImageFiles = Array.from(input.files);
+    const container = document.getElementById('eldImagesContainer');
+    if (!container) return;
+    container.querySelectorAll('.eld-new-img-preview').forEach(e => e.remove());
+    _editState.newImageFiles.forEach(f => {
+        const url = URL.createObjectURL(f);
+        const div = document.createElement('div');
+        div.className = 'eld-new-img-preview';
+        div.style.cssText = 'position:relative;width:100px;height:76px;border-radius:8px;overflow:hidden;background:#f0f0f0;flex-shrink:0;border:2px dashed var(--primary,#EB6753);';
+        div.innerHTML = `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;"><span style="position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:#fff;background:rgba(235,103,83,0.85);padding:2px 0;">NEW</span>`;
+        container.appendChild(div);
+    });
+}
+window._editHandleNewImages = _editHandleNewImages;
+
+function _editHandleNewVideos(input) {
+    if (!_editState || !input.files) return;
+    _editState.newVideoFiles = Array.from(input.files);
+    const container = document.getElementById('eldVideosContainer');
+    if (!container) return;
+    container.querySelectorAll('.eld-new-vid-preview').forEach(e => e.remove());
+    _editState.newVideoFiles.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'eld-new-vid-preview';
+        div.style.cssText = 'display:flex;align-items:center;gap:8px;background:#fff3e0;border:1px solid #ffe082;border-radius:8px;padding:8px 12px;';
+        div.innerHTML = `<i class="fa-solid fa-film" style="color:#e67e22;font-size:16px;"></i><span style="font-size:13px;color:#7c5c00;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(f.name)}</span><span style="font-size:11px;color:#e67e22;font-weight:700;">NEW</span>`;
+        container.appendChild(div);
+    });
+}
+window._editHandleNewVideos = _editHandleNewVideos;
+
+function _editFeaturedToggleStyle() {
+    const cb    = document.getElementById('eldFeatured');
+    const track = document.getElementById('eldFeaturedTrack');
+    const knob  = document.getElementById('eldFeaturedKnob');
+    if (!cb || !track || !knob) return;
+    track.style.background = cb.checked ? 'var(--primary,#EB6753)' : '#ddd';
+    knob.style.left = cb.checked ? '22px' : '2px';
+}
+window._editFeaturedToggleStyle = _editFeaturedToggleStyle;
+
+function _editUpdatePricePreview() {
+    const price = Number(document.getElementById('eldPrice')?.value) || 0;
+    const fee   = Number(document.getElementById('eldCommission')?.value) || 0;
+    const prev  = document.getElementById('eldPricePreview');
+    if (prev) prev.textContent = (price + fee).toLocaleString('en-RW') + ' RWF';
+}
+window._editUpdatePricePreview = _editUpdatePricePreview;
+
+async function handleSaveEditListing() {
+    if (!_editState || !_supabase || !CURRENT_PROFILE) return;
+    const { listingId, ownerId, removedImageIds, removedVideoIds, newImageFiles, newVideoFiles } = _editState;
+    const saveBtn  = document.getElementById('eldSaveBtn');
+    const statusEl = document.getElementById('eldStatus');
+    function setStatus(msg, type) {
+        if (!statusEl) return;
+        const colors = { info:'#e8f4fd', success:'#e9faf0', error:'#fdecea', warning:'#fff8e1' };
+        const text   = { info:'#1565c0', success:'#1b7a3e', error:'#c0392b', warning:'#7c5c00' };
+        statusEl.style.cssText = `display:block;padding:12px 16px;border-radius:8px;font-size:14px;background:${colors[type]||colors.info};color:${text[type]||text.info};border:1px solid ${text[type]||text.info}33;`;
+        statusEl.innerHTML = msg;
+        statusEl.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    }
+    const title    = document.getElementById('eldTitle')?.value?.trim();
+    const price    = Number(document.getElementById('eldPrice')?.value || 0);
+    const desc     = document.getElementById('eldDesc')?.value?.trim();
+    const category = document.getElementById('eldCategory')?.value;
+    if (!title || !price || !desc) { setStatus('Please fill in Title, Price, and Description.', 'error'); return; }
+    const isVehicle = category === 'vehicle';
+    const keptImages = document.querySelectorAll('#eldImagesContainer > div[id^="eldImg_"]').length - removedImageIds.length;
+    if (keptImages + newImageFiles.length > 10) { setStatus('Max 10 images allowed.', 'error'); return; }
+    const keptVideos = document.querySelectorAll('#eldVideosContainer > div[id^="eldVid_"]').length - removedVideoIds.length;
+    if (keptVideos + newVideoFiles.length > 3) { setStatus('Max 3 videos allowed.', 'error'); return; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:8px;"></i>Saving…'; }
+    try {
+        setStatus('<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Saving changes…', 'info');
+        const provinceId = document.getElementById('eldProvince')?.value || null;
+        const districtId = document.getElementById('eldDistrict')?.value || null;
+        const sectorId   = document.getElementById('eldSector')?.value   || null;
+        const address    = document.getElementById('eldAddress')?.value?.trim() || '';
+        const roomCount  = !isVehicle ? (parseInt(document.getElementById('eldRooms')?.value)     || null) : null;
+        const bathCount  = !isVehicle ? (parseInt(document.getElementById('eldBaths')?.value)     || null) : null;
+        const bedCount   = !isVehicle ? (parseInt(document.getElementById('eldBeds')?.value)      || null) : null;
+        const maxGuests  = !isVehicle ? (parseInt(document.getElementById('eldMaxGuests')?.value)  || null) : null;
+        const floorArea  = !isVehicle ? (parseInt(document.getElementById('eldFloorArea')?.value)  || null) : null;
+        const vehicleSpecs = isVehicle ? {
+            make:         document.getElementById('eldVMake')?.value?.trim()  || null,
+            model:        document.getElementById('eldVModel')?.value?.trim() || null,
+            year:         parseInt(document.getElementById('eldVYear')?.value)  || null,
+            fuel_type:    document.getElementById('eldVFuel')?.value            || null,
+            transmission: document.getElementById('eldVTrans')?.value           || null,
+        } : null;
+        const maxPassengers      = isVehicle ? (parseInt(document.getElementById('eldVMaxPass')?.value)    || null) : null;
+        const priceOutsideKigali = isVehicle ? (Number(document.getElementById('eldPriceOutside')?.value) || null) : null;
+        const amenitySlugs = Array.from(document.querySelectorAll('#eldAmenities .am-chip.active')).map(c => c.dataset.am);
+        const updatePayload = {
+            title, description: desc, price, category_slug: category,
+            province_id: provinceId, district_id: districtId, sector_id: sectorId, address,
+            price_outside_kigali: priceOutsideKigali,
+            room_count: roomCount, bathroom_count: bathCount, bed_count: bedCount,
+            max_guests: maxGuests, floor_area_sqm: floorArea,
+            vehicle_specs: vehicleSpecs, max_passengers: maxPassengers,
+            amenities_data: amenitySlugs.length ? amenitySlugs : null,
+        };
+        // ── OWNER FLOW: submit edit request for admin review ──
+        if (CURRENT_ROLE === 'owner') {
+            // Upload new staging images (stored but not yet in listing_images)
+            const newImageMeta = [];
+            for (let i = 0; i < newImageFiles.length; i++) {
+                const file = newImageFiles[i];
+                setStatus(`<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Uploading image ${i+1}/${newImageFiles.length}…`, 'info');
+                const path = `${ownerId}/${listingId}/staging/${Date.now()}-${file.name}`;
+                const { error: upErr } = await _supabase.storage.from('listing-images').upload(path, file, { upsert: false });
+                if (upErr) { console.warn('Staging image upload failed:', upErr); continue; }
+                const { data: urlData } = await _supabase.storage.from('listing-images').getPublicUrl(path);
+                newImageMeta.push({ url: urlData?.publicUrl || null, filename: file.name, mime_type: file.type });
+            }
+            // Upload new staging videos
+            const newVideoMeta = [];
+            for (let i = 0; i < newVideoFiles.length; i++) {
+                const file = newVideoFiles[i];
+                setStatus(`<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Uploading video ${i+1}/${newVideoFiles.length}…`, 'info');
+                const path = `${ownerId}/${listingId}/staging/${Date.now()}-${file.name}`;
+                const { error: upErr } = await _supabase.storage.from('listing-videos').upload(path, file, { upsert: false });
+                if (upErr) { console.warn('Staging video upload failed:', upErr); continue; }
+                const { data: urlData } = await _supabase.storage.from('listing-videos').getPublicUrl(path);
+                newVideoMeta.push({ url: urlData?.publicUrl || null, filename: file.name, mime_type: file.type });
+            }
+            setStatus('<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Submitting for admin review…', 'info');
+            const proposedChanges = {
+                ...updatePayload,
+                remove_image_ids: removedImageIds,
+                new_images: newImageMeta,
+                remove_video_ids: removedVideoIds,
+                new_videos: newVideoMeta,
+            };
+            const { error: reqErr } = await _supabase.from('listing_edit_requests').insert([{
+                listing_id: listingId,
+                owner_id: CURRENT_PROFILE.id,
+                proposed_changes: proposedChanges
+            }]);
+            if (reqErr) throw reqErr;
+            setStatus('<i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>Edit submitted! An admin will review it and apply the changes.', 'success');
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" style="margin-right:8px;"></i>Save Changes'; }
+            setTimeout(() => {
+                document.getElementById('editListingOverlay')?.remove();
+                if (typeof loadListingsGrid === 'function') loadListingsGrid();
+            }, 1800);
+            return;
+        }
+
+        // ── ADMIN FLOW: apply changes directly ──
+        if (CURRENT_ROLE === 'admin') {
+            const featured   = document.getElementById('eldFeatured')?.checked || false;
+            const commission = Number(document.getElementById('eldCommission')?.value) || 0;
+            updatePayload.featured           = featured;
+            updatePayload.price_afristay_fee = commission;
+            updatePayload.price_display      = price + commission;
+        }
+        // 1) Update listing row
+        const { error: updateErr } = await _supabase.from('listings').update(updatePayload).eq('id', listingId);
+        if (updateErr) throw updateErr;
+        // 2) Delete removed images from storage + DB
+        if (removedImageIds.length) {
+            setStatus('<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Removing images…', 'info');
+            const { data: imgRows } = await _supabase.from('listing_images').select('id,image_url').in('id', removedImageIds);
+            if (imgRows?.length) {
+                const paths = imgRows.map(r => { try { const u = new URL(r.image_url); return u.pathname.split('/object/public/listing-images/')[1] || null; } catch { return null; } }).filter(Boolean);
+                if (paths.length) await _supabase.storage.from('listing-images').remove(paths);
+            }
+            await _supabase.from('listing_images').delete().in('id', removedImageIds);
+        }
+        // 3) Delete removed videos from storage + DB
+        if (removedVideoIds.length) {
+            setStatus('<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Removing videos…', 'info');
+            const { data: vidRows } = await _supabase.from('listing_videos').select('id,video_url').in('id', removedVideoIds);
+            if (vidRows?.length) {
+                const paths = vidRows.map(r => { try { const u = new URL(r.video_url); return u.pathname.split('/object/public/listing-videos/')[1] || null; } catch { return null; } }).filter(Boolean);
+                if (paths.length) await _supabase.storage.from('listing-videos').remove(paths);
+            }
+            await _supabase.from('listing_videos').delete().in('id', removedVideoIds);
+        }
+        // 4) Upload new images
+        for (let i = 0; i < newImageFiles.length; i++) {
+            const file = newImageFiles[i];
+            setStatus(`<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Uploading image ${i+1}/${newImageFiles.length}…`, 'info');
+            const path = `${ownerId}/${listingId}/${Date.now()}-${file.name}`;
+            const { error: upErr } = await _supabase.storage.from('listing-images').upload(path, file, { upsert: false });
+            if (upErr) { console.warn('Image upload failed:', upErr); continue; }
+            const { data: urlData } = await _supabase.storage.from('listing-images').getPublicUrl(path);
+            await _supabase.from('listing_images').insert([{ listing_id: listingId, image_url: urlData?.publicUrl || null, filename: file.name, mime_type: file.type }]);
+        }
+        // 5) Upload new videos
+        for (let i = 0; i < newVideoFiles.length; i++) {
+            const file = newVideoFiles[i];
+            setStatus(`<i class="fa-solid fa-circle-notch fa-spin" style="margin-right:6px;"></i>Uploading video ${i+1}/${newVideoFiles.length}…`, 'info');
+            const path = `${ownerId}/${listingId}/${Date.now()}-${file.name}`;
+            const { error: upErr } = await _supabase.storage.from('listing-videos').upload(path, file, { upsert: false });
+            if (upErr) { console.warn('Video upload failed:', upErr); continue; }
+            const { data: urlData } = await _supabase.storage.from('listing-videos').getPublicUrl(path);
+            await _supabase.from('listing_videos').insert([{ listing_id: listingId, video_url: urlData?.publicUrl || null, filename: file.name, mime_type: file.type }]);
+        }
+        setStatus('<i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>Listing updated successfully!', 'success');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" style="margin-right:8px;"></i>Save Changes'; }
+        setTimeout(() => {
+            document.getElementById('editListingOverlay')?.remove();
+            if (typeof loadListingsGrid === 'function') loadListingsGrid();
+        }, 1200);
+    } catch (err) {
+        console.error('handleSaveEditListing error:', err);
+        setStatus('<i class="fa-solid fa-circle-xmark" style="margin-right:6px;"></i>' + sanitizeError(err), 'error');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk" style="margin-right:8px;"></i>Save Changes'; }
+    }
+}
+window.handleSaveEditListing = handleSaveEditListing;
+// ── End Edit Listing Modal ──────────────────────────────────────────────────
 
 async function populatePromoListings() {
     const sel = document.getElementById('promoListingId');
@@ -2839,7 +3612,7 @@ async function handleCreateEvent() {
         await loadEventsCards();
     } catch (err) {
         console.error('❌ [EVENTS] create:', err);
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-calendar-plus"></i> Create Event'; }
     }
@@ -2853,7 +3626,7 @@ async function deleteEvent(eventId) {
         toast('Event deleted.', 'success');
         await loadEventsCards();
     } catch (err) {
-        toast('Failed to delete: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 window.deleteEvent = deleteEvent;
@@ -3029,7 +3802,7 @@ async function savePromoEdit(promoId) {
         document.getElementById('promoEditModal').style.display = 'none';
         await loadPromotionsCards();
     } catch (err) {
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
     }
@@ -3136,7 +3909,7 @@ async function handleCreatePromo() {
         await loadPromotionsCards();
     } catch (err) {
         console.error('❌ [PROMOS] create:', err);
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-tag"></i> Create Promotion'; }
     }
@@ -3151,7 +3924,7 @@ async function deletePromotion(promoId) {
         toast('Promotion deleted.', 'success');
         await loadPromotionsCards();
     } catch (err) {
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 window.deletePromotion = deletePromotion;
@@ -3191,7 +3964,7 @@ async function handleSaveSettings() {
         document.getElementById('newPassword').value = '';
     } catch (err) {
         console.error("❌ [SETTINGS]", err);
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
     }
@@ -3236,7 +4009,7 @@ function injectListingRequestsTab() {
     }
 }
 
-async function loadListingRequests(searchTerm = '') {
+async function loadListingRequests(searchTerm = '', page = 0) {
     console.log('📋 [REQUESTS] Loading pending listing requests...');
     let container = document.getElementById('listingRequestsContainer');
     if (!container) {
@@ -3245,15 +4018,20 @@ async function loadListingRequests(searchTerm = '') {
         container = panel.querySelector('#listingRequestsContainer') || panel;
     }
     container.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;">Loading requests...</div>';
+    const _guard = skeletonGuard(container);
+
+    const PAGE_SIZE = 15;
+    const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
 
     try {
         let rq = _supabase
             .from('listings')
-            .select('id,title,price,price_display,currency,category_slug,province_id,district_id,owner_id,created_at,status')
+            .select('id,title,price,price_display,currency,category_slug,province_id,district_id,owner_id,created_at,status', { count: 'exact' })
             .in('status', ['pending'])
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .range(start, end);
         if (searchTerm) rq = rq.ilike('title', `%${searchTerm}%`);
-        const { data, error } = await rq;
+        const { data, error, count } = await rq;
         if (error) throw error;
 
         // Batch owner names
@@ -3270,12 +4048,26 @@ async function loadListingRequests(searchTerm = '') {
         if (pvIds.length) { const {data:ps} = await _supabase.from('provinces').select('id,name').in('id',pvIds); (ps||[]).forEach(p=>pvMap[p.id]=p.name); }
         if (dtIds.length) { const {data:ds} = await _supabase.from('districts').select('id,name').in('id',dtIds); (ds||[]).forEach(d=>dtMap[d.id]=d.name); }
 
+        clearTimeout(_guard);
+        container.innerHTML = '';
+
         if (!data || !data.length) {
-            container.innerHTML = '<div style="text-align:center;padding:60px;color:#ccc;"><i class="fa-solid fa-inbox" style="font-size:48px;display:block;margin-bottom:16px;"></i><p>No pending listing requests.</p></div>';
+            // Still load pending edit requests before bailing
+            await loadPendingEditRequests(container, searchTerm);
+            if (!container.children.length) {
+                container.innerHTML = '<div style="text-align:center;padding:60px;color:#ccc;"><i class="fa-solid fa-inbox" style="font-size:48px;display:block;margin-bottom:16px;"></i><p>No pending listing requests.</p></div>';
+            }
             return;
         }
 
-        container.innerHTML = '';
+        // Section header: new listings
+        if (data.length) {
+            const hdr = document.createElement('p');
+            hdr.style.cssText = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#aaa;margin:0 0 12px;';
+            hdr.textContent = 'New Listings';
+            container.appendChild(hdr);
+        }
+
         data.forEach(l => {
             const owner = ownerMap[l.owner_id] || {};
             const loc = [dtMap[l.district_id], pvMap[l.province_id]].filter(Boolean).join(', ') || 'Rwanda';
@@ -3291,19 +4083,197 @@ async function loadListingRequests(searchTerm = '') {
                 '<p style="font-size:13px;color:#555;margin:0;font-weight:600;">' + escapeHtml(owner.full_name||'Unknown') + '</p>' +
                 '<p style="font-size:12px;color:#aaa;margin:2px 0 0;">' + escapeHtml(owner.email||'') + '</p></div>' +
                 '<div style="display:flex;gap:8px;flex-shrink:0;">' +
+                '<button onclick="openEditListingModal(\'' + l.id + '\')" style="background:#e8f4fd;color:#1565c0;border:1px solid #bbdefb;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-pen"></i> Edit</button>' +
                 '<button onclick="openApprovalFeeDialog(\'' + l.id + '\',\'' + Number(l.price||0) + '\')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:9px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;">' +
                 '<i class="fa-solid fa-check"></i> Approve</button>' +
                 '<button onclick="rejectListingRequest(\'' + l.id + '\',this)" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:9px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;">' +
                 '<i class="fa-solid fa-xmark"></i> Reject</button></div>';
             container.appendChild(row);
         });
+        clearTimeout(_guard);
         console.log('✅ [REQUESTS] Loaded', data.length, 'pending listings');
+
+        // ── Pagination ──
+        if (window.renderPagination) {
+            const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
+            renderPagination('listingRequestsPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadListingRequests(searchTerm, p));
+        }
+
+        // ── Also load pending edit requests (always, no pagination — tend to be few) ──
+        await loadPendingEditRequests(container, searchTerm);
+
     } catch(err) {
+        clearTimeout(_guard);
         console.error('❌ [REQUESTS]', err);
-        container.innerHTML = '<div style="color:red;padding:20px;">' + err.message + '</div>';
+        container.innerHTML = emptyState('😕', 'Could not load requests', sanitizeError(err));
     }
 }
 window.loadListingRequests = loadListingRequests;
+
+async function loadPendingEditRequests(container, searchTerm = '') {
+    try {
+        let erq = _supabase
+            .from('listing_edit_requests')
+            .select('id,listing_id,owner_id,proposed_changes,created_at')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+        const { data: erData, error: erErr } = await erq;
+        if (erErr || !erData?.length) return;
+
+        // Fetch listing titles + owner info
+        const lIds = [...new Set(erData.map(r => r.listing_id))];
+        const oIds = [...new Set(erData.map(r => r.owner_id))];
+        const [lRes, oRes] = await Promise.all([
+            _supabase.from('listings').select('id,title,price,price_afristay_fee').in('id', lIds),
+            _supabase.from('profiles').select('id,full_name,email').in('id', oIds),
+        ]);
+        const lMap = {}; (lRes.data||[]).forEach(l => lMap[l.id] = l);
+        const oMap = {}; (oRes.data||[]).forEach(o => oMap[o.id] = o);
+
+        // Section header
+        const hdr = document.createElement('p');
+        hdr.style.cssText = 'font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#aaa;margin:20px 0 12px;';
+        hdr.innerHTML = `<i class="fa-solid fa-pen-to-square" style="margin-right:4px;color:#EB6753;"></i>Pending Edit Requests`;
+        container.appendChild(hdr);
+
+        erData.forEach(er => {
+            const listing = lMap[er.listing_id] || {};
+            const owner = oMap[er.owner_id] || {};
+            const pc = er.proposed_changes || {};
+            // Filter by search term if provided
+            if (searchTerm && !(pc.title||listing.title||'').toLowerCase().includes(searchTerm.toLowerCase())) return;
+
+            const row = document.createElement('div');
+            row.setAttribute('data-edit-req-id', er.id);
+            row.style.cssText = 'background:#fff;border-left:4px solid #f39c12;border-radius:16px;padding:20px 24px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,0.07);transition:opacity 0.3s;';
+            const changes = [];
+            if (pc.title && pc.title !== listing.title) changes.push(`Title → <em>${escapeHtml(pc.title)}</em>`);
+            if (pc.price && pc.price !== listing.price) changes.push(`Price → <strong>${Number(pc.price).toLocaleString('en-RW')} RWF</strong>`);
+            if (pc.description) changes.push('Description updated');
+            if (pc.new_images?.length) changes.push(`${pc.new_images.length} new image(s)`);
+            if (pc.remove_image_ids?.length) changes.push(`${pc.remove_image_ids.length} image(s) removed`);
+            if (pc.new_videos?.length) changes.push(`${pc.new_videos.length} new video(s)`);
+            if (pc.amenities_data) changes.push('Amenities updated');
+            row.innerHTML =
+                '<div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;">' +
+                '<div style="flex:1;min-width:200px;">' +
+                '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+                '<span style="background:#fff3cd;color:#856404;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;">EDIT REQUEST</span>' +
+                '<h4 style="font-size:15px;font-weight:700;color:#1a1a1a;margin:0;">' + escapeHtml(pc.title||listing.title||'Unknown') + '</h4>' +
+                '</div>' +
+                '<p style="font-size:12px;color:#888;margin:0 0 6px;"><i class="fa-solid fa-user" style="color:#EB6753;font-size:10px;"></i> ' + escapeHtml(owner.full_name||'Unknown') + ' · ' + escapeHtml(owner.email||'') + '</p>' +
+                (changes.length ? '<p style="font-size:12px;color:#555;margin:0;">Changes: ' + changes.join(' · ') + '</p>' : '') +
+                '</div>' +
+                '<div style="display:flex;gap:8px;flex-shrink:0;align-items:center;">' +
+                '<button onclick="openApproveEditDialog(\'' + er.id + '\',\'' + er.listing_id + '\',\'' + Number(listing.price_afristay_fee||0) + '\')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:9px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-check"></i> Approve</button>' +
+                '<button onclick="rejectEditRequest(\'' + er.id + '\',this)" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:9px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;display:flex;align-items:center;gap:6px;"><i class="fa-solid fa-xmark"></i> Reject</button>' +
+                '</div></div>';
+            container.appendChild(row);
+        });
+    } catch(err) {
+        console.warn('loadPendingEditRequests:', err);
+    }
+}
+
+function openApproveEditDialog(editReqId, listingId, currentFee) {
+    document.getElementById('approveEditDlg')?.remove();
+    const fee = Number(currentFee) || 0;
+    const dlg = document.createElement('div');
+    dlg.id = 'approveEditDlg';
+    dlg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    dlg.innerHTML = `
+<div style="background:#fff;border-radius:16px;padding:28px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+  <h3 style="margin:0 0 6px;font-size:18px;font-weight:700;"><i class="fa-solid fa-check-circle" style="color:#27ae60;margin-right:8px;"></i>Approve Edit Request</h3>
+  <p style="font-size:13px;color:#888;margin:0 0 20px;">Set or keep the commission fee. The owner's changes will be applied to the live listing.</p>
+  <label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">Commission Fee (RWF/night)</label>
+  <input id="approveEditFee" type="number" min="0" value="${fee}" style="width:100%;padding:10px 14px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;margin-bottom:20px;">
+  <div style="display:flex;gap:10px;justify-content:flex-end;">
+    <button onclick="document.getElementById('approveEditDlg')?.remove()" style="padding:10px 20px;border:1.5px solid #ddd;border-radius:8px;background:#fff;color:#555;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
+    <button onclick="approveEditRequest('${editReqId}','${listingId}')" style="padding:10px 24px;border:none;border-radius:8px;background:#27ae60;color:#fff;font-size:14px;font-weight:700;cursor:pointer;"><i class="fa-solid fa-check" style="margin-right:6px;"></i>Approve</button>
+  </div>
+</div>`;
+    document.body.appendChild(dlg);
+    dlg.addEventListener('click', e => { if (e.target === dlg) dlg.remove(); });
+}
+window.openApproveEditDialog = openApproveEditDialog;
+
+async function approveEditRequest(editReqId, listingId) {
+    const commission = Number(document.getElementById('approveEditFee')?.value) || 0;
+    document.getElementById('approveEditDlg')?.remove();
+    try {
+        // Fetch the edit request
+        const { data: er, error: erErr } = await _supabase
+            .from('listing_edit_requests').select('*').eq('id', editReqId).single();
+        if (erErr) throw erErr;
+        const pc = er.proposed_changes || {};
+        // Fetch current listing price to compute price_display
+        const newPrice = pc.price || 0;
+        const updatePayload = { ...pc };
+        // Remove media-handling keys from the listing update payload
+        delete updatePayload.remove_image_ids;
+        delete updatePayload.new_images;
+        delete updatePayload.remove_video_ids;
+        delete updatePayload.new_videos;
+        // Apply commission + price_display
+        updatePayload.price_afristay_fee = commission;
+        updatePayload.price_display = newPrice + commission;
+        updatePayload.status = 'approved'; // bring back to approved if it was re-editing
+        // 1) Update the listing
+        const { error: updErr } = await _supabase.from('listings').update(updatePayload).eq('id', listingId);
+        if (updErr) throw updErr;
+        // 2) Remove old media
+        if (pc.remove_image_ids?.length) {
+            const { data: imgRows } = await _supabase.from('listing_images').select('image_url').in('id', pc.remove_image_ids);
+            if (imgRows?.length) {
+                const paths = imgRows.map(r => { try { const u = new URL(r.image_url); return u.pathname.split('/object/public/listing-images/')[1] || null; } catch { return null; } }).filter(Boolean);
+                if (paths.length) await _supabase.storage.from('listing-images').remove(paths);
+            }
+            await _supabase.from('listing_images').delete().in('id', pc.remove_image_ids);
+        }
+        if (pc.remove_video_ids?.length) {
+            const { data: vidRows } = await _supabase.from('listing_videos').select('video_url').in('id', pc.remove_video_ids);
+            if (vidRows?.length) {
+                const paths = vidRows.map(r => { try { const u = new URL(r.video_url); return u.pathname.split('/object/public/listing-videos/')[1] || null; } catch { return null; } }).filter(Boolean);
+                if (paths.length) await _supabase.storage.from('listing-videos').remove(paths);
+            }
+            await _supabase.from('listing_videos').delete().in('id', pc.remove_video_ids);
+        }
+        // 3) Insert new staging media into DB
+        if (pc.new_images?.length) {
+            await _supabase.from('listing_images').insert(pc.new_images.map(m => ({ listing_id: listingId, image_url: m.url, filename: m.filename, mime_type: m.mime_type })));
+        }
+        if (pc.new_videos?.length) {
+            await _supabase.from('listing_videos').insert(pc.new_videos.map(m => ({ listing_id: listingId, video_url: m.url, filename: m.filename, mime_type: m.mime_type })));
+        }
+        // 4) Mark edit request as approved
+        await _supabase.from('listing_edit_requests').update({ status: 'approved', reviewed_at: new Date().toISOString(), reviewed_by: CURRENT_PROFILE?.id }).eq('id', editReqId);
+        toast('Edit request approved and listing updated!', 'success');
+        const row = document.querySelector('[data-edit-req-id="' + editReqId + '"]');
+        if (row) { row.style.opacity = '0'; setTimeout(() => row.remove(), 320); }
+        loadDashPendingListings();
+        loadAttentionItems();
+    } catch (err) {
+        console.error('approveEditRequest', err);
+        toast(sanitizeError(err), 'error');
+    }
+}
+window.approveEditRequest = approveEditRequest;
+
+async function rejectEditRequest(editReqId, btn) {
+    if (!confirm('Reject this edit request?')) return;
+    if (btn) btn.disabled = true;
+    try {
+        await _supabase.from('listing_edit_requests').update({ status: 'rejected', reviewed_at: new Date().toISOString(), reviewed_by: CURRENT_PROFILE?.id }).eq('id', editReqId);
+        toast('Edit request rejected.', 'success');
+        const row = document.querySelector('[data-edit-req-id="' + editReqId + '"]');
+        if (row) { row.style.opacity = '0'; setTimeout(() => row.remove(), 320); }
+    } catch (err) {
+        console.error('rejectEditRequest', err);
+        if (btn) btn.disabled = false;
+        toast(sanitizeError(err), 'error');
+    }
+}
+window.rejectEditRequest = rejectEditRequest;
 
 function openApprovalFeeDialog(listingId, ownerPrice) {
     // Remove any existing dialog
@@ -3356,7 +4326,7 @@ async function confirmApproveWithFee(listingId, ownerPrice) {
         loadDashPendingListings();
         loadAttentionItems();
     } catch (err) {
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 window.confirmApproveWithFee = confirmApproveWithFee;
@@ -3367,15 +4337,18 @@ async function approveListingRequest(listingId, btn) {
 }
 window.approveListingRequest = approveListingRequest;
 
-async function loadOwnerApplications() {
+async function loadOwnerApplications(page = 0) {
     const container = document.getElementById('ownerApplicationsContainer');
     if (!container) return;
     container.innerHTML = '<div style="padding:20px;color:#aaa;font-size:13px;">Loading…</div>';
+    const PAGE_SIZE = 15;
+    const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
     try {
-        const { data, error } = await _supabase
+        const { data, error, count } = await _supabase
             .from('owner_applications')
-            .select('id, user_id, phone, motivation, property_type, status, answers, admin_note, created_at, profiles ( full_name, email, phone )')
-            .order('created_at', { ascending: false });
+            .select('id, user_id, phone, motivation, property_type, status, answers, admin_note, created_at, profiles ( full_name, email, phone )', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(start, end);
         if (error) throw error;
         if (!data || !data.length) {
             container.innerHTML = '<div style="padding:30px;text-align:center;color:#aaa;font-size:14px;">No owner applications yet.</div>';
@@ -3446,8 +4419,12 @@ async function loadOwnerApplications() {
                 </div>`;
             container.appendChild(row);
         });
+        if (window.renderPagination) {
+            const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
+            renderPagination('ownerApplicationsPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadOwnerApplications(p));
+        }
     } catch(err) {
-        container.innerHTML = '<div style="color:red;padding:20px;">' + err.message + '</div>';
+        container.innerHTML = '<div style="color:#e74c3c;padding:20px;">' + sanitizeError(err) + '</div>';
     }
 }
 window.loadOwnerApplications = loadOwnerApplications;
@@ -3478,7 +4455,7 @@ async function handleOwnerApplication(appId, userId, newStatus) {
         loadAttentionItems();
     } catch(err) {
         logAudit({ action: 'owner_application_failed', entityType: 'user', entityId: userId, description: 'Failed to ' + newStatus + ' owner application: ' + err.message, isError: true });
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 window.handleOwnerApplication = handleOwnerApplication;
@@ -3638,7 +4615,7 @@ window.markAttentionHandled = async function(source, id) {
         toast('Marked as fixed.', 'success');
         loadAttentionItems();
     } catch(err) {
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 };
 
@@ -3810,42 +4787,74 @@ async function rejectListingRequest(listingId, btn) {
         loadAttentionItems();
     } catch (err) {
         logAudit({ action: 'listing_request_rejected_failed', entityType: 'listing', entityId: listingId, description: 'Failed to reject listing request: ' + err.message, isError: true });
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Reject'; }
     }
 }
 window.rejectListingRequest = rejectListingRequest;
 
 /* ═══════════════════════════════════════════════════
-   OWNER — NEW BOOKINGS (pending only)
+   NEW BOOKINGS — pending/awaiting_approval only
+   Owner: own listings, info only (no approve/reject)
+   Admin: all listings, with approve/reject actions
    ═══════════════════════════════════════════════════ */
-async function loadNewBookings() {
+async function loadNewBookings(page = 0) {
     console.log('🆕 [NEW BOOKINGS] Loading pending bookings...');
-    const container = document.getElementById('newBookingsContainer');
+    const isAdmin = CURRENT_ROLE === 'admin';
+    const PAGE_SIZE = 15;
+    const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
+
+    // For admin: inject container into dashboardPanel if missing
+    let container = document.getElementById('newBookingsContainer');
+    if (!container && isAdmin) {
+        const panel = document.getElementById('dashboardPanel');
+        if (!panel) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'data-section';
+        wrap.style.marginTop = '20px';
+        wrap.innerHTML =
+            '<div class="sec-head">' +
+            '<h2><i class="fa-solid fa-bell" style="color:var(--primary);margin-right:8px;"></i>Bookings Awaiting Approval</h2>' +
+            '<button class="btn-s" onclick="loadNewBookings()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>' +
+            '</div>' +
+            '<div class="sec-body"><div id="newBookingsContainer"></div><div id="newBookingsPagination" style="margin-top:12px;"></div></div>';
+        panel.appendChild(wrap);
+        container = document.getElementById('newBookingsContainer');
+    }
     if (!container) return;
     container.innerHTML = '<div style="text-align:center;padding:30px;color:#aaa;">Loading...</div>';
+    const _guard = skeletonGuard(container);
 
     try {
-        const listingIds = await cOwnerIds();
-        if (!listingIds.length) {
-            container.innerHTML = '<div style="text-align:center;padding:40px;color:#ccc;"><i class="fa-solid fa-inbox" style="font-size:36px;display:block;margin-bottom:12px;"></i><p>No listings yet.</p></div>';
-            return;
-        }
-        const { data, error } = await _supabase
+        let q = _supabase
             .from('bookings')
-            .select('id,listing_id,user_id,guest_name,guest_email,guest_phone,start_date,end_date,total_amount,payment_method,created_at,category_slug')
-            .in('listing_id', listingIds)
-            .in('status', ['awaiting_approval', 'approved', 'pending'])
-            .order('created_at', { ascending: false });
+            .select('id,listing_id,user_id,guest_name,guest_email,guest_phone,start_date,end_date,total_amount,payment_method,created_at,category_slug', { count: 'exact' })
+            .in('status', ['awaiting_approval', 'pending'])
+            .order('created_at', { ascending: false })
+            .range(start, end);
+
+        if (!isAdmin) {
+            // Owner: filter to their listings only
+            const listingIds = await cOwnerIds();
+            if (!listingIds.length) {
+                clearTimeout(_guard);
+                container.innerHTML = '<div style="text-align:center;padding:40px;color:#ccc;"><i class="fa-solid fa-inbox" style="font-size:36px;display:block;margin-bottom:12px;"></i><p>No listings yet.</p></div>';
+                return;
+            }
+            q = q.in('listing_id', listingIds);
+        }
+
+        const { data, error, count } = await q;
         if (error) throw error;
 
         if (!data || !data.length) {
-            container.innerHTML = '<div style="text-align:center;padding:40px;color:#ccc;"><i class="fa-solid fa-check-circle" style="font-size:36px;display:block;margin-bottom:12px;color:#2ecc71;"></i><p>No new bookings waiting for approval.</p></div>';
+            clearTimeout(_guard);
+            container.innerHTML = emptyState('✅', 'All clear!', 'No bookings awaiting approval right now.');
             return;
         }
 
         // Batch listing titles
-        const lids = [...new Set(data.map(b=>b.listing_id))];
+        const lids = [...new Set(data.map(b => b.listing_id))];
         const lstM = {};
         if (lids.length) { const {data:ls} = await _supabase.from('listings').select('id,title').in('id',lids); (ls||[]).forEach(l=>lstM[l.id]=l.title); }
 
@@ -3857,6 +4866,11 @@ async function loadNewBookings() {
             const pmLabel = (b.payment_method || '').replace(/_/g,' ').replace(/\b\w/g, c=>c.toUpperCase()) || 'Pay on Arrival';
             const row = document.createElement('div');
             row.style.cssText = 'background:#fff;border-radius:14px;padding:18px 20px;margin-bottom:12px;display:flex;align-items:center;gap:16px;box-shadow:0 3px 12px rgba(0,0,0,0.07);flex-wrap:wrap;border-left:4px solid #f39c12;';
+            const actionBtns = isAdmin
+                ? '<div style="display:flex;gap:8px;">' +
+                  '<button onclick="approveBooking(\'' + b.id + '\')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-check"></i> Approve</button>' +
+                  '<button onclick="rejectBooking(\'' + b.id + '\')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-xmark"></i> Reject</button></div>'
+                : '<span style="font-size:11px;font-weight:700;background:#fff8e1;color:#c47f2a;padding:4px 10px;border-radius:20px;border:1px solid #f5cc6e;">Awaiting Approval</span>';
             row.innerHTML =
                 '<div style="flex:1;min-width:160px;">' +
                 '<p style="font-size:14px;font-weight:700;color:#1a1a1a;margin:0 0 3px;">' + escapeHtml(lstM[b.listing_id]||'Unknown listing') + '</p>' +
@@ -3869,16 +4883,19 @@ async function loadNewBookings() {
                 (b.guest_phone ? '<p style="font-size:12px;color:#aaa;margin:2px 0 0;">' + escapeHtml(b.guest_phone) + '</p>' : '') +
                 '</div>' +
                 '<p style="font-size:16px;font-weight:800;color:#EB6753;margin:0;min-width:100px;">' + Number(b.total_amount||0).toLocaleString('en-RW') + ' RWF</p>' +
-                '<div style="display:flex;gap:8px;">' +
-                '<button onclick="approveBooking(\'' + b.id + '\')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-check"></i> Approve</button>' +
-                '<button onclick="rejectBooking(\'' + b.id + '\')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-xmark"></i> Reject</button></div>';
+                actionBtns;
             container.appendChild(row);
         });
+        clearTimeout(_guard);
         console.log('✅ [NEW BOOKINGS] Loaded', data.length);
+        if (window.renderPagination) {
+            const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
+            renderPagination('newBookingsPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadNewBookings(p));
+        }
     } catch (err) {
+        clearTimeout(_guard);
         console.error('❌ [NEW BOOKINGS]', err);
-        const offline = !navigator.onLine;
-        container.innerHTML = '<div style="text-align:center;padding:40px;color:#ccc;"><i class="fa-solid fa-' + (offline ? 'wifi-slash' : 'triangle-exclamation') + '" style="font-size:32px;display:block;margin-bottom:12px;color:#e0a0a0;"></i><p style="font-size:14px;color:#c0392b;">' + (offline ? 'No internet connection' : 'Could not load bookings') + '</p></div>';
+        container.innerHTML = emptyState('😕', 'Could not load bookings', sanitizeError(err));
     }
 }
 window.loadNewBookings = loadNewBookings;
@@ -4033,7 +5050,7 @@ async function dashApprove(id, btn) {
         // Also refresh the sidebar Listing Requests panel if visible
         if (document.getElementById('listingRequestsContainer')) loadListingRequests();
     } catch(err) {
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
         if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = '<i class="fa-solid fa-check"></i> Approve'; }
     }
 }
@@ -4054,7 +5071,7 @@ async function dashReject(id, btn) {
         if (document.getElementById('listingRequestsContainer')) loadListingRequests();
     } catch(err) {
         logAudit({ action: 'listing_request_rejected_failed', entityType: 'listing', entityId: id, description: 'Failed dashReject: ' + err.message, isError: true });
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
         if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Reject'; }
     }
 }
@@ -4371,7 +5388,7 @@ async function saveOwnerWallet() {
         await loadOwnerWallet(); // refresh to show verified state
     } catch (err) {
         console.error('❌ [WALLET] Save error:', err);
-        toast('Failed to save wallet: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 }
 
@@ -4440,7 +5457,7 @@ window.loadEarnings = loadEarnings;
 /* ═══════════════════════════════════════════════════════════════
    PAYOUT HISTORY (for owners + admin)
    ═══════════════════════════════════════════════════════════════ */
-async function loadPayoutHistory() {
+async function loadPayoutHistory(page = 0) {
     if (CURRENT_ROLE !== 'owner' && CURRENT_ROLE !== 'admin') return;
 
     let section = document.getElementById('payoutHistorySection');
@@ -4448,14 +5465,17 @@ async function loadPayoutHistory() {
 
     console.log('[PAYOUTS] Loading payout history...');
 
+    const PAGE_SIZE = 15;
+    const start = page * PAGE_SIZE, end = start + PAGE_SIZE - 1;
+
     let q = _supabase.from('payouts')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('initiated_at', { ascending: false })
-        .limit(50);
+        .range(start, end);
 
     if (CURRENT_ROLE === 'owner') q = q.eq('owner_id', CURRENT_PROFILE.id).eq('recipient_type','owner');
 
-    const { data: payouts, error } = await q;
+    const { data: payouts, error, count } = await q;
     if (error) {
         console.error('[PAYOUTS] Error:', error);
         const payOffline = !navigator.onLine;
@@ -4494,6 +5514,11 @@ async function loadPayoutHistory() {
             </span>
         </div>
     `).join('');
+
+    if (window.renderPagination) {
+        const pageCount = Math.ceil((count || payouts.length) / PAGE_SIZE);
+        renderPagination('payoutHistoryPagination', page, pageCount, count || payouts.length, PAGE_SIZE, (p) => loadPayoutHistory(p));
+    }
 }
 
 window.loadPayoutHistory = loadPayoutHistory;
@@ -5260,7 +6285,7 @@ window.downloadReceipt = async function(bookingId) {
 
     } catch (err) {
         console.error('❌ [RECEIPT] Error:', err);
-        toast('Failed to generate receipt: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 };
 
@@ -5347,7 +6372,7 @@ window.deleteOwnerPromo = async function(promoId) {
         toast('Promotion deleted.', 'success');
         loadOwnerPromotions();
     } catch (err) {
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 };
 
@@ -5410,7 +6435,7 @@ window.submitOwnerPromo = async function() {
         document.getElementById('_ownerPromoModal').style.display = 'none';
         loadOwnerPromotions();
     } catch (err) {
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 };
 
@@ -6072,7 +7097,7 @@ window.setMaintenanceMode = async function(enable) {
         toast(`Maintenance mode ${enable ? 'ENABLED — site is now blocked for users' : 'disabled — site is live again'}!`, enable ? 'warning' : 'success');
         logAudit({ action: enable ? 'enable_maintenance_mode' : 'disable_maintenance_mode', entityType: 'platform_config', description: enable ? `Maintenance enabled: ${msg || '(no message)'}` : 'Maintenance disabled' });
     } catch(err) {
-        toast('Failed: ' + err.message, 'error');
+        toast(sanitizeError(err), 'error');
     }
 };
 

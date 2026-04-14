@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 — Page Not Found · AfriStay</title>
+<link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:#fff8f6;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;overflow:hidden;}
+.wrap{text-align:center;max-width:480px;position:relative;z-index:1;}
+
+/* ── floating background blobs ── */
+.blob{position:fixed;border-radius:50%;filter:blur(80px);opacity:.18;pointer-events:none;animation:drift 12s ease-in-out infinite;}
+.b1{width:500px;height:500px;background:#EB6753;top:-100px;right:-120px;animation-delay:0s;}
+.b2{width:380px;height:380px;background:#f5a623;bottom:-80px;left:-100px;animation-delay:4s;}
+.b3{width:260px;height:260px;background:#EB6753;bottom:60px;right:40px;animation-delay:7s;}
+@keyframes drift{0%,100%{transform:translate(0,0);}50%{transform:translate(18px,-22px);}}
+
+/* ── 404 number ── */
+.num{font-size:clamp(100px,22vw,160px);font-weight:800;line-height:1;background:linear-gradient(135deg,#EB6753 30%,#f5a623);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-4px;animation:numPop .7s cubic-bezier(.22,1.5,.36,1) both;}
+@keyframes numPop{from{opacity:0;transform:scale(.7);}to{opacity:1;transform:scale(1);}}
+
+/* ── illustration ── */
+.illo{margin:0 auto 28px;animation:float 3.6s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-12px);}}
+
+/* ── text ── */
+h1{font-size:24px;font-weight:800;color:#1a1a1a;margin:0 0 10px;}
+p{font-size:15px;color:#888;line-height:1.6;margin:0 0 32px;}
+
+/* ── buttons ── */
+.btns{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:13px 28px;border-radius:50px;font-size:14px;font-weight:700;text-decoration:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;}
+.btn-primary{background:#EB6753;color:#fff;box-shadow:0 6px 20px rgba(235,103,83,.3);}
+.btn-primary:hover{background:#d45742;transform:translateY(-2px);box-shadow:0 8px 24px rgba(235,103,83,.4);}
+.btn-ghost{background:#fff;color:#555;border:1.5px solid #e0e0e0;}
+.btn-ghost:hover{border-color:#EB6753;color:#EB6753;transform:translateY(-2px);}
+
+/* ── stars ── */
+.star{position:fixed;border-radius:50%;background:#EB6753;opacity:0;animation:twinkle var(--d,2s) ease-in-out infinite;animation-delay:var(--dl,0s);}
+@keyframes twinkle{0%,100%{opacity:0;transform:scale(.6);}50%{opacity:.45;transform:scale(1.2);}}
+</style>
+</head>
+<body>
+
+<!-- Background blobs -->
+<div class="blob b1"></div>
+<div class="blob b2"></div>
+<div class="blob b3"></div>
+
+<!-- Twinkling stars -->
+<script>
+for(let i=0;i<18;i++){
+    const s=document.createElement('div');
+    s.className='star';
+    const sz=Math.random()*5+3;
+    s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}vh;left:${Math.random()*100}vw;--d:${(Math.random()*2.5+1.5).toFixed(1)}s;--dl:${(Math.random()*3).toFixed(1)}s;`;
+    document.body.appendChild(s);
+}
+</script>
+
+<div class="wrap">
+    <!-- Floating house illustration -->
+    <div class="illo">
+        <svg width="140" height="120" viewBox="0 0 140 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Shadow -->
+            <ellipse cx="70" cy="115" rx="42" ry="6" fill="#EB6753" opacity="0.12"/>
+            <!-- House body -->
+            <rect x="28" y="58" width="84" height="54" rx="4" fill="#fff" stroke="#EB6753" stroke-width="2.5"/>
+            <!-- Door -->
+            <rect x="56" y="82" width="28" height="30" rx="4" fill="#EB6753" opacity="0.18"/>
+            <rect x="56" y="82" width="28" height="30" rx="4" stroke="#EB6753" stroke-width="2"/>
+            <circle cx="81" cy="97" r="2.5" fill="#EB6753"/>
+            <!-- Window left -->
+            <rect x="35" y="68" width="20" height="16" rx="3" fill="#f5a623" opacity="0.25"/>
+            <rect x="35" y="68" width="20" height="16" rx="3" stroke="#f5a623" stroke-width="1.8"/>
+            <!-- Window right -->
+            <rect x="85" y="68" width="20" height="16" rx="3" fill="#f5a623" opacity="0.25"/>
+            <rect x="85" y="68" width="20" height="16" rx="3" stroke="#f5a623" stroke-width="1.8"/>
+            <!-- Roof -->
+            <path d="M18 62L70 14L122 62" stroke="#EB6753" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M18 62L70 14L122 62" fill="#EB6753" opacity="0.08"/>
+            <!-- Chimney -->
+            <rect x="88" y="28" width="10" height="22" rx="2" fill="#EB6753" opacity="0.7"/>
+            <!-- Smoke puffs -->
+            <circle cx="93" cy="24" r="5" fill="#ddd" opacity="0.6"/>
+            <circle cx="99" cy="18" r="4" fill="#ddd" opacity="0.4"/>
+            <circle cx="92" cy="12" r="3" fill="#ddd" opacity="0.25"/>
+            <!-- Question mark -->
+            <text x="70" y="49" text-anchor="middle" font-size="22" font-weight="800" fill="#EB6753" opacity="0.7" font-family="Inter,sans-serif">?</text>
+        </svg>
+    </div>
+
+    <div class="num">404</div>
+    <h1>This page doesn't exist</h1>
+    <p>Looks like you wandered off the map. The page you're looking for has moved, been deleted, or never existed.</p>
+
+    <div class="btns">
+        <a href="/" class="btn btn-primary">
+            <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+            Back to Home
+        </a>
+        <button class="btn btn-ghost" onclick="history.back()">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            Go Back
+        </button>
+    </div>
+</div>
+</body>
+</html>
