@@ -80,8 +80,11 @@
                     </div>
                 </div>
 
-                <div class="input-group" id="passwordGroup">
+                <div class="input-group pw-wrap" id="passwordGroup">
                     <input type="password" id="password" placeholder="Password">
+                    <button type="button" class="pw-eye" onclick="_togglePwVisibility('password',this)" tabindex="-1">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
                 </div>
 
                 <!-- Forgot password link — only visible on sign-in mode -->
@@ -113,17 +116,23 @@
                     <p style="font-size:14px;color:#666;margin-bottom:16px;line-height:1.5;">
                         Choose a strong new password for your account.
                     </p>
-                    <div class="input-group">
+                    <div class="input-group pw-wrap">
                         <input type="password" id="newPassword" placeholder="New password (min. 6 chars)">
+                        <button type="button" class="pw-eye" onclick="_togglePwVisibility('newPassword',this)" tabindex="-1">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
                     </div>
-                    <div class="input-group">
+                    <div class="input-group pw-wrap">
                         <input type="password" id="confirmPassword" placeholder="Confirm new password">
+                        <button type="button" class="pw-eye" onclick="_togglePwVisibility('confirmPassword',this)" tabindex="-1">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
                     </div>
                 </div>
 
                 <button type="submit" id="submitBtn">Login</button>
 
-                <p id="authError" class="error-msg"></p>
+                <div id="authError" class="error-msg"></div>
                 <p id="authSuccess" class="success-msg"></p>
 
                 <p id="termsNote" style="font-size:12px;color:#aaa;text-align:center;margin-top:14px;line-height:1.6;display:none;">

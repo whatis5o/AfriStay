@@ -4,7 +4,16 @@
  * Place at: /js/checkout.js
  */
 
-console.log('📋 [CHECKOUT] Loading...');
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+function addOneDay(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+}
 
 let _supabase    = null;
 let CURRENT_USER = null;
@@ -114,8 +123,9 @@ window.confirmBooking = async function () {
     const guestPhone = (document.getElementById('guestPhone')?.value || '').trim();
     const notes      = (document.getElementById('guestNotes')?.value || '').trim();
 
-    if (!guestName)  { showErr('Please enter your full name.');  return; }
-    if (!guestEmail) { showErr('Please enter your email address.'); return; }
+    if (!guestName)              { showErr('Please enter your full name.'); return; }
+    if (!guestEmail)             { showErr('Please enter your email address.'); return; }
+    if (!isValidEmail(guestEmail)){ showErr('Please enter a valid email address (e.g. name@example.com).'); return; }
     if (!CURRENT_USER) { showErr('You must be logged in to book.'); return; }
 
     btn.disabled = true;
@@ -163,17 +173,53 @@ window.confirmBooking = async function () {
 
         console.log('✅ [CHECKOUT] Booking created:', data.booking_id, 'Ref:', data.reference);
 
-        // Lock listing immediately to prevent double-booking while owner reviews
+        // Lock listing — unavailable_until is end_date + 1 day buffer for turnaround
         if (BOOKING_PARAMS.listing_id) {
             _supabase.from('listings').update({
-                availability_status: 'unavailable',
-                unavailable_from: BOOKING_PARAMS.start_date || null,
-                unavailable_until: BOOKING_PARAMS.end_date || null,
+                availability_status:  'unavailable',
+                unavailable_from:     BOOKING_PARAMS.start_date || null,
+                unavailable_until:    addOneDay(BOOKING_PARAMS.end_date),
                 unavailable_indefinite: false,
-            }).eq('id', BOOKING_PARAMS.listing_id).then(() => {
-                console.log('🔒 [CHECKOUT] Listing locked pending owner approval');
-            });
+            }).eq('id', BOOKING_PARAMS.listing_id).then(() => {});
         }
+
+        // Notify owner by email (fire-and-forget)
+        (async () => {
+            try {
+                const { data: listing } = await _supabase
+                    .from('listings')
+                    .select('title, owner_id, profiles!listings_owner_id_fkey(email, full_name)')
+                    .eq('id', BOOKING_PARAMS.listing_id)
+                    .single();
+                const ownerEmail = listing?.profiles?.email;
+                const ownerName  = listing?.profiles?.full_name || 'there';
+                if (!ownerEmail) return;
+                const session2 = (await _supabase.auth.getSession()).data.session;
+                if (!session2) return;
+                await fetch(CONFIG.FUNCTIONS_BASE + '/send-email', {
+                    method:  'POST',
+                    headers: {
+                        'Content-Type':  'application/json',
+                        'Authorization': 'Bearer ' + session2.access_token,
+                        'apikey':        CONFIG.SUPABASE_KEY,
+                    },
+                    body: JSON.stringify({
+                        type:          'booking_request',
+                        to:            ownerEmail,
+                        owner_name:    ownerName,
+                        listing_title: listing.title || BOOKING_PARAMS.title,
+                        guest_name:    guestName,
+                        guest_email:   guestEmail,
+                        start_date:    BOOKING_PARAMS.start_date,
+                        end_date:      BOOKING_PARAMS.end_date,
+                        nights:        BOOKING_PARAMS.nights,
+                        total:         BOOKING_PARAMS.total,
+                        currency:      BOOKING_PARAMS.currency || 'RWF',
+                        booking_id:    data.booking_id,
+                    }),
+                });
+            } catch (e) { console.warn('[CHECKOUT] Owner notify failed:', e); }
+        })();
 
         btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Request Sent!';
         setTimeout(() => showSuccessScreen(data), 1000);

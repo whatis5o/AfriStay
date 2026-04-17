@@ -648,11 +648,7 @@ async function initBookingForm() {
     // ── Fetch already-booked date ranges ──
     let BOOKED_RANGES = [];
     try {
-        const { data: taken } = await _supabase
-            .from('bookings')
-            .select('start_date, end_date')
-            .eq('listing_id', LISTING_ID)
-            .in('status', ['pending', 'awaiting_approval', 'approved', 'confirmed']);
+        const { data: taken } = await _supabase.rpc('get_blocked_dates', { p_listing_id: LISTING_ID });
         BOOKED_RANGES = (taken || []).map(b => ({
             s: new Date(b.start_date + 'T00:00:00'),
             e: new Date(b.end_date   + 'T00:00:00')
@@ -667,8 +663,6 @@ async function initBookingForm() {
     const startDate = document.getElementById('bookingStartDate');
     const endDate   = document.getElementById('bookingEndDate');
     const today     = new Date().toISOString().split('T')[0];
-    if (startDate) startDate.min = today;
-    if (endDate)   endDate.min   = today;
 
     // ── Inject guest count field ──
     if (!document.getElementById('bookingGuestCount')) {
@@ -729,8 +723,38 @@ async function initBookingForm() {
         const currency = CURRENT_LISTING?.currency || 'RWF';
         totalEl.innerHTML = days + ' ' + unit + (days > 1 ? 's' : '') + ' × ' + Number(price).toLocaleString('en-RW') + ' ' + currency + ' = <span style="color:#EB6753;font-weight:700;">' + Number(days * price).toLocaleString('en-RW') + ' ' + currency + '</span>';
     }
-    startDate?.addEventListener('change', () => { calcTotal(); if (endDate && startDate.value) endDate.min = startDate.value; });
-    endDate?.addEventListener('change', calcTotal);
+    // Build disabled date ranges for Flatpickr
+    const disabledRanges = BOOKED_RANGES.map(r => ({ from: r.s, to: r.e }));
+    const L = CURRENT_LISTING;
+    if (L?.unavailable_indefinite) {
+        disabledRanges.push({ from: new Date(), to: new Date('2100-01-01') });
+    } else if (L?.unavailable_from || L?.unavailable_until) {
+        disabledRanges.push({
+            from: L.unavailable_from ? new Date(L.unavailable_from + 'T00:00:00') : new Date(),
+            to:   L.unavailable_until ? new Date(L.unavailable_until + 'T00:00:00') : new Date('2100-01-01'),
+        });
+    }
+
+    let fpEnd;
+    const fpStart = startDate && window.flatpickr ? flatpickr(startDate, {
+        dateFormat: 'Y-m-d',
+        minDate: 'today',
+        disable: disabledRanges,
+        disableMobile: true,
+        onChange(sel) {
+            if (sel[0] && fpEnd) fpEnd.set('minDate', sel[0]);
+            calcTotal();
+        },
+    }) : null;
+
+    fpEnd = endDate && window.flatpickr ? flatpickr(endDate, {
+        dateFormat: 'Y-m-d',
+        minDate: 'today',
+        disable: disabledRanges,
+        disableMobile: true,
+        onChange() { calcTotal(); },
+    }) : null;
+
     document.getElementById('bookingBtn')?.addEventListener('click', goToCheckout);
 
     // Zone selector for vehicles with dual pricing

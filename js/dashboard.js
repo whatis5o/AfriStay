@@ -4609,11 +4609,16 @@ async function sendOwnerInvite() {
 
     if (!name)     { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter the invitee\'s name.</p>'; return; }
     if (!email)    { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter the invitee\'s email address.</p>'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a valid email address (e.g. name@example.com).</p>'; return; }
     if (!business) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter the business or property name.</p>'; return; }
 
     // Persist sender title + phone so they don't need re-entering
     if (senderTitle) localStorage.setItem('afristay_sender_title', senderTitle);
     if (senderPhone) localStorage.setItem('afristay_sender_phone', senderPhone);
+
+    // Generate a unique token per invite — makes every link URL different so
+    // it never appears as a browser autocomplete suggestion
+    const inviteToken = crypto.randomUUID();
 
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending…'; }
     if (statusEl) statusEl.innerHTML = '';
@@ -4635,6 +4640,7 @@ async function sendOwnerInvite() {
                 invitee_name: name,
                 business:     business,
                 category:     category,
+                invite_token: inviteToken,
                 sender_name:  CURRENT_PROFILE?.full_name || 'AfriStay Team',
                 sender_email: CURRENT_PROFILE?.email || 'team@afristay.rw',
                 sender_title: senderTitle || localStorage.getItem('afristay_sender_title') || 'AfriStay Team',
@@ -4667,6 +4673,7 @@ async function sendCustomEmail() {
     const body    = document.getElementById('customBody')?.value.trim();
 
     if (!to)      { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a recipient email.</p>'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(to)) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a valid email address (e.g. name@example.com).</p>'; return; }
     if (!subject) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a subject.</p>'; return; }
     if (!body)    { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please write a message body.</p>'; return; }
 

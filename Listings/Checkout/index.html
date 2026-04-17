@@ -476,22 +476,25 @@ async function pay() {
       return;
     }
 
-    // ── Duplicate booking check ──
+    // ── Duplicate booking check (only block if dates overlap) ──
     setBusy(true, 'Checking your bookings…');
-    const { data: existing } = await sb
+    const { data: existingList } = await sb
       .from('bookings')
       .select('id, start_date, end_date, status')
       .eq('user_id', user.id)
       .eq('listing_id', LISTING)
-      .in('status', ['pending', 'approved', 'confirmed'])
-      .maybeSingle();
+      .in('status', ['pending', 'approved', 'confirmed']);
+
+    const existing = (existingList || []).find(b =>
+      new Date(S_DATE) < new Date(b.end_date) && new Date(E_DATE) > new Date(b.start_date)
+    );
 
     if (existing) {
       setBusy(false);
       const fmt = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const statusLabel = { pending: 'pending approval', approved: 'approved — awaiting your confirmation', confirmed: 'already confirmed' }[existing.status] || existing.status;
       showErr(
-        `You already have an active booking for this listing (${fmt(existing.start_date)} → ${fmt(existing.end_date)}) — currently ${statusLabel}. ` +
+        `You already have an overlapping booking for this listing (${fmt(existing.start_date)} → ${fmt(existing.end_date)}) — currently ${statusLabel}. ` +
         `Check your bookings in your Profile before booking again.`
       );
       return;
@@ -502,57 +505,11 @@ async function pay() {
     const fnBase  = (CONFIG?.FUNCTIONS_BASE || '').replace(/\/$/, '');
     const pmMethod = METHOD === 'momo' ? 'momo_' + NETWORK : 'card_irembo';
 
-    let iremboRef       = null;
-    let iremboTxId      = null;
-    let iremboPayStatus = null;
+    const iremboRef       = null;
+    const iremboTxId      = null;
+    const iremboPayStatus = null;
 
-    // ── Step 1: Send to Irembo Pay ──
-    {
-      setBusy(true, METHOD === 'card' ? 'Sending card details to Irembo Pay…' : 'Sending MoMo request to Irembo Pay…');
-
-      const iBody = {
-        amount:      TOTAL,
-        currency:    CUR,
-        method:      METHOD,
-        guest_name:  form.name,
-        guest_email: form.email,
-        guest_phone: form.phone,
-        listing_id:  LISTING,
-        ...(METHOD === 'card' ? {
-          card_name:   form.cardName,
-          card_number: form.cardNumber,
-          card_expiry: form.cardExpiry,
-          card_cvv:    form.cardCvv,
-        } : {
-          momo_network: NETWORK,
-          momo_phone:   form.momoPhone,
-        }),
-      };
-
-      console.log('📡 [CHECKOUT] POST irembo-pay | method:', METHOD);
-      const iRes  = await fetch(fnBase + '/irembo-pay', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'apikey': CONFIG.SUPABASE_KEY },
-        body:    JSON.stringify(iBody),
-      });
-
-      let iData;
-      try { iData = await iRes.json(); }
-      catch(_) { throw new Error('Irembo Pay service error — please try again.'); }
-
-      console.log('📬 [CHECKOUT] irembo-pay response:', JSON.stringify(iData));
-
-      if (!iRes.ok || iData.error) {
-        throw new Error(iData.error || iData.message || 'Payment initiation failed. Please check your details.');
-      }
-
-      iremboRef       = iData.reference   || null;
-      iremboTxId      = iData.transaction_id || null;
-      iremboPayStatus = iData.status || 'initiated';
-      setBusy(true, 'Saving your booking…');
-    }
-
-    // ── Step 2: Store booking via edge function ──
+    // ── Store booking via edge function ──
     console.log('📡 [CHECKOUT] POST store-booking');
     const res = await fetch(fnBase + '/store-booking', {
       method:  'POST',

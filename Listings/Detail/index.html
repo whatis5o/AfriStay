@@ -13,11 +13,23 @@
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Oleo+Script+Swash+Caps:wght@400;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/Style/style.css">
     <style>
         :root { --primary: #EB6753; }
         body { background: #f5f5f5; }
+
+        /* Flatpickr AfriStay theme */
+        .flatpickr-day.selected, .flatpickr-day.selected:hover { background: #EB6753; border-color: #EB6753; }
+        .flatpickr-day.inRange { background: #fde8e4; border-color: #fde8e4; }
+        .flatpickr-day.startRange, .flatpickr-day.endRange { background: #EB6753; border-color: #EB6753; }
+        .flatpickr-day.disabled, .flatpickr-day.disabled:hover { background: #f5f5f5; color: #ccc; text-decoration: line-through; cursor: not-allowed; }
+        .flatpickr-months .flatpickr-month, .flatpickr-weekdays { background: #EB6753; }
+        .flatpickr-current-month, .flatpickr-current-month .cur-month, .flatpickr-weekday { color: #fff !important; fill: #fff; }
+        .flatpickr-day:hover { background: #fde8e4; border-color: #fde8e4; }
+        .flatpickr-prev-month svg, .flatpickr-next-month svg { fill: #fff; }
+        .flatpickr-prev-month:hover svg, .flatpickr-next-month:hover svg { fill: #fff; opacity: 0.7; }
 
         .page-body { max-width: 1100px; margin: 0 auto; padding: 110px 24px 72px; }
 
@@ -195,8 +207,8 @@
                 <div id="bookingForm">
                     <label style="font-size: 13px; color: #666; font-weight: 600; margin-bottom: 6px; display: block;">Select Dates</label>
                     <div class="date-inputs">
-                        <input type="date" id="bookingStartDate" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: 'Inter', sans-serif;">
-                        <input type="date" id="bookingEndDate" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: 'Inter', sans-serif;">
+                        <input type="text" id="bookingStartDate" placeholder="Check-in" readonly style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: 'Inter', sans-serif; cursor: pointer; background: #fff;">
+                        <input type="text" id="bookingEndDate" placeholder="Check-out" readonly style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: 'Inter', sans-serif; cursor: pointer; background: #fff;">
                     </div>
                     <div id="bookingTotal" style="font-size: 15px; font-weight: 600; text-align: center; margin-bottom: 16px; color: #222;"></div>
                     <button id="bookingBtn" class="book-btn">
@@ -216,6 +228,7 @@
 
 </body>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="/js/config.js"></script>
 <script src="/js/detail.js"></script>
 <script src="/js/utils.js"></script>

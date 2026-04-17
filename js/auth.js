@@ -17,15 +17,23 @@
     const formTitle       = document.getElementById('dynamicTitle');
     const submitBtn       = document.getElementById('submitBtn');
 
-    let mode = 'signin'; // 'signin', 'signup', 'forgot', 'reset'
+    let mode = 'signin';
+
+    function isValidEmail(email) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    }
 
     // Show banned message if redirected here from a suspended-account block
     if (new URLSearchParams(window.location.search).get('error') === 'banned') {
         showError('Your account has been suspended. Contact support if you believe this is a mistake.');
     }
 
-    function showError(msg) {
-        if (authError)   { authError.style.display = msg ? 'block' : 'none'; authError.innerText = msg; }
+    function showError(msg, isHtml) {
+        if (authError) {
+            authError.style.display = msg ? 'block' : 'none';
+            if (isHtml) authError.innerHTML = msg;
+            else authError.innerText = msg;
+        }
         if (authSuccess) { authSuccess.style.display = 'none'; authSuccess.innerText = ''; }
     }
     function showSuccess(msg) {
@@ -33,12 +41,22 @@
         if (authError)   { authError.style.display = 'none'; authError.innerText = ''; }
     }
 
+    // Eye toggle for password fields
+    window._togglePwVisibility = function(inputId, btn) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.innerHTML = show
+            ? '<i class="fa-regular fa-eye-slash"></i>'
+            : '<i class="fa-regular fa-eye"></i>';
+    };
+
     window.toggleAuth = (m) => {
         mode = m;
         showError('');
         showSuccess('');
 
-        // Reset all groups
         loginGroup.classList.add('hidden');
         signupGroup.classList.add('hidden');
         forgotGroup.classList.add('hidden');
@@ -71,7 +89,6 @@
             formTitle.innerText = 'New Password';
             submitBtn.innerText = 'Save New Password';
         } else {
-            // Default: Sign In
             toggleSignin.classList.add('active');
             loginGroup.classList.remove('hidden');
             if (forgotLink) forgotLink.style.display = 'block';
@@ -82,7 +99,6 @@
 
     toggleAuth('signin');
 
-    // Auto-trigger reset mode when user lands via password-reset email link
     (function waitForSupabase() {
         const client = window.supabaseClient;
         if (!client) { setTimeout(waitForSupabase, 100); return; }
@@ -92,13 +108,29 @@
     })();
 
     async function handleSuccessfulLogin(client, user) {
-        const { data: profile, error: pErr } = await client
+        let { data: profile, error: pErr } = await client
             .from('profiles')
             .select('full_name, role, banned, email')
             .eq('id', user.id)
-            .single();
+            .maybeSingle();
 
-        if (pErr) { showError('Could not load your profile.'); return; }
+        // Profile missing — trigger didn't fire at signup, create it now
+        if (!profile && !pErr) {
+            const { data: newProfile, error: insertErr } = await client
+                .from('profiles')
+                .upsert({
+                    id:        user.id,
+                    email:     user.email,
+                    full_name: user.user_metadata?.full_name || '',
+                    role:      user.user_metadata?.role === 'owner' ? 'owner' : 'user',
+                }, { onConflict: 'id' })
+                .select('full_name, role, banned, email')
+                .maybeSingle();
+            if (insertErr) { showError('Could not set up your profile. Please contact support.'); return; }
+            profile = newProfile;
+        }
+
+        if (pErr) { showError('Could not load your profile. Please try again.'); return; }
 
         if (profile?.banned === true) {
             await client.auth.signOut();
@@ -134,13 +166,20 @@
                 const email    = document.getElementById('loginEmail')?.value?.trim();
                 const password = document.getElementById('password')?.value;
 
-                if (!email || !password) { showError('Please enter your email and password'); return; }
+                if (!email)              { showError('Please enter your email address.'); return; }
+                if (!isValidEmail(email)){ showError('Please enter a valid email address (e.g. name@example.com).'); return; }
+                if (!password)           { showError('Please enter your password.'); return; }
 
                 submitBtn.innerText = 'Logging in...';
                 const { data, error } = await client.auth.signInWithPassword({ email, password });
 
                 if (error) {
-                    showError(error.message || 'Sign in failed');
+                    if (error.message?.toLowerCase().includes('invalid login') ||
+                        error.message?.toLowerCase().includes('invalid credentials')) {
+                        showError('Incorrect email or password. Please try again.');
+                    } else {
+                        showError(error.message || 'Sign in failed.');
+                    }
                     submitBtn.innerText = 'Login';
                     return;
                 }
@@ -152,29 +191,45 @@
                 const email    = document.getElementById('signupEmail')?.value?.trim();
                 const password = document.getElementById('password')?.value;
 
-                if (!email)    { showError('Email address is required'); return; }
-                if (!password) { showError('Password is required'); return; }
+                if (!fullName)           { showError('Please enter your full name.'); return; }
+                if (!email)              { showError('Please enter your email address.'); return; }
+                if (!isValidEmail(email)){ showError('Please enter a valid email address (e.g. name@example.com).'); return; }
+                if (!password)           { showError('Please choose a password.'); return; }
+                if (password.length < 6) { showError('Password must be at least 6 characters.'); return; }
 
                 submitBtn.innerText = 'Creating Account...';
 
                 const { error } = await client.auth.signUp({
                     email,
                     password,
-                    options: { data: { full_name: fullName || null } }
+                    options: { data: { full_name: fullName } }
                 });
 
                 if (error) {
-                    showError(error.message || 'Sign up failed');
+                    const msg = error.message || '';
+                    if (msg.toLowerCase().includes('already registered') ||
+                        msg.toLowerCase().includes('already exists') ||
+                        error.status === 422) {
+                        showError(
+                            'An account with this email already exists. ' +
+                            '<a href="#" onclick="window.toggleAuth(\'signin\');return false;" ' +
+                            'style="color:#EB6753;font-weight:700;text-decoration:none;">Sign in instead?</a>',
+                            true
+                        );
+                    } else {
+                        showError(msg || 'Sign up failed. Please try again.');
+                    }
                     submitBtn.innerText = 'Create Account';
                     return;
                 }
 
-                showSuccess('Account created! Please check your email to confirm, then sign in.');
+                showSuccess('Account created! Check your email to confirm, then sign in.');
                 submitBtn.innerText = 'Create Account';
 
             } else if (mode === 'forgot') {
                 const email = document.getElementById('forgotEmail')?.value?.trim();
-                if (!email) { showError('Please enter your email address'); return; }
+                if (!email)              { showError('Please enter your email address.'); return; }
+                if (!isValidEmail(email)){ showError('Please enter a valid email address (e.g. name@example.com).'); return; }
 
                 submitBtn.innerText = 'Sending...';
 
@@ -183,22 +238,22 @@
                 });
 
                 submitBtn.innerText = 'Send Reset Link';
-                if (error) { showError(error.message || 'Could not send reset email'); return; }
+                if (error) { showError(error.message || 'Could not send reset email.'); return; }
                 showSuccess('Check your inbox — we sent a password reset link.');
 
             } else if (mode === 'reset') {
                 const newPwd  = document.getElementById('newPassword')?.value;
                 const confPwd = document.getElementById('confirmPassword')?.value;
 
-                if (!newPwd || newPwd.length < 6) { showError('Password must be at least 6 characters'); return; }
-                if (newPwd !== confPwd) { showError('Passwords do not match'); return; }
+                if (!newPwd || newPwd.length < 6) { showError('Password must be at least 6 characters.'); return; }
+                if (newPwd !== confPwd) { showError('Passwords do not match.'); return; }
 
                 submitBtn.innerText = 'Saving...';
 
                 const { error } = await client.auth.updateUser({ password: newPwd });
 
                 if (error) {
-                    showError(error.message || 'Could not update password');
+                    showError(error.message || 'Could not update password.');
                     submitBtn.innerText = 'Save New Password';
                     return;
                 }
@@ -216,7 +271,6 @@
         }
     });
 
-    // Enter key support
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && document.activeElement?.form === authForm) {
             authForm.requestSubmit();

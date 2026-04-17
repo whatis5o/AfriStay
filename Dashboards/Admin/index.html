@@ -1057,50 +1057,76 @@ window.handleCreateListing=async function(){
 // Sidebar toggle handled by initSidebarToggle() in dashboard.js
 
 /* ══════════════════════════════════════════════
-   ADMIN PIN — SHA-256 hash, lockout, sessionStorage unlock
+   ADMIN PIN — SHA-256 hash stored in Supabase profiles
+   (cross-device: same hash across all devices)
    Default PIN: 0000
    ══════════════════════════════════════════════ */
 (function() {
-    const PIN_HASH_KEY    = 'afristay_admin_pin_hash';
-    const ATTEMPTS_KEY    = 'afristay_admin_pin_attempts';
-    const LOCKOUT_KEY     = 'afristay_admin_pin_lock';
-    const SESSION_KEY     = 'afristay_admin_unlocked';
-    const DEFAULT_HASH    = '9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0'; // SHA-256 of "0000"
-    const MAX_ATTEMPTS    = 5;
-    const LOCKOUT_MS      = 3 * 60 * 1000; // 3 minutes
+    const DEFAULT_HASH = '9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0'; // SHA-256 of "0000"
+    const ATTEMPTS_KEY = 'afristay_admin_pin_attempts';
+    const LOCKOUT_KEY  = 'afristay_admin_pin_lock';
+    const MAX_ATTEMPTS = 5;
+    const LOCKOUT_MS   = 3 * 60 * 1000;
 
-    const overlay  = document.getElementById('adminPinOverlay');
-    const input    = document.getElementById('adminPinInput');
-    const errEl    = document.getElementById('adminPinError');
-    const okBtn    = document.getElementById('adminPinOkBtn');
+    const overlay = document.getElementById('adminPinOverlay');
+    const input   = document.getElementById('adminPinInput');
+    const errEl   = document.getElementById('adminPinError');
+    const okBtn   = document.getElementById('adminPinOkBtn');
+
+    let _hash = null;    // loaded from Supabase
+    let _loaded = false; // true once fetch completes
+    let _userId = null;
 
     async function sha256(str) {
         const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
         return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
     }
 
-    function storedHash()   { return localStorage.getItem(PIN_HASH_KEY) || DEFAULT_HASH; }
+    async function loadHashFromSupabase() {
+        try {
+            const client = window.supabaseClient;
+            if (!client) return;
+            const { data: { user } } = await client.auth.getUser();
+            if (!user) return;
+            _userId = user.id;
+            const { data: profile } = await client
+                .from('profiles').select('pin_hash').eq('id', user.id).single();
+            _hash = profile?.pin_hash || DEFAULT_HASH;
+        } catch (e) {
+            _hash = DEFAULT_HASH;
+        } finally {
+            _loaded = true;
+        }
+    }
+
+    function currentHash()  { return _hash || DEFAULT_HASH; }
     function attempts()     { return parseInt(localStorage.getItem(ATTEMPTS_KEY) || '0', 10); }
     function lockUntil()    { return parseInt(localStorage.getItem(LOCKOUT_KEY)  || '0', 10); }
     function isLocked()     { return Date.now() < lockUntil(); }
     function remainingSec() { return Math.ceil((lockUntil() - Date.now()) / 1000); }
-
-    function showErr(msg) { errEl.textContent = msg || ''; }
-
-    function unlock() {
-        overlay.classList.add('hidden');
-    }
+    function showErr(msg)   { errEl.textContent = msg || ''; }
 
     async function tryUnlock() {
         if (isLocked()) { showErr('Too many attempts. Try again in ' + remainingSec() + 's.'); return; }
         const val = (input.value || '').trim();
         if (!/^\d{4}$/.test(val)) { showErr('Enter a 4-digit PIN.'); return; }
         showErr('');
+
+        // Wait for Supabase hash to load (usually instant, max ~2s)
+        if (!_loaded) {
+            showErr('Verifying...');
+            await new Promise(r => {
+                const t = setInterval(() => { if (_loaded) { clearInterval(t); r(); } }, 100);
+                setTimeout(() => { clearInterval(t); _loaded = true; r(); }, 3000);
+            });
+            showErr('');
+        }
+
         const hashed = await sha256(val);
-        if (hashed === storedHash()) {
+        if (hashed === currentHash()) {
             localStorage.removeItem(ATTEMPTS_KEY);
             localStorage.removeItem(LOCKOUT_KEY);
-            unlock();
+            overlay.classList.add('hidden');
         } else {
             const n = attempts() + 1;
             localStorage.setItem(ATTEMPTS_KEY, n);
@@ -1115,15 +1141,19 @@ window.handleCreateListing=async function(){
         }
     }
 
-    // Require PIN on every page load
+    loadHashFromSupabase();
     if (isLocked()) showErr('Too many attempts. Try again in ' + remainingSec() + 's.');
     setTimeout(() => input.focus(), 80);
 
     okBtn.addEventListener('click', tryUnlock);
     input.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); tryUnlock(); } });
 
-    // Expose for settings panel
-    window._adminPinUtils = { sha256, storedHash, storedHashKey: PIN_HASH_KEY };
+    window._adminPinUtils = {
+        sha256,
+        getHash:    () => currentHash(),
+        setHash:    (h) => { _hash = h; },
+        getUserId:  () => _userId,
+    };
 })();
 
 async function changeAdminPin() {
@@ -1133,15 +1163,22 @@ async function changeAdminPin() {
     if (!/^\d{4}$/.test(cur))    { window.toast('Current PIN must be 4 digits.', 'error'); return; }
     if (!/^\d{4}$/.test(newPin)) { window.toast('New PIN must be 4 digits.', 'error'); return; }
     if (newPin !== confirm)      { window.toast('New PINs do not match.', 'error'); return; }
+
     const utils = window._adminPinUtils;
     const curHash = await utils.sha256(cur);
-    if (curHash !== utils.storedHash()) { window.toast('Current PIN is incorrect.', 'error'); return; }
+    if (curHash !== utils.getHash()) { window.toast('Current PIN is incorrect.', 'error'); return; }
+
     const newHash = await utils.sha256(newPin);
-    localStorage.setItem(utils.storedHashKey, newHash);
-    window.toast('Admin PIN updated successfully!', 'success');
-    document.getElementById('pinCurrent').value = '';
-    document.getElementById('pinNew').value = '';
-    document.getElementById('pinConfirm').value = '';
+    const userId  = utils.getUserId();
+    if (!userId) { window.toast('Not logged in. Please refresh.', 'error'); return; }
+
+    const client = window.supabaseClient;
+    const { error } = await client.from('profiles').update({ pin_hash: newHash }).eq('id', userId);
+    if (error) { window.toast('Could not save PIN: ' + error.message, 'error'); return; }
+
+    utils.setHash(newHash);
+    window.toast('Admin PIN updated across all devices.', 'success');
+    ['pinCurrent', 'pinNew', 'pinConfirm'].forEach(id => { document.getElementById(id).value = ''; });
 }
 </script>
 </body>

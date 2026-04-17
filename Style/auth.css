@@ -96,8 +96,26 @@ input:focus { border-color: #EB6753; }
 #submitBtn:hover { transform: translateY(-2px); }
 
 .hidden { display: none; }
-.error-msg { color: red; margin-top: 10px; display: none; }
-.success-msg { color: green; margin-top: 10px; display: none; }
+.error-msg { color: #c0392b; margin-top: 10px; display: none; font-size: 14px; }
+.success-msg { color: #1e8449; margin-top: 10px; display: none; font-size: 14px; }
+
+/* Password eye toggle */
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 48px; }
+.pw-eye {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #bbb;
+    font-size: 16px;
+    padding: 0;
+    line-height: 1;
+}
+.pw-eye:hover { color: #EB6753; }
 
 /* MOBILE */
 @media (max-width: 900px) {
