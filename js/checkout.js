@@ -162,6 +162,19 @@ window.confirmBooking = async function () {
         }
 
         console.log('✅ [CHECKOUT] Booking created:', data.booking_id, 'Ref:', data.reference);
+
+        // Lock listing immediately to prevent double-booking while owner reviews
+        if (BOOKING_PARAMS.listing_id) {
+            _supabase.from('listings').update({
+                availability_status: 'unavailable',
+                unavailable_from: BOOKING_PARAMS.start_date || null,
+                unavailable_until: BOOKING_PARAMS.end_date || null,
+                unavailable_indefinite: false,
+            }).eq('id', BOOKING_PARAMS.listing_id).then(() => {
+                console.log('🔒 [CHECKOUT] Listing locked pending owner approval');
+            });
+        }
+
         btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Request Sent!';
         setTimeout(() => showSuccessScreen(data), 1000);
 

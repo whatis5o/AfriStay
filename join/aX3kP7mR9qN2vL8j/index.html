@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join AfriStay as an Owner</title>
+    <link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f2f0ec;
+            font-family: 'Inter', sans-serif;
+            padding: 24px 16px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+            overflow: hidden;
+            width: 100%;
+            max-width: 460px;
+        }
+
+        .card-header {
+            background: #EB6753;
+            padding: 36px 40px 28px;
+            text-align: center;
+        }
+
+        .card-header img {
+            display: block;
+            margin: 0 auto 20px;
+            height: 36px;
+        }
+
+        .card-header h1 {
+            margin: 0 0 6px;
+            font-size: 22px;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.3px;
+        }
+
+        .card-header p {
+            margin: 0;
+            font-size: 14px;
+            color: rgba(255,255,255,0.85);
+        }
+
+        .card-body {
+            padding: 36px 40px 40px;
+        }
+
+        .fg {
+            margin-bottom: 16px;
+        }
+
+        .fg label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #555;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .fi {
+            width: 100%;
+            padding: 13px 16px;
+            border: 1.5px solid #e8e8e8;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: 'Inter', sans-serif;
+            color: #1a1a1a;
+            background: #fafafa;
+            outline: none;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .fi:focus {
+            border-color: #EB6753;
+            background: #fff;
+        }
+
+        .pw-wrap {
+            position: relative;
+        }
+
+        .pw-wrap .fi {
+            padding-right: 44px;
+        }
+
+        .pw-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #aaa;
+            font-size: 15px;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .pw-toggle:hover { color: #EB6753; }
+
+        .btn-submit {
+            width: 100%;
+            padding: 15px;
+            background: #EB6753;
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background 0.2s, transform 0.1s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-submit:hover { background: #d95a47; }
+        .btn-submit:active { transform: scale(0.98); }
+        .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .msg {
+            margin-top: 14px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .msg.error   { background: #fdf1ef; color: #c0392b; border: 1px solid #f5c6c0; }
+        .msg.success { background: #edfaf1; color: #1e8449; border: 1px solid #b2dfcb; }
+
+        .terms {
+            margin-top: 16px;
+            font-size: 12px;
+            color: #aaa;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .terms a { color: #EB6753; text-decoration: none; font-weight: 600; }
+
+        .divider {
+            margin: 20px 0;
+            border: none;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .signin-link {
+            text-align: center;
+            font-size: 13px;
+            color: #888;
+            margin-top: 16px;
+        }
+
+        .signin-link a { color: #EB6753; text-decoration: none; font-weight: 600; }
+
+        /* Success screen */
+        .success-screen {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .success-screen .icon {
+            font-size: 52px;
+            color: #27ae60;
+            margin-bottom: 16px;
+        }
+
+        .success-screen h2 {
+            margin: 0 0 10px;
+            font-size: 20px;
+            font-weight: 800;
+            color: #1a1a1a;
+        }
+
+        .success-screen p {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+            line-height: 1.7;
+        }
+
+        .success-screen .note {
+            margin-top: 20px;
+            padding: 14px 16px;
+            background: #fdf1ef;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #EB6753;
+            font-weight: 600;
+        }
+
+        @media (max-width: 480px) {
+            .card-header, .card-body { padding-left: 24px; padding-right: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="card-header">
+        <img src="/Pictures/light-afri1.png" alt="AfriStay">
+        <h1>Join AfriStay as an Owner</h1>
+        <p>Create your owner account and start listing today</p>
+    </div>
+
+    <div class="card-body" id="formSection">
+        <form id="ownerSignupForm" novalidate>
+            <div class="fg">
+                <label>Full Name</label>
+                <input type="text" class="fi" id="fullName" placeholder="Your full name" autocomplete="name">
+            </div>
+            <div class="fg">
+                <label>Email Address</label>
+                <input type="email" class="fi" id="signupEmail" placeholder="you@example.com" autocomplete="email">
+            </div>
+            <div class="fg">
+                <label>Password</label>
+                <div class="pw-wrap">
+                    <input type="password" class="fi" id="password" placeholder="Min. 6 characters" autocomplete="new-password">
+                    <button type="button" class="pw-toggle" onclick="togglePw('password', this)">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="fg">
+                <label>Confirm Password</label>
+                <div class="pw-wrap">
+                    <input type="password" class="fi" id="confirmPassword" placeholder="Repeat your password" autocomplete="new-password">
+                    <button type="button" class="pw-toggle" onclick="togglePw('confirmPassword', this)">
+                        <i class="fa-regular fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">
+                <i class="fa-solid fa-user-plus"></i> Create Owner Account
+            </button>
+
+            <div class="msg" id="errMsg"></div>
+
+            <p class="terms">
+                By signing up you agree to our
+                <a href="/Terms/" target="_blank">Terms of Service</a> and
+                <a href="/Privacy/" target="_blank">Privacy Policy</a>.
+            </p>
+        </form>
+
+        <hr class="divider">
+        <p class="signin-link">Already have an account? <a href="/Auth/">Sign In</a></p>
+    </div>
+
+    <!-- Success screen (shown after signup) -->
+    <div class="success-screen" id="successSection">
+        <div class="icon"><i class="fa-solid fa-circle-check"></i></div>
+        <h2>Account Created!</h2>
+        <p>
+            We sent a confirmation link to your email address.<br>
+            Click it to activate your account, then sign in — you'll have full owner access from day one.
+        </p>
+        <div class="note">
+            <i class="fa-solid fa-envelope" style="margin-right:6px;"></i>
+            Check your inbox (and spam folder) for the confirmation email.
+        </div>
+        <p style="margin-top:22px;">
+            <a href="/Auth/" style="color:#EB6753;font-weight:700;text-decoration:none;font-size:14px;">
+                Go to Sign In →
+            </a>
+        </p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
+<script>
+    function togglePw(id, btn) {
+        const input = document.getElementById(id);
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        btn.innerHTML = isHidden
+            ? '<i class="fa-regular fa-eye-slash"></i>'
+            : '<i class="fa-regular fa-eye"></i>';
+    }
+
+    function showErr(msg) {
+        const el = document.getElementById('errMsg');
+        el.textContent = msg;
+        el.className = 'msg error';
+        el.style.display = msg ? 'block' : 'none';
+    }
+
+    document.getElementById('ownerSignupForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        showErr('');
+
+        const client = window.supabaseClient;
+        if (!client) { showErr('Connection error — please refresh and try again.'); return; }
+
+        const fullName  = document.getElementById('fullName').value.trim();
+        const email     = document.getElementById('signupEmail').value.trim();
+        const password  = document.getElementById('password').value;
+        const confirm   = document.getElementById('confirmPassword').value;
+
+        if (!fullName)           { showErr('Please enter your full name.'); return; }
+        if (!email)              { showErr('Please enter your email address.'); return; }
+        if (!password)           { showErr('Please choose a password.'); return; }
+        if (password.length < 6) { showErr('Password must be at least 6 characters.'); return; }
+        if (password !== confirm) { showErr('Passwords do not match.'); return; }
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Creating account…';
+
+        try {
+            const { error } = await client.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: fullName,
+                        role: 'owner',
+                    }
+                }
+            });
+
+            if (error) {
+                showErr(error.message || 'Sign up failed. Please try again.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Owner Account';
+                return;
+            }
+
+            // Show success screen
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('successSection').style.display = 'block';
+
+        } catch (err) {
+            showErr('Something went wrong. Please try again.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create Owner Account';
+        }
+    });
+</script>
+</body>
+</html>

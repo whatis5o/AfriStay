@@ -245,6 +245,7 @@
         <button class="nav-btn" data-tab="attention" id="attentionNavBtn"><i class="fa-solid fa-bell"></i> Attention <span class="nav-badge" id="attentionBadge" style="display:none;"></span></button>
         <button class="nav-btn" data-tab="owner-applications"><i class="fa-solid fa-user-plus"></i> Owner Applications <span class="nav-badge" id="badge-owner-applications" style="display:none;"></span></button>
         <button class="nav-btn" data-tab="broadcast"><i class="fa-solid fa-paper-plane"></i> Broadcast</button>
+        <button class="nav-btn" data-tab="invite-owner"><i class="fa-solid fa-envelope-open-text"></i> Invite Owner</button>
         <div class="nav-sec">Finance</div>
         <button class="nav-btn" data-tab="financial"><i class="fa-solid fa-chart-line"></i> Financial</button>
         <button class="nav-btn" data-tab="receipts"><i class="fa-solid fa-receipt"></i> Receipts</button>
@@ -482,6 +483,97 @@
                         <button class="btn-s" onclick="setMaintenanceMode(false)" style="background:#e8f5e9;color:#27ae60;border:none;">
                             <i class="fa-solid fa-circle-check"></i> Disable Maintenance
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- INVITE OWNER -->
+        <div class="content-panel" id="invite-ownerPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-envelope-open-text" style="color:var(--primary);margin-right:8px;"></i>Invite an Owner</h2>
+                </div>
+                <div class="sec-body" style="max-width:600px;">
+                    <p style="font-size:13px;color:#aaa;margin:0 0 24px;">Send a branded onboarding invitation to potential property or vehicle owners on AfriStay.</p>
+
+                    <!-- Tab switcher -->
+                    <div style="display:flex;gap:0;border:1.5px solid #e0e0e0;border-radius:12px;overflow:hidden;margin-bottom:24px;">
+                        <button id="inviteTabBtn" onclick="switchInviteTab('invite')"
+                            style="flex:1;padding:11px;background:#EB6753;color:#fff;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;transition:all .2s;">
+                            <i class="fa-solid fa-user-plus" style="margin-right:6px;"></i>Onboarding Invite
+                        </button>
+                        <button id="customTabBtn" onclick="switchInviteTab('custom')"
+                            style="flex:1;padding:11px;background:#fff;color:#888;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;transition:all .2s;">
+                            <i class="fa-solid fa-pen-to-square" style="margin-right:6px;"></i>Custom Email
+                        </button>
+                    </div>
+
+                    <!-- ── ONBOARDING INVITE FORM ── -->
+                    <div id="inviteFormSection">
+                        <div class="fg">
+                            <label>Invitee Full Name or Title</label>
+                            <input type="text" class="fi" id="inviteeName" placeholder='e.g. "Mr. Gakuba John" or "Marketing Director"'>
+                        </div>
+                        <div class="fg">
+                            <label>Invitee Email Address</label>
+                            <input type="email" class="fi" id="inviteeEmail" placeholder="john@example.com">
+                        </div>
+                        <div class="fg">
+                            <label>Listing Category</label>
+                            <select class="fi" id="inviteeCategory" onchange="updateBusinessSuggestions()">
+                                <option value="">— Select category —</option>
+                                <option value="hotel">Hotel / Guest House</option>
+                                <option value="apartment">Apartment / Studio</option>
+                                <option value="villa">Villa / Luxury Home</option>
+                                <option value="vehicle">Vehicles / Car Rental</option>
+                                <option value="conference">Conference / Event Space</option>
+                                <option value="cottage">Cottage / Cabin</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label>Business / Property Name</label>
+                            <input type="text" class="fi" id="inviteeBusiness" placeholder="e.g. Mille Collines Hotel" list="businessSuggestions" autocomplete="off">
+                            <datalist id="businessSuggestions"></datalist>
+                            <div id="businessSuggestionChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+                        </div>
+                        <div class="fg">
+                            <label>Your Title (shown in email signature)</label>
+                            <input type="text" class="fi" id="senderTitle" placeholder='e.g. "Marketing Director, AfriStay"'>
+                        </div>
+                        <div class="fg">
+                            <label>Your Phone (shown in email footer — saved for next time)</label>
+                            <input type="tel" class="fi" id="senderPhone" placeholder='e.g. "+250 788 000 000"'>
+                        </div>
+                        <div style="background:#f8fafc;border-radius:12px;padding:14px 16px;margin-bottom:20px;border:1px solid #e8e8e8;">
+                            <p style="margin:0;font-size:12px;color:#888;"><i class="fa-solid fa-circle-info" style="color:#EB6753;margin-right:6px;"></i>
+                            The email will be sent from your logged-in AfriStay admin account (<strong id="senderEmailPreview">—</strong>).</p>
+                        </div>
+                        <button class="btn-p" id="sendInviteBtn" onclick="sendOwnerInvite()">
+                            <i class="fa-solid fa-paper-plane"></i> Send Invite
+                        </button>
+                        <div id="inviteStatus" style="margin-top:14px;"></div>
+                    </div>
+
+                    <!-- ── CUSTOM EMAIL FORM ── -->
+                    <div id="customEmailSection" style="display:none;">
+                        <div class="fg">
+                            <label>To (email address)</label>
+                            <input type="email" class="fi" id="customTo" placeholder="recipient@example.com">
+                        </div>
+                        <div class="fg">
+                            <label>Subject</label>
+                            <input type="text" class="fi" id="customSubject" placeholder="Email subject...">
+                        </div>
+                        <div class="fg">
+                            <label>Body</label>
+                            <textarea class="fi" id="customBody" style="min-height:160px;resize:vertical;" placeholder="Write your message here..."></textarea>
+                        </div>
+                        <button class="btn-p" id="sendCustomBtn" onclick="sendCustomEmail()">
+                            <i class="fa-solid fa-paper-plane"></i> Send Email
+                        </button>
+                        <div id="customEmailStatus" style="margin-top:14px;"></div>
                     </div>
                 </div>
             </div>

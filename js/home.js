@@ -141,14 +141,14 @@ function renderCards(listings, imgMap, dtMap, pvMap) {
                 imgHtml +
                 '<div class="cat-label">' + catLbl + '</div>' +
                 '<div class="card-heart" data-lid="' + l.id + '" onclick="event.preventDefault();event.stopPropagation();window.toggleFavorite(event,this,\'' + l.id + '\')"><i class="fa-regular fa-heart"></i></div>' +
-                '<div class="avail-strip ' + avail + '">' + (avail === 'available' ? '&#9679; Available' : '&#9679; ' + avail) + '</div>' +
+                (avail !== 'available' ? '<div class="avail-strip ' + avail + '">&#9679; ' + avail + '</div>' : '') +
             '</div>' +
             '<div class="card-content">' +
                 '<h3>' + esc(l.title) + '</h3>' +
                 '<div class="card-location"><i class="fa-solid fa-location-dot"></i><span>' + esc(loc) + '</span></div>' +
                 '<div class="card-features">' +
                     '<div class="feature"><i class="fa-solid ' + catIcon + '"></i><span>' + catLbl + '</span></div>' +
-                    '<div class="feature"><i class="fa-solid fa-circle-check" style="color:#2ecc71"></i><span>' + avail + '</span></div>' +
+                    (avail !== 'available' ? '<div class="feature"><i class="fa-solid fa-circle-xmark" style="color:#e74c3c"></i><span>' + avail + '</span></div>' : '') +
                 '</div>' +
                 '<div class="card-footer">' +
                     (promoPrice

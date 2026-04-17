@@ -504,6 +504,7 @@ function bindUIInteractions() {
             if (tabName === 'listing-requests') { loadListingRequests(); }
             if (tabName === 'bookings')         { loadBookingsTable(); }
             if (tabName === 'attention')        { loadAttentionItems(); setTimeout(loadSiteHealthGraph, 300); }
+            if (tabName === 'invite-owner')     { initInviteOwnerTab(); }
 
             // Mark relevant notifications as read and hide the badge
             const typesToClear = _TAB_NOTIF_CLEAR[tabName];
@@ -2410,20 +2411,114 @@ async function approveListing(listingId) {
 
 async function toggleListingAvailability(listingId, current) {
     console.log("🔄 [ACTION] Toggling listing availability:", listingId, current);
+    if (current !== 'available') {
+        // Make available immediately (manual override)
+        try {
+            const { error } = await _supabase.from('listings').update({
+                availability_status: 'available',
+                unavailable_from: null,
+                unavailable_until: null,
+                unavailable_indefinite: false,
+            }).eq('id', listingId);
+            if (error) throw error;
+            toast('Listing is now available!', 'success');
+            await filterListings();
+        } catch (err) {
+            console.error("❌ [ACTION] Error making listing available:", err);
+            toast(sanitizeError(err), 'error');
+        }
+        return;
+    }
+    // Setting unavailable — show date-picker modal
+    openUnavailabilityModal(listingId);
+}
+
+function openUnavailabilityModal(listingId) {
+    document.getElementById('unavailModalOverlay')?.remove();
+    const today = new Date().toISOString().split('T')[0];
+    const overlay = document.createElement('div');
+    overlay.id = 'unavailModalOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = `
+<div style="background:#fff;border-radius:20px;padding:28px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+    <div style="width:36px;height:36px;border-radius:50%;background:#fef2f2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <i class="fa-solid fa-calendar-xmark" style="color:#EB6753;font-size:15px;"></i>
+    </div>
+    <h3 style="margin:0;font-size:17px;font-weight:700;color:#1a1a1a;">Set as Unavailable</h3>
+  </div>
+  <p style="font-size:13px;color:#888;margin:0 0 20px 46px;">Choose the period or mark indefinitely.</p>
+
+  <div id="unavailDateFields" style="margin-bottom:14px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:5px;">From</label>
+        <input type="date" id="unavailFrom" min="${today}" value="${today}"
+          style="width:100%;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:13px;font-family:Inter,sans-serif;box-sizing:border-box;outline:none;">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:5px;">Until</label>
+        <input type="date" id="unavailUntil" min="${today}"
+          style="width:100%;padding:10px 12px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:13px;font-family:Inter,sans-serif;box-sizing:border-box;outline:none;">
+      </div>
+    </div>
+  </div>
+
+  <label style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fff8f6;border-radius:12px;border:1.5px solid #fcd5cf;cursor:pointer;margin-bottom:20px;transition:border-color .2s;">
+    <input type="checkbox" id="unavailIndefinite" style="width:16px;height:16px;accent-color:#EB6753;flex-shrink:0;"
+      onchange="window.toggleUnavailDateFields(this.checked)">
+    <div>
+      <p style="margin:0;font-size:13px;font-weight:700;color:#1a1a1a;">Until I make it available again</p>
+      <p style="margin:2px 0 0;font-size:11px;color:#aaa;">No end date — you'll manually re-enable it.</p>
+    </div>
+  </label>
+
+  <div style="display:flex;gap:10px;">
+    <button onclick="document.getElementById('unavailModalOverlay').remove()"
+      style="flex:1;padding:11px;border:1.5px solid #e0e0e0;border-radius:10px;background:#fff;color:#555;font-size:14px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;">Cancel</button>
+    <button onclick="window.confirmSetUnavailable('${listingId}')"
+      style="flex:1;padding:11px;border:none;border-radius:10px;background:#EB6753;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;">
+      <i class="fa-solid fa-eye-slash" style="margin-right:6px;"></i>Set Unavailable</button>
+  </div>
+</div>`;
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+}
+window.openUnavailabilityModal = openUnavailabilityModal;
+
+function toggleUnavailDateFields(isIndefinite) {
+    const fields = document.getElementById('unavailDateFields');
+    if (!fields) return;
+    fields.style.opacity = isIndefinite ? '0.35' : '1';
+    fields.style.pointerEvents = isIndefinite ? 'none' : '';
+}
+window.toggleUnavailDateFields = toggleUnavailDateFields;
+
+async function confirmSetUnavailable(listingId) {
+    const indefinite = document.getElementById('unavailIndefinite')?.checked || false;
+    const from = document.getElementById('unavailFrom')?.value;
+    const until = document.getElementById('unavailUntil')?.value;
+
+    if (!indefinite && !until) {
+        toast('Please pick an end date or tick "Until I make it available again".', 'error');
+        return;
+    }
     try {
-        const newStatus = (current === 'available') ? 'unavailable' : 'available';
-        const { error } = await _supabase
-            .from('listings')
-            .update({ availability_status: newStatus })
-            .eq('id', listingId);
+        const { error } = await _supabase.from('listings').update({
+            availability_status: 'unavailable',
+            unavailable_from: from || new Date().toISOString().split('T')[0],
+            unavailable_until: indefinite ? null : until,
+            unavailable_indefinite: indefinite,
+        }).eq('id', listingId);
         if (error) throw error;
-        toast(`Listing set to "${newStatus}"`, 'success');
+        document.getElementById('unavailModalOverlay')?.remove();
+        toast('Listing set as unavailable.', 'success');
         await filterListings();
     } catch (err) {
-        console.error("❌ [ACTION] Error toggling availability:", err);
         toast(sanitizeError(err), 'error');
     }
 }
+window.confirmSetUnavailable = confirmSetUnavailable;
 
 /* ═══════════════════════════════════════════════════════════════
    APPROVE / REJECT BOOKING — v3 clean flow (no payment)
@@ -2513,7 +2608,12 @@ async function rejectBooking(bookingId) {
 
         // Reset listing availability so it can be booked again
         if (booking.listing_id) {
-            await _supabase.from('listings').update({ availability_status: 'available' }).eq('id', booking.listing_id);
+            await _supabase.from('listings').update({
+                availability_status: 'available',
+                unavailable_from: null,
+                unavailable_until: null,
+                unavailable_indefinite: false,
+            }).eq('id', booking.listing_id);
         }
 
         // Mark any existing receipt as cancelled (don't delete — keep for audit trail)
@@ -4428,6 +4528,187 @@ async function loadOwnerApplications(page = 0) {
     }
 }
 window.loadOwnerApplications = loadOwnerApplications;
+
+/* ═══════════════════════════════════════════════════════════════
+   INVITE OWNER — Admin email tool (Resend API via edge function)
+   ═══════════════════════════════════════════════════════════════ */
+
+const _BUSINESS_SUGGESTIONS = {
+    hotel:      ['Hotel', 'Guest House', 'Boutique Hotel', 'Lodge', 'Resort', 'Inn', 'Hostel'],
+    apartment:  ['Apartment', 'Studio Apartment', 'Furnished Apartment', 'Serviced Apartment', 'Flat', 'Penthouse'],
+    villa:      ['Villa', 'Luxury Villa', 'Private Villa', 'Manor House', 'Chalet'],
+    vehicle:    ['Car Rental', 'Fleet Services', 'Transport Company', 'Luxury Car Hire', 'Chauffeur Service', 'Van Hire'],
+    conference: ['Conference Center', 'Meeting Rooms', 'Event Space', 'Convention Hall', 'Training Center'],
+    cottage:    ['Cottage', 'Mountain Cottage', 'Lake Cottage', 'Country House', 'Cabin'],
+    other:      ['Property', 'Rental', 'Space'],
+};
+
+function switchInviteTab(tab) {
+    const inviteSection = document.getElementById('inviteFormSection');
+    const customSection = document.getElementById('customEmailSection');
+    const inviteBtn = document.getElementById('inviteTabBtn');
+    const customBtn = document.getElementById('customTabBtn');
+    if (tab === 'invite') {
+        inviteSection.style.display = '';
+        customSection.style.display = 'none';
+        inviteBtn.style.background = '#EB6753'; inviteBtn.style.color = '#fff';
+        customBtn.style.background = '#fff';    customBtn.style.color = '#888';
+    } else {
+        inviteSection.style.display = 'none';
+        customSection.style.display = '';
+        inviteBtn.style.background = '#fff';    inviteBtn.style.color = '#888';
+        customBtn.style.background = '#EB6753'; customBtn.style.color = '#fff';
+    }
+}
+window.switchInviteTab = switchInviteTab;
+
+function updateBusinessSuggestions() {
+    const cat = document.getElementById('inviteeCategory')?.value || '';
+    const suggestions = _BUSINESS_SUGGESTIONS[cat] || [];
+    const datalist = document.getElementById('businessSuggestions');
+    const chips = document.getElementById('businessSuggestionChips');
+    if (datalist) datalist.innerHTML = suggestions.map(s => `<option value="${s}">`).join('');
+    if (chips) {
+        chips.innerHTML = suggestions.map(s =>
+            `<span onclick="document.getElementById('inviteeBusiness').value='${s}'"
+              style="padding:4px 12px;background:#f0f4ff;color:#3b5bdb;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #c5cef8;transition:background .15s;"
+              onmouseover="this.style.background='#e0e8ff'" onmouseout="this.style.background='#f0f4ff'">${s}</span>`
+        ).join('');
+    }
+}
+window.updateBusinessSuggestions = updateBusinessSuggestions;
+
+// Pre-fill sender info when tab loads — restore title + phone from localStorage
+function initInviteOwnerTab() {
+    const preview = document.getElementById('senderEmailPreview');
+    if (preview && CURRENT_PROFILE?.email) preview.textContent = CURRENT_PROFILE.email;
+    // Restore saved sender title
+    const saved = localStorage.getItem('afristay_sender_title');
+    if (saved) {
+        const titleEl = document.getElementById('senderTitle');
+        if (titleEl && !titleEl.value) titleEl.value = saved;
+    }
+    // Restore saved sender phone
+    const savedPhone = localStorage.getItem('afristay_sender_phone');
+    if (savedPhone) {
+        const phoneEl = document.getElementById('senderPhone');
+        if (phoneEl && !phoneEl.value) phoneEl.value = savedPhone;
+    }
+}
+window.initInviteOwnerTab = initInviteOwnerTab;
+
+async function sendOwnerInvite() {
+    const btn = document.getElementById('sendInviteBtn');
+    const statusEl = document.getElementById('inviteStatus');
+    const name     = document.getElementById('inviteeName')?.value.trim();
+    const email    = document.getElementById('inviteeEmail')?.value.trim();
+    const category = document.getElementById('inviteeCategory')?.value;
+    const business = document.getElementById('inviteeBusiness')?.value.trim();
+    const senderTitle = document.getElementById('senderTitle')?.value.trim();
+    const senderPhone = document.getElementById('senderPhone')?.value.trim();
+
+    if (!name)     { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter the invitee\'s name.</p>'; return; }
+    if (!email)    { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter the invitee\'s email address.</p>'; return; }
+    if (!business) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter the business or property name.</p>'; return; }
+
+    // Persist sender title + phone so they don't need re-entering
+    if (senderTitle) localStorage.setItem('afristay_sender_title', senderTitle);
+    if (senderPhone) localStorage.setItem('afristay_sender_phone', senderPhone);
+
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending…'; }
+    if (statusEl) statusEl.innerHTML = '';
+
+    try {
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) throw new Error('Not logged in');
+
+        const res = await fetch(CONFIG.FUNCTIONS_BASE + '/send-email', {
+            method:  'POST',
+            headers: {
+                'Content-Type':  'application/json',
+                'Authorization': 'Bearer ' + session.access_token,
+                'apikey':        CONFIG.SUPABASE_KEY,
+            },
+            body: JSON.stringify({
+                type:         'owner_invite',
+                to:           email,
+                invitee_name: name,
+                business:     business,
+                category:     category,
+                sender_name:  CURRENT_PROFILE?.full_name || 'AfriStay Team',
+                sender_email: CURRENT_PROFILE?.email || 'team@afristay.rw',
+                sender_title: senderTitle || localStorage.getItem('afristay_sender_title') || 'AfriStay Team',
+                sender_phone: senderPhone || localStorage.getItem('afristay_sender_phone') || '',
+            }),
+        });
+        const result = await res.json();
+        if (!res.ok || result.error) throw new Error(result.error || 'Failed to send email');
+
+        if (statusEl) statusEl.innerHTML = '<p style="color:#27ae60;font-size:13px;font-weight:600;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>Invite sent to ' + email + '!</p>';
+        toast('Invite sent to ' + email + '!', 'success');
+        // Clear invitee fields only — keep sender title since it's the same admin
+        ['inviteeName','inviteeEmail','inviteeBusiness'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        document.getElementById('inviteeCategory').value = '';
+        document.getElementById('businessSuggestionChips').innerHTML = '';
+    } catch (err) {
+        if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">' + sanitizeError(err) + '</p>';
+        toast(sanitizeError(err), 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Invite'; }
+    }
+}
+window.sendOwnerInvite = sendOwnerInvite;
+
+async function sendCustomEmail() {
+    const btn      = document.getElementById('sendCustomBtn');
+    const statusEl = document.getElementById('customEmailStatus');
+    const to      = document.getElementById('customTo')?.value.trim();
+    const subject = document.getElementById('customSubject')?.value.trim();
+    const body    = document.getElementById('customBody')?.value.trim();
+
+    if (!to)      { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a recipient email.</p>'; return; }
+    if (!subject) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a subject.</p>'; return; }
+    if (!body)    { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please write a message body.</p>'; return; }
+
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending…'; }
+    if (statusEl) statusEl.innerHTML = '';
+
+    try {
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) throw new Error('Not logged in');
+
+        const res = await fetch(CONFIG.FUNCTIONS_BASE + '/send-email', {
+            method:  'POST',
+            headers: {
+                'Content-Type':  'application/json',
+                'Authorization': 'Bearer ' + session.access_token,
+                'apikey':        CONFIG.SUPABASE_KEY,
+            },
+            body: JSON.stringify({
+                type:         'custom',
+                to,
+                subject,
+                body,
+                sender_name:  CURRENT_PROFILE?.full_name || 'AfriStay Team',
+                sender_email: CURRENT_PROFILE?.email || 'team@afristay.rw',
+                sender_title: localStorage.getItem('afristay_sender_title') || 'AfriStay Team',
+                sender_phone: localStorage.getItem('afristay_sender_phone') || '',
+            }),
+        });
+        const result = await res.json();
+        if (!res.ok || result.error) throw new Error(result.error || 'Failed to send email');
+
+        if (statusEl) statusEl.innerHTML = '<p style="color:#27ae60;font-size:13px;font-weight:600;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>Email sent to ' + to + '!</p>';
+        toast('Email sent to ' + to + '!', 'success');
+        ['customTo','customSubject','customBody'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    } catch (err) {
+        if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">' + sanitizeError(err) + '</p>';
+        toast(sanitizeError(err), 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Email'; }
+    }
+}
+window.sendCustomEmail = sendCustomEmail;
 
 async function handleOwnerApplication(appId, userId, newStatus) {
     try {
