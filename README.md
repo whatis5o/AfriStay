@@ -1,6 +1,10 @@
-# AfriStay — Rwanda Property & Vehicle Rental Platform
+# AfriStay 🇷🇼
+**Rwanda's Premier Property & Vehicle Rental Platform**
 
-**AfriStay** (`afristay.rw`) connects property owners and vehicle renters with guests across Rwanda. Built by Josue, Sabin, and Artur under **King Technologies** — part of the broader Rwanda App Hub vision.
+AfriStay connects property owners and vehicle renters with guests across Rwanda.
+Built by Josue, Sabin, and Artur under **King Technologies**.
+
+Live at → [afristay.rw](https://afristay.rw)
 
 ---
 
@@ -8,12 +12,12 @@
 
 | Layer | Technology |
 |---|---|
-| Frontend | Vanilla HTML, CSS, JavaScript (no framework, no build step) |
+| Frontend | Vanilla HTML, CSS, JavaScript — no framework, no build step |
 | Backend / Auth | Supabase (PostgreSQL + Auth + Storage + Edge Functions) |
-| Payments | Irembo Pay (dummy edge function; swap with live credentials when ready) |
-| Email | Brevo Transactional API (`bookings@afristay.rw`) |
-| Icons | Font Awesome 6 |
-| Fonts | Google Fonts — Inter |
+| Payments | IremboPay (Rwanda's national payment gateway) |
+| Email | Resend (`bookings@dm.afristay.rw`) |
+| Fonts & Icons | Google Fonts (Sora, Playfair Display) + Font Awesome 6 |
+| Hosting | cPanel / afristay.rw |
 
 ---
 
@@ -21,186 +25,107 @@
 
 | Route | Description |
 |---|---|
-| `/` | Home — featured listings carousel |
+| `/` | Home — hero, featured listings carousel |
 | `/Listings/` | Browse all approved + available listings with filters |
-| `/Detail/?id=` | Single listing — gallery, booking form, reviews |
+| `/Listings/Detail/` | Single listing — gallery, map, booking |
+| `/Listings/Checkout/request/` | Booking request form (no payment upfront) |
+| `/Listings/Checkout/approve/` | Owner approve/reject page (from email link) |
+| `/Listings/Checkout/result/` | Post-payment confirmation page |
 | `/Auth/` | Sign in / Sign up / Forgot password |
-| `/Checkout/` | Booking checkout — card or MoMo payment via Irembo Pay |
-| `/Profile/` | User profile — bookings, favorites, receipts |
-| `/Dashboard/` | Admin + Owner dashboard |
-| `/Events/` | Events listing page |
-| `/Event/?id=` | Single event detail |
+| `/Dashboards/Profile/` | User profile — bookings, favorites, settings |
+| `/Dashboards/Owner/` | Owner dashboard — listings, bookings, earnings |
+| `/Dashboards/Admin/` | Admin dashboard — all listings, users, financials |
+| `/Events/` | Events & promotions |
 | `/Favorites/` | Saved listings |
+| `/About/` | About AfriStay |
 | `/Contact/` | Contact form |
-| `/About/` | About page |
+| `/Privacy/` | Privacy policy |
+| `/Terms/` | Terms & conditions |
 
 ---
 
-## User Roles
+## Booking Flow
 
-| Role | Access |
-|---|---|
-| `user` | Browse, book, favorite, review |
-| `owner` | All user access + manage own listings, bookings, promotions |
-| `admin` | Full dashboard — users, all listings, bookings, events, promotions, messages |
-
----
-
-## Key Features
-
-### Listings
-- Filter by province, district, sector, category (vehicle / real estate)
-- Only `approved` + `available` listings shown publicly
-- Owners submit → admins approve before going live
-
-### Promotions
-- Admin or owner sets a % discount with start and end date on a specific listing
-- Active promotions automatically reduce the displayed price on the home page, listings page, and detail page
-- Crossed-out original price + "X% OFF" badge + promo end date shown
-- Price reverts automatically once the end date passes — no manual action needed
-
-### Bookings & Payments
-- Supports **card** (name, number, expiry MM/YY, CVV) and **Mobile Money** (MTN / Airtel)
-- Two-step flow: `irembo-pay` edge function validates payment details → `store-booking` edge function saves the booking
-- Pay on arrival bypasses Irembo Pay entirely
-
-### Favorites
-- Heart icon on every listing card — click to save / unsave
-- Synced to `favorites` table when logged in; prompts sign-in when logged out
-
-### Reviews
-- Gated by `platform_config` key `open_reviews`:
-  - `true` → any logged-in user can review (open / testing mode)
-  - `false` / missing → only guests with a completed booking can review
-
-### Forgot Password
-- User requests reset email → Supabase sends link → user lands on `/Auth/` → auto-switches to "New Password" form → password updated, redirected to sign in
+```
+Guest requests booking (no payment upfront)
+        ↓
+Owner + Admins receive email with Approve / Reject buttons
+        ↓
+Owner approves → IremboPay invoice created → Guest gets payment link by email
+        ↓
+Guest pays on IremboPay hosted page (card or Mobile Money)
+        ↓
+IremboPay fires webhook → booking confirmed → Guest gets receipt email
+```
 
 ---
 
-## Database Tables
-
-| Table | Purpose |
-|---|---|
-| `profiles` | Extends `auth.users` — name, role, phone, avatar, banned flag |
-| `listings` | Properties and vehicles |
-| `listing_images` | Images per listing |
-| `listing_videos` | Videos per listing |
-| `bookings` | Booking records — dates, payment method, status, reference |
-| `favorites` | User saved listings |
-| `reviews` | Guest reviews |
-| `promotions` | Time-limited % discounts on listings |
-| `events` | Events created by admin |
-| `provinces` / `districts` / `sectors` | Rwanda location hierarchy |
-| `platform_config` | Feature flags (e.g. `open_reviews = true`) |
-
----
-
-## Edge Functions
+## Edge Functions (Supabase)
 
 | Function | Purpose |
 |---|---|
-| `irembo-pay` | Dummy Irembo Pay gateway — validates card/MoMo, returns fake reference. Replace `/* DUMMY */` blocks with real Irembo API calls when credentials arrive. |
-| `store-booking` | Saves the booking to the database after payment is confirmed |
-
-Deploy:
-```bash
-supabase functions deploy irembo-pay --no-verify-jwt
-supabase functions deploy store-booking --no-verify-jwt
-```
+| `store-booking` | Creates booking record, validates availability |
+| `send-email` | All transactional emails via Resend |
+| `approve-booking` | Approves/rejects bookings, creates IremboPay invoice |
+| `irembo-webhook` | Receives IremboPay payment confirmation (no JWT) |
+| `booking-expiry-reminder` | Hourly cron — alerts owner + admin before expiry |
+| `delete-account` | GDPR account deletion |
 
 ---
 
-## RLS Policies — Promotions
+## Environment Secrets (Supabase)
 
-Run in the Supabase SQL editor:
-
-```sql
--- Anyone (including guests) can read promotions
-alter policy "Public can read promotions"
-on "public"."promotions"
-to public
-using (true);
-
--- Admins and owners can insert, update, and delete promotions
-alter policy "Admin can manage promotions"
-on "public"."promotions"
-to authenticated
-using (
-  exists (
-    select 1 from profiles
-    where profiles.id = auth.uid()
-      and profiles.role = any (array['admin'::user_role, 'owner'::user_role])
-  )
-)
-with check (
-  exists (
-    select 1 from profiles
-    where profiles.id = auth.uid()
-      and profiles.role = any (array['admin'::user_role, 'owner'::user_role])
-  )
-);
-```
+| Secret | Purpose |
+|---|---|
+| `SUPABASE_URL` | Auto-injected |
+| `SUPABASE_SERVICE_ROLE_KEY` | Auto-injected |
+| `RESEND_API_KEY` | Resend email API |
+| `IREMBO_SECRET_KEY` | IremboPay API auth + webhook HMAC verification |
+| `IREMBO_PUBLIC_KEY` | IremboPay public key |
+| `IREMBO_PAYMENT_ACCOUNT` | Payment account identifier from IremboPay portal |
+| `IREMBO_PRODUCT_CODE` | Product code from IremboPay portal |
+| `IREMBO_CALLBACK_URL` | Webhook URL registered with IremboPay |
+| `SITE_ORIGIN` | `https://afristay.rw` |
 
 ---
 
-## Project Structure
+## Go Live
 
-```
-AfriStay/
-├── index.html              # Home page
-├── Auth/                   # Sign in / sign up / forgot password
-├── Listings/               # Browse listings
-├── Detail/                 # Single listing detail
-├── Checkout/               # Booking checkout
-├── Profile/                # User profile
-├── Dashboard/              # Admin + owner dashboard
-├── Events/                 # Events list
-├── Event/                  # Single event
-├── Favorites/              # Saved listings
-├── Contact/                # Contact form
-├── About/                  # About page
-├── js/
-│   ├── script.js           # Global nav, card generator, favorites, promo merge helper
-│   ├── home.js             # Home page featured listings + carousel
-│   ├── detail.js           # Listing detail page (price, booking, reviews)
-│   ├── auth.js             # Auth flow (sign in, sign up, OTP, forgot/reset password)
-│   ├── dashboard.js        # Full admin + owner dashboard logic
-│   └── supabase-client.js  # Supabase init
-├── Style/
-│   ├── style.css           # Global styles + responsive breakpoints
-│   └── index.css           # Home page styles
-└── supabase/
-    └── functions/
-        ├── irembo-pay/     # Dummy Irembo Pay edge function
-        └── store-booking/  # Booking persistence edge function
-```
+See [`docs/GO-LIVE-CHECKLIST.md`](docs/GO-LIVE-CHECKLIST.md) for the full checklist and monitoring guide.
+
+**Quick summary:**
+1. Swap Supabase secrets to live IremboPay credentials
+2. Change `IREMBO_BASE_URL` in `approve-booking/index.ts` → `https://api.irembopay.com/payments`
+3. Redeploy `approve-booking`
+4. Run one live test end-to-end
 
 ---
 
 ## Local Development
 
-No build step required — it's a static site.
+No build step — serve with any static server:
 
 ```bash
-# Option A — npx serve
 npx serve .
-
-# Option B — Python
+# or
 python -m http.server 8080
 ```
 
-Supabase config lives in `/js/supabase-client.js`. Swap the keys for your own project if forking.
+Update `/js/config.js` to point to a different Supabase project if needed.
 
 ---
 
-## Roadmap
+## Deploy Edge Functions
 
-- [ ] Irembo Pay live credentials — replace dummy edge function
-- [ ] Supabase custom SMTP — send auth emails from `bookings@afristay.rw`
-- [ ] Brevo domain verification — remove `brevosend.com` subdomain from outbound emails
-- [ ] Rwanda App Hub integration — connect AfriStay to the unified East Africa digital ecosystem
+```bash
+npx supabase functions deploy approve-booking --no-verify-jwt --project-ref xuxzeinufjpplxkerlsd
+npx supabase functions deploy irembo-webhook --no-verify-jwt --project-ref xuxzeinufjpplxkerlsd
+npx supabase functions deploy send-email --project-ref xuxzeinufjpplxkerlsd
+npx supabase functions deploy store-booking --project-ref xuxzeinufjpplxkerlsd
+npx supabase functions deploy booking-expiry-reminder --project-ref xuxzeinufjpplxkerlsd
+npx supabase functions deploy delete-account --project-ref xuxzeinufjpplxkerlsd
+```
 
 ---
 
-*Built with love in Rwanda by King Technologies.*
+© 2026 AfriStay · King Technologies · Rwanda

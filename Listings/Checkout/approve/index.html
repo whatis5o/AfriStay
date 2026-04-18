@@ -96,7 +96,11 @@
     try {
       const res  = await fetch(`${FN}?token=${encodeURIComponent(token)}&info=1`);
       const data = await res.json();
-      if (!res.ok || data.error) { showError(data.error || 'Invalid or expired link.'); return; }
+      if (!res.ok || data.error) {
+        // Token already consumed = booking was already approved/rejected successfully
+        showAlreadyDone();
+        return;
+      }
 
       document.getElementById('mainIcon').innerHTML   = isApprove ? '&#9989;' : '&#10060;';
       document.getElementById('mainTitle').textContent = isApprove ? 'Approve This Booking?' : 'Reject This Booking?';
@@ -150,13 +154,38 @@
       setTimeout(() => window.location.replace('https://afristay.rw'), 2800);
 
     } catch (e) {
-      sp.style.display  = 'none';
+      // Network dropped — re-check if approval actually went through on the server
+      sp.style.display = 'none';
+      try {
+        const check = await fetch(`${FN}?token=${encodeURIComponent(token)}&info=1`);
+        if (!check.ok) {
+          // Token is gone = server processed it successfully despite the network blip
+          showAlreadyDone();
+          return;
+        }
+      } catch(_) {}
       msg.className = 'result-msg err';
       msg.textContent = 'Connection error. Please try again.';
       msg.style.display = 'block';
       btn.disabled = false;
       btn.style.display = 'block';
     }
+  }
+
+  function showAlreadyDone() {
+    document.getElementById('stateLoading').style.display = 'none';
+    document.getElementById('stateError').style.display   = 'none';
+    document.getElementById('stateMain').style.display    = 'none';
+    document.querySelector('.card').innerHTML = `
+      <div class="logo">AfriStay</div>
+      <div style="padding:12px 0;text-align:center;">
+        <div style="font-size:52px;margin-bottom:16px">✅</div>
+        <h1 style="font-size:20px;font-weight:800;color:#1a1a1a;margin-bottom:10px;">Already ${isApprove ? 'Approved' : 'Rejected'}</h1>
+        <p style="font-size:14px;color:#666;line-height:1.7;margin-bottom:20px;">
+          This booking was already ${isApprove ? 'approved and the guest has been sent a payment link' : 'rejected and the guest has been notified'}.
+        </p>
+        <a href="https://afristay.rw" style="display:inline-block;padding:12px 28px;background:#EB6753;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:14px;">Go to AfriStay</a>
+      </div>`;
   }
 
   init();

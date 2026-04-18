@@ -215,9 +215,8 @@ async function doApprove(sb: ReturnType<typeof createClient>, bookingId: string)
   const nights     = b.nights || Math.ceil((new Date(b.end_date).getTime() - new Date(b.start_date).getTime()) / 86400000);
   const guestEmail = b.guest_email || b.profiles?.email;
 
-  // Try to create IremboPay invoice
-  let paymentUrl = `${getSiteOrigin()}/Listings/Checkout/confirm/?booking_id=${bookingId}`;
-  let isIrembo   = false;
+  // Create IremboPay invoice — required, no fallback
+  let paymentUrl: string | null = null;
 
   if (guestEmail) {
     const invoice = await createIremboInvoice({
@@ -229,19 +228,19 @@ async function doApprove(sb: ReturnType<typeof createClient>, bookingId: string)
       guest_phone:   b.guest_phone || undefined,
     });
 
-    if (invoice) {
-      paymentUrl = invoice.payment_url;
-      isIrembo   = true;
-      await sb.from('bookings').update({ irembo_reference: invoice.invoice_number }).eq('id', bookingId);
+    if (!invoice) {
+      console.error('[APPROVE] IremboPay invoice failed — check IREMBO_SECRET_KEY, IREMBO_PAYMENT_ACCOUNT, IREMBO_PRODUCT_CODE secrets');
+      return { ok: false, msg: 'Payment link could not be created. Check IremboPay secrets in Supabase.' };
     }
+
+    paymentUrl = invoice.payment_url;
+    await sb.from('bookings').update({ irembo_reference: invoice.invoice_number }).eq('id', bookingId);
   }
 
-  if (guestEmail) {
+  if (guestEmail && paymentUrl) {
     await sendEmail(
       guestEmail,
-      isIrembo
-        ? `Your stay at ${b.listings?.title} is approved — complete payment now`
-        : `Your stay at ${b.listings?.title} is approved — confirm now`,
+      `Your stay at ${b.listings?.title} is approved — complete payment now`,
       approvedEmail({
         guestName:    b.guest_name || b.profiles?.full_name || 'Guest',
         ownerName:    owner?.full_name || 'Your host',
@@ -252,13 +251,13 @@ async function doApprove(sb: ReturnType<typeof createClient>, bookingId: string)
         totalAmount:  Number(b.total_amount),
         currency:     b.listings?.currency || b.currency || 'RWF',
         bookingRef:   b.booking_reference || bookingId.slice(0, 8).toUpperCase(),
-        paymentUrl,
-        isIrembo,
+        paymentUrl:   paymentUrl!,
+        isIrembo:     true,
       }),
     );
   }
 
-  return { ok: true, irembo: isIrembo, payment_url: isIrembo ? paymentUrl : undefined };
+  return { ok: true, irembo: true, payment_url: paymentUrl };
 }
 
 /* ── Core: reject ── */
