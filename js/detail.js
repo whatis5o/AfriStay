@@ -312,7 +312,7 @@ async function renderListingAmenities(listing) {
         html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;">';
         groups[cat].forEach(a => {
             html += '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid #f0f0f0;border-radius:12px;font-size:13px;font-weight:600;color:#333;background:#fafafa;">' +
-                '<i class="' + (a.icon || 'fa-solid fa-check') + '" style="color:#EB6753;font-size:15px;width:18px;text-align:center;flex-shrink:0;"></i>' +
+                '<i class="fa-solid fa-check" style="color:#EB6753;font-size:14px;width:18px;text-align:center;flex-shrink:0;"></i>' +
                 escHtml(a.label) + '</div>';
         });
         html += '</div></div>';
@@ -682,6 +682,18 @@ async function initBookingForm() {
         // Clamp manual input to [1, maxG]
         const gcInput = document.getElementById('bookingGuestCount');
         const gcError = document.getElementById('guestCountError');
+        function clampGuests() {
+            let v = parseInt(gcInput.value, 10);
+            if (isNaN(v) || v < 1) { gcInput.value = 1; gcError.style.display = 'none'; return; }
+            if (v > maxG) {
+                gcInput.value = maxG;
+                gcError.textContent = 'Maximum ' + maxG + (isVeh ? ' passenger' : ' guest') + (maxG === 1 ? '' : 's') + ' allowed.';
+                gcError.style.display = 'block';
+                setTimeout(() => { gcError.style.display = 'none'; }, 3000);
+            } else { gcError.style.display = 'none'; }
+        }
+        gcInput.addEventListener('blur', clampGuests);
+        gcInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { clampGuests(); e.preventDefault(); } });
         gcInput.addEventListener('input', () => {
             let v = parseInt(gcInput.value, 10);
             if (isNaN(v) || v < 1) {
@@ -805,7 +817,7 @@ function goToCheckout() {
     }
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Redirecting...'; }
     const params = new URLSearchParams({ listing_id: LISTING_ID, title: CURRENT_LISTING?.title || '', start_date: startDate, end_date: endDate, nights: days, price: selectedPrice, currency, total: totalAmount, category: CURRENT_LISTING?.category_slug || 'property', price_zone: selectedZone, guests });
-    window.location.href = '/Listings/Checkout/?' + params.toString();
+    window.location.href = '/Listings/Checkout/request/?' + params.toString();
 }
 
 /* ═══════════════════════════════════════════════

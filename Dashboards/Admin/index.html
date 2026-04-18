@@ -706,6 +706,7 @@
                             <option value="cancelled">Cancelled Only</option>
                         </select>
                         <button class="btn-p" onclick="loadReceiptsSearch(0)"><i class="fa-solid fa-magnifying-glass"></i> Search</button>
+                        <button class="btn-s" id="dlZipBtn" onclick="downloadAllReceiptsZip()" style="background:#16a34a;color:#fff;border-color:#16a34a;" title="Download all confirmed receipts as a ZIP of PDFs"><i class="fa-solid fa-file-zipper"></i> Download All (ZIP)</button>
                         <button class="btn-s" onclick="
                             document.getElementById('rcptSearch').value='';
                             document.getElementById('rcptDateFrom').value='';
@@ -956,6 +957,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

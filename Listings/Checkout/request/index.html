@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Request Booking — AfriStay</title>
+<link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+<link rel="manifest" href="/manifest.json">
+<meta property="og:title" content="Request Booking — AfriStay">
+<meta property="og:description" content="Request to book your stay in Rwanda through AfriStay.">
+<meta property="og:image" content="https://afristay.rw/Pictures/light-afri1.png">
+<meta property="og:url" content="https://afristay.rw/Listings/Checkout/request/">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#EB6753;--red-d:#d04e3b;--red-glow:rgba(235,103,83,.11);
+  --dark:#161616;--mid:#555;--muted:#999;--faint:#ccc;
+  --border:#e8e8e8;--bg:#f5f4f2;--card:#fff;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-bdr:#bbf7d0;
+  --radius:20px;--sh:0 2px 32px rgba(0,0,0,.07);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:var(--dark);-webkit-font-smoothing:antialiased}
+
+#nav{position:fixed;top:14px;left:50%;transform:translateX(-50%);width:92%;max-width:1100px;height:60px;background:rgba(255,255,255,.93);backdrop-filter:blur(20px);border-radius:100px;padding:0 26px;display:flex;align-items:center;justify-content:space-between;z-index:1000;box-shadow:0 2px 24px rgba(0,0,0,.08)}
+.nav-logo img{height:34px;display:block}
+.nav-back{display:flex;align-items:center;gap:7px;color:var(--muted);text-decoration:none;font-size:13px;font-weight:600;padding:8px 16px;border-radius:100px;border:1.5px solid var(--border);transition:all .2s}
+.nav-back:hover{color:var(--red);border-color:var(--red);background:var(--red-glow)}
+
+.page{max-width:980px;margin:0 auto;padding:96px 18px 60px;display:grid;grid-template-columns:1fr 420px;gap:22px;align-items:start}
+
+/* Summary */
+.summary{background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--sh)}
+.s-img{width:100%;height:210px;object-fit:cover;display:block}
+.s-img-ph{width:100%;height:210px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f0efed,#e8e7e4)}
+.s-body{padding:22px 24px 24px}
+.s-name{font-family:'Playfair Display',serif;font-size:18px;line-height:1.4;margin-bottom:16px}
+.s-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.s-row:last-child{border:none}
+.s-lbl{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.s-lbl i{color:var(--red);font-size:11px}
+.s-val{font-size:13px;font-weight:700}
+.s-divider{border:none;border-top:2px dashed var(--border);margin:6px 0}
+.s-total-row{display:flex;justify-content:space-between;align-items:center;padding-top:14px}
+.s-total-val{font-size:30px;font-weight:800;color:var(--red);letter-spacing:-1px}
+
+/* Request card */
+.req-card{background:var(--card);border-radius:var(--radius);padding:28px;box-shadow:var(--sh);position:sticky;top:88px}
+.req-title{font-size:19px;font-weight:800;color:var(--dark);margin-bottom:3px}
+.req-sub{font-size:12px;color:var(--muted);margin-bottom:20px}
+
+/* How it works steps */
+.steps-wrap{background:#f9fafb;border-radius:14px;border:1px solid #eee;padding:16px 18px;margin-bottom:20px}
+.step{display:flex;gap:12px;align-items:flex-start;position:relative}
+.step:not(:last-child){padding-bottom:14px}
+.step:not(:last-child)::after{content:'';position:absolute;left:11px;top:26px;bottom:0;width:1.5px;background:var(--border)}
+.step-n{width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-title{font-size:13px;font-weight:700;color:var(--dark);margin-bottom:2px}
+.step-sub{font-size:11px;color:var(--muted);line-height:1.5}
+
+/* Form */
+.sep{border:none;border-top:1.5px solid var(--border);margin:18px 0 16px}
+.g-lbl{font-size:10px;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:10px;font-weight:700;color:#bbb;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.fg input,.fg textarea{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Sora',sans-serif;outline:none;background:#fff;color:var(--dark);transition:border-color .15s}
+.fg input:focus,.fg textarea:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow)}
+.fg textarea{resize:vertical;min-height:72px}
+.ph-wrap{position:relative;display:flex}
+.ph-pre{position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;padding:0 12px;font-size:13px;font-weight:700;color:var(--dark);border-right:1.5px solid var(--border);pointer-events:none;z-index:1;gap:5px;white-space:nowrap}
+.ph-wrap input{width:100%;padding:11px 13px 11px 92px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Sora',sans-serif;outline:none;color:var(--dark);transition:border-color .15s;background:#fff}
+.ph-wrap input:focus{border-color:var(--red);box-shadow:0 0 0 3px var(--red-glow)}
+
+.err{display:none;align-items:flex-start;gap:9px;background:#fff1f0;border:1.5px solid #fcc;border-radius:10px;padding:11px 13px;font-size:13px;color:#c0392b;margin-bottom:13px;line-height:1.5}
+.err i{flex-shrink:0;margin-top:1px}
+
+.req-btn{width:100%;padding:15px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;font-family:'Sora',sans-serif;display:flex;align-items:center;justify-content:center;gap:9px;background:var(--red);color:#fff;transition:all .2s}
+.req-btn:hover:not(:disabled){background:var(--red-d);transform:translateY(-2px);box-shadow:0 8px 24px rgba(235,103,83,.32)}
+.req-btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.lock-row{display:flex;align-items:flex-start;justify-content:center;gap:5px;margin-top:9px;font-size:11px;color:var(--faint);text-align:center;line-height:1.5}
+.lock-row i{color:var(--green);font-size:10px;flex-shrink:0;margin-top:2px}
+
+.skel{background:linear-gradient(90deg,#f0f0f0 25%,#e8e8e8 50%,#f0f0f0 75%);background-size:200%;animation:sk 1.4s infinite;border-radius:8px}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Success state */
+.success-wrap{max-width:560px;margin:100px auto 60px;text-align:center;background:var(--card);border-radius:24px;box-shadow:var(--sh);padding:50px 32px;display:none}
+.success-wrap.show{display:block}
+.pulse-icon{width:76px;height:76px;border-radius:50%;background:#fff8f3;border:3px solid var(--red);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+
+@media(max-width:780px){
+  .page{grid-template-columns:1fr;padding-top:78px;gap:18px}
+  .req-card{position:static}
+  #nav{top:0;left:0;transform:none;width:100%;border-radius:0;padding:0 16px}
+  .fg input,.fg textarea,.ph-wrap input,input[type=date]{font-size:16px!important}
+}
+@media(max-width:480px){
+  .page{padding:70px 14px 36px;gap:14px}
+  #nav{height:52px;padding:0 14px}
+  .nav-logo img{height:28px}
+  .nav-back{padding:6px 12px;font-size:12px}
+  .s-img,.s-img-ph{height:160px}
+  .s-body{padding:14px 14px 16px}
+  .s-name{font-size:15px}
+  .s-total-val{font-size:22px;letter-spacing:-.5px}
+  .req-card{padding:18px 16px}
+  .req-btn{padding:14px;font-size:14px}
+  .date-grid{grid-template-columns:1fr!important}
+}
+</style>
+</head>
+<body>
+
+<nav id="nav">
+  <a href="/" class="nav-logo">
+    <img src="/Pictures/light-afri1.png" alt="AfriStay"
+         onerror="this.outerHTML='<span style=\'font-family:Playfair Display,serif;font-size:20px;font-weight:700;color:#EB6753\'>AfriStay</span>'">
+  </a>
+  <a href="javascript:history.back()" class="nav-back">
+    <i class="fa-solid fa-arrow-left"></i> Back
+  </a>
+</nav>
+
+<div class="page" id="mainPage">
+
+  <!-- BOOKING SUMMARY -->
+  <div class="summary">
+    <div id="sImgWrap" class="s-img-ph">
+      <i class="fa-solid fa-image" style="font-size:38px;color:#ccc"></i>
+    </div>
+    <div class="s-body">
+      <div id="sTitle" class="s-name skel" style="height:22px;width:70%;margin-bottom:16px">&nbsp;</div>
+      <div class="s-row">
+        <span class="s-lbl"><i class="fa-solid fa-calendar-check"></i><span id="sInLbl">Check-in</span></span>
+        <span class="s-val" id="sIn">—</span>
+      </div>
+      <div class="s-row">
+        <span class="s-lbl"><i class="fa-solid fa-calendar-xmark"></i><span id="sOutLbl">Check-out</span></span>
+        <span class="s-val" id="sOut">—</span>
+      </div>
+      <div class="s-row">
+        <span class="s-lbl"><i class="fa-solid fa-moon"></i>Duration</span>
+        <span class="s-val" id="sNights">—</span>
+      </div>
+      <div class="s-row">
+        <span class="s-lbl"><i class="fa-solid fa-users"></i>Guests</span>
+        <span class="s-val" id="sGuests">—</span>
+      </div>
+      <div class="s-row">
+        <span class="s-lbl"><i class="fa-solid fa-tag"></i><span id="sRateLbl">Per night</span></span>
+        <span class="s-val" id="sRate">—</span>
+      </div>
+      <hr class="s-divider">
+      <div class="s-total-row">
+        <span style="font-size:14px;font-weight:700">Estimated Total</span>
+        <span class="s-total-val" id="sTotal">—<span style="font-size:13px;font-weight:600;color:#ccc;margin-left:3px" id="sCur"> RWF</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- REQUEST FORM -->
+  <div class="req-card">
+    <div class="req-title">Request to Book</div>
+    <div class="req-sub">No payment now — the host reviews your request first</div>
+
+    <div class="steps-wrap">
+      <div class="step">
+        <span class="step-n">1</span>
+        <div>
+          <div class="step-title">Submit your request</div>
+          <div class="step-sub">Fill in your details and send the request to the host</div>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-n">2</span>
+        <div>
+          <div class="step-title">Host reviews (within 12 hrs)</div>
+          <div class="step-sub">The host accepts or declines — you'll be notified by email</div>
+        </div>
+      </div>
+      <div class="step">
+        <span class="step-n">3</span>
+        <div>
+          <div class="step-title">Pay &amp; confirm</div>
+          <div class="step-sub">If approved, a secure payment link is sent to your email</div>
+        </div>
+      </div>
+    </div>
+
+    <hr class="sep">
+    <div class="g-lbl">Dates</div>
+    <div class="date-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="fg" style="margin-bottom:0">
+        <label id="inLbl">Check-in *</label>
+        <input type="date" id="dIn" oninput="onDateChange()">
+      </div>
+      <div class="fg" style="margin-bottom:0">
+        <label id="outLbl">Check-out *</label>
+        <input type="date" id="dOut" oninput="onDateChange()">
+      </div>
+    </div>
+    <div id="dateMsg" style="display:none;font-size:12px;border-radius:9px;padding:9px 12px;margin-bottom:12px;line-height:1.5"></div>
+
+    <div class="fg" style="margin-bottom:4px">
+      <label id="guestLbl">Guests</label>
+      <div style="display:flex;align-items:center;gap:0;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;background:#fff">
+        <button type="button" onclick="changeGuests(-1)"
+          style="width:44px;height:44px;border:none;background:none;font-size:20px;font-weight:700;color:var(--mid);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s"
+          onmouseover="this.style.background='var(--red-glow)'" onmouseout="this.style.background='none'">−</button>
+        <div style="flex:1;text-align:center;font-size:15px;font-weight:700;color:var(--dark);border-left:1.5px solid var(--border);border-right:1.5px solid var(--border);height:44px;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span id="guestCount">1</span>
+          <span id="guestUnit" style="font-size:12px;font-weight:500;color:var(--muted)">guest</span>
+        </div>
+        <button type="button" onclick="changeGuests(1)"
+          style="width:44px;height:44px;border:none;background:none;font-size:20px;font-weight:700;color:var(--mid);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s"
+          onmouseover="this.style.background='var(--red-glow)'" onmouseout="this.style.background='none'">+</button>
+      </div>
+    </div>
+
+    <hr class="sep">
+    <div class="g-lbl">Your details</div>
+
+    <div class="fg">
+      <label>Full Name *</label>
+      <input type="text" id="gName" placeholder="e.g. Amahoro Jean" autocomplete="name">
+    </div>
+    <div class="fg">
+      <label>Email Address *</label>
+      <input type="email" id="gEmail" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="fg">
+      <label>Phone Number *</label>
+      <div class="ph-wrap">
+        <span class="ph-pre"><span style="font-size:15px">🇷🇼</span>&nbsp;+250</span>
+        <input type="tel" id="gPhone" placeholder="78X XXX XXX" maxlength="9"
+               inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')">
+      </div>
+    </div>
+    <div class="fg">
+      <label>Special Requests <span style="font-weight:400;color:#ccc;text-transform:none">(optional)</span></label>
+      <textarea id="gNotes" placeholder="Early check-in, extra bedding, dietary needs…"></textarea>
+    </div>
+
+    <div class="err" id="errBox">
+      <i class="fa-solid fa-triangle-exclamation"></i>
+      <span id="errMsg">Error</span>
+    </div>
+
+    <button class="req-btn" id="reqBtn" onclick="submitRequest()">
+      <i id="reqIcon" class="fa-regular fa-calendar-check"></i>
+      <span id="reqLabel">Send Booking Request</span>
+    </button>
+    <div class="lock-row">
+      <i class="fa-solid fa-shield-halved"></i>
+      <span>No charge until the host approves &middot; You can cancel before approval</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- SUCCESS STATE (shown after submission) -->
+<div class="success-wrap" id="successWrap">
+  <div class="pulse-icon">
+    <i class="fa-solid fa-hourglass-half" style="font-size:30px;color:#EB6753"></i>
+  </div>
+  <h2 style="font-family:'Playfair Display',serif;font-size:24px;color:#161616;margin-bottom:10px">
+    Request Sent!
+  </h2>
+  <p style="font-size:14px;color:#888;margin-bottom:20px;line-height:1.8">
+    Your booking request has been submitted. The host will review and respond within
+    <strong>12 hours</strong>. Check your email for a confirmation.
+  </p>
+  <div style="background:#fff8f3;border:1.5px solid #fdd5c4;border-radius:12px;padding:14px 18px;font-size:13px;color:#9a3412;margin-bottom:20px;line-height:1.8">
+    <i class="fa-solid fa-bell" style="margin-right:6px"></i>
+    You'll get an <strong>email notification</strong> when the host responds.<br>
+    No payment is collected until you receive approval.
+  </div>
+  <div style="background:#f7f7f7;border-radius:10px;padding:9px 14px;font-size:12px;color:#aaa;margin-bottom:24px">
+    Booking reference: <strong id="successRef" style="color:#161616;font-size:13px">—</strong>
+  </div>
+  <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+    <a href="/Dashboards/Profile/?tab=bookings"
+       style="display:inline-flex;align-items:center;gap:7px;padding:12px 22px;background:#EB6753;color:#fff;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none">
+      <i class="fa-solid fa-calendar-check"></i> My Bookings
+    </a>
+    <a href="/Listings"
+       style="display:inline-flex;align-items:center;gap:7px;padding:12px 22px;border:2px solid #EB6753;color:#EB6753;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none">
+      <i class="fa-solid fa-magnifying-glass"></i> Browse More
+    </a>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
+<script>
+const P          = new URLSearchParams(window.location.search);
+const LISTING    = P.get('listing_id') || '';
+const TITLE      = P.get('title')      || 'AfriStay Booking';
+const PRICE      = Number(P.get('price')    || 0);
+const CUR        = P.get('currency')        || 'RWF';
+const CATEGORY   = P.get('category')       || 'real_estate';
+const PRICE_ZONE = P.get('price_zone')     || 'kigali';
+let GUESTS = parseInt(P.get('guests') || '1', 10);
+
+// Mutable — updated when dates change
+let S_DATE = P.get('start_date') || '';
+let E_DATE = P.get('end_date')   || '';
+let NIGHTS = parseInt(P.get('nights') || '1', 10);
+let TOTAL  = Number(P.get('total') || 0);
+
+let BUSY = false;
+
+const $     = id => document.getElementById(id);
+const tx    = (id, v) => { const e=$(id); if (e) e.textContent = v; };
+const fmt   = n => Number(n).toLocaleString('en-RW');
+const esc   = s => String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = d => {
+  if (!d) return '—';
+  try { return new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}); }
+  catch(_) { return d; }
+};
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const sb = window.supabaseClient;
+  if (!sb) { showErr('Page configuration error. Please refresh.'); disableBtn(); return; }
+
+  let currentUser = null;
+  try { const { data: { user } } = await sb.auth.getUser(); currentUser = user; } catch(_) {}
+  if (!currentUser) {
+    window.location.href = '/Auth?next=' + encodeURIComponent(window.location.href);
+    return;
+  }
+
+  if (!LISTING || !S_DATE || !E_DATE || TOTAL <= 0) {
+    showErr('Missing booking info — please go back and select your dates.');
+    disableBtn();
+    return;
+  }
+
+  const isVeh = CATEGORY === 'vehicle';
+  const tEl = $('sTitle');
+  if (tEl) { tEl.textContent = TITLE; tEl.classList.remove('skel'); }
+  tx('sInLbl',   isVeh ? 'Pick-up'  : 'Check-in');
+  tx('sOutLbl',  isVeh ? 'Return'   : 'Check-out');
+  tx('sRateLbl', isVeh ? 'Per day'  : 'Per night');
+  tx('sGuests',  GUESTS + (GUESTS === 1 ? (isVeh ? ' passenger' : ' guest') : (isVeh ? ' passengers' : ' guests')));
+  tx('sRate',    fmt(PRICE) + ' ' + CUR + (isVeh ? '/day' : '/night'));
+  tx('sCur',     ' ' + CUR);
+
+  // Labels for vehicle vs accommodation
+  if (isVeh) { tx('inLbl', 'Pick-up *'); tx('outLbl', 'Return *'); tx('guestLbl', 'Passengers'); }
+
+  // Init guest counter display
+  refreshGuests();
+
+  // Set minimum date to today
+  const today = new Date().toISOString().split('T')[0];
+  $('dIn').min  = today;
+  $('dOut').min = today;
+
+  // Pre-fill date inputs from URL params
+  if (S_DATE) $('dIn').value  = S_DATE;
+  if (E_DATE) $('dOut').value = E_DATE;
+
+  refreshSummary();
+
+  try {
+    const { data: imgs } = await sb.from('listing_images').select('image_url').eq('listing_id', LISTING).limit(1);
+    if (imgs?.[0]?.image_url) {
+      $('sImgWrap').innerHTML = '<img src="' + esc(imgs[0].image_url) + '" class="s-img" alt="' + esc(TITLE) + '">';
+    }
+  } catch(e) { console.warn('[REQUEST] Image:', e.message); }
+
+  try {
+    const { data: p } = await sb.from('profiles').select('full_name,email,phone').eq('id', currentUser.id).single();
+    if (p?.full_name) $('gName').value  = p.full_name;
+    if (p?.email)     $('gEmail').value = p.email;
+    else if (currentUser.email) $('gEmail').value = currentUser.email;
+    if (p?.phone)     $('gPhone').value = (p.phone||'').replace(/^\+?250/,'').replace(/\D/g,'');
+  } catch(_) { if (currentUser?.email) $('gEmail').value = currentUser.email; }
+});
+
+function disableBtn() { const btn = $('reqBtn'); if (btn) btn.disabled = true; }
+function showErr(msg) { tx('errMsg', msg); $('errBox').style.display = 'flex'; $('errBox').scrollIntoView({behavior:'smooth',block:'nearest'}); }
+function hideErr() { if ($('errBox')) $('errBox').style.display = 'none'; }
+
+function refreshSummary() {
+  const isVeh = CATEGORY === 'vehicle';
+  const unit  = isVeh ? 'day' : 'night';
+  const units = isVeh ? 'days' : 'nights';
+  tx('sIn',     S_DATE ? fmtDate(S_DATE) : '—');
+  tx('sOut',    E_DATE ? fmtDate(E_DATE) : '—');
+  tx('sNights', NIGHTS > 0 ? NIGHTS + ' ' + (NIGHTS === 1 ? unit : units) : '—');
+  tx('sTotal',  TOTAL > 0  ? fmt(TOTAL) : '—');
+}
+
+function refreshGuests() {
+  const isVeh = CATEGORY === 'vehicle';
+  const unit  = isVeh ? (GUESTS === 1 ? 'passenger' : 'passengers') : (GUESTS === 1 ? 'guest' : 'guests');
+  tx('guestCount', GUESTS);
+  tx('guestUnit',  unit);
+  tx('sGuests',    GUESTS + ' ' + unit);
+}
+
+function changeGuests(delta) {
+  const next = GUESTS + delta;
+  if (next < 1 || next > 20) return;
+  GUESTS = next;
+  refreshGuests();
+}
+
+function onDateChange() {
+  const inVal  = $('dIn')?.value  || '';
+  const outVal = $('dOut')?.value || '';
+  const msg    = $('dateMsg');
+
+  // Update check-out minimum to be at least 1 day after check-in
+  if (inVal) {
+    const nextDay = new Date(inVal);
+    nextDay.setDate(nextDay.getDate() + 1);
+    $('dOut').min = nextDay.toISOString().split('T')[0];
+    if (outVal && outVal <= inVal) $('dOut').value = '';
+  }
+
+  if (!inVal || !outVal) {
+    S_DATE = inVal; E_DATE = outVal;
+    NIGHTS = 0; TOTAL = 0;
+    refreshSummary();
+    msg.style.display = 'none';
+    return;
+  }
+
+  const ms = new Date(outVal) - new Date(inVal);
+  if (ms <= 0) {
+    msg.style.cssText = 'display:block;background:#fff1f0;border:1.5px solid #fcc;color:#c0392b';
+    msg.textContent   = 'Check-out must be after check-in.';
+    return;
+  }
+
+  S_DATE = inVal;
+  E_DATE = outVal;
+  NIGHTS = Math.ceil(ms / 86400000);
+  TOTAL  = NIGHTS * PRICE;
+
+  refreshSummary();
+  msg.style.cssText = 'display:block;background:#f0fdf4;border:1.5px solid #bbf7d0;color:#166534';
+  msg.textContent   = NIGHTS + ' ' + (NIGHTS === 1 ? (CATEGORY === 'vehicle' ? 'day' : 'night') : (CATEGORY === 'vehicle' ? 'days' : 'nights')) + ' · Total: ' + fmt(TOTAL) + ' ' + CUR;
+}
+
+function setBusy(on, label) {
+  BUSY = on;
+  const btn = $('reqBtn'); if (!btn) return;
+  btn.disabled = on;
+  if (on) {
+    tx('reqLabel', label || 'Sending…');
+    $('reqIcon').className = 'fa-solid fa-circle-notch fa-spin';
+  } else {
+    tx('reqLabel', 'Send Booking Request');
+    $('reqIcon').className = 'fa-regular fa-calendar-check';
+  }
+}
+
+async function submitRequest() {
+  if (BUSY) return;
+  hideErr();
+
+  const name  = $('gName')?.value.trim()  || '';
+  const email = $('gEmail')?.value.trim() || '';
+  const phone = $('gPhone')?.value.trim() || '';
+  const notes = $('gNotes')?.value.trim() || '';
+
+  if (!name)                { showErr('Please enter your full name.'); return; }
+  if (!email.includes('@')) { showErr('Please enter a valid email address.'); return; }
+  if (phone.length < 8)     { showErr('Please enter your phone number (9 digits, without +250).'); return; }
+  if (!S_DATE || !E_DATE)   { showErr('Please select your check-in and check-out dates.'); return; }
+  if (NIGHTS <= 0)          { showErr('Check-out must be after check-in.'); return; }
+
+  setBusy(true, 'Checking availability…');
+
+  try {
+    const sb = window.supabaseClient;
+    if (!sb) throw new Error('Page config error — please refresh.');
+
+    const { data: { user }, error: authErr } = await sb.auth.getUser();
+    if (authErr || !user) { window.location.href = '/Auth?next=' + encodeURIComponent(window.location.href); return; }
+
+    // Client-side overlap guard
+    const { data: existingList } = await sb
+      .from('bookings')
+      .select('id, start_date, end_date, status')
+      .eq('user_id', user.id)
+      .eq('listing_id', LISTING)
+      .in('status', ['awaiting_approval','pending','approved','confirmed']);
+
+    const overlap = (existingList || []).find(b =>
+      new Date(S_DATE) < new Date(b.end_date) && new Date(E_DATE) > new Date(b.start_date)
+    );
+    if (overlap) {
+      setBusy(false);
+      const fd = d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      showErr('You already have an overlapping booking for this listing (' + fd(overlap.start_date) + ' → ' + fd(overlap.end_date) + '). Check My Bookings.');
+      return;
+    }
+
+    const { data: { session } } = await sb.auth.getSession();
+    const token  = session?.access_token || CONFIG.SUPABASE_KEY;
+    const fnBase = (CONFIG?.FUNCTIONS_BASE || '').replace(/\/$/, '');
+
+    // Create the booking
+    setBusy(true, 'Sending request…');
+    const res = await fetch(fnBase + '/store-booking', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'apikey': CONFIG.SUPABASE_KEY },
+      body: JSON.stringify({
+        listing_id:        LISTING,
+        start_date:        S_DATE,
+        end_date:          E_DATE,
+        nights:            NIGHTS,
+        total_amount:      TOTAL,
+        currency:          CUR,
+        payment_method:    'card_irembo',
+        guest_name:        name,
+        guest_email:       email,
+        guest_phone:       '+250' + phone,
+        guest_notes:       notes || null,
+        user_id:           user.id,
+        payment_reference: null,
+        category_slug:     CATEGORY,
+        price_zone:        PRICE_ZONE,
+        price_per_unit:    PRICE,
+        guests:            GUESTS,
+      }),
+    });
+
+    let data;
+    try { data = await res.json(); }
+    catch(_) { throw new Error('Server error (HTTP ' + res.status + '). Please try again.'); }
+
+    if (!res.ok || data.error) {
+      if (data.code === 'SELF_BOOKING')      throw new Error('You cannot book your own listing.');
+      if (data.code === 'DUPLICATE_BOOKING') throw new Error('You already have an active booking for these dates.');
+      if (data.code === 'DATES_UNAVAILABLE') throw new Error('These dates are no longer available. Please go back and choose different dates.');
+      throw new Error(data.error || data.message || 'Booking failed. Please try again.');
+    }
+
+    const bookingId = data.booking_id || data.id || '';
+
+    // Notify owner + admins + send guest confirmation (non-fatal)
+    setBusy(true, 'Notifying host…');
+    try {
+      await fetch(fnBase + '/send-email', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'apikey': CONFIG.SUPABASE_KEY },
+        body: JSON.stringify({ type: 'booking_request_all', booking_id: bookingId }),
+      });
+    } catch(emailErr) {
+      console.warn('[REQUEST] Email notification failed (non-fatal):', emailErr.message);
+    }
+
+    // Show success
+    $('mainPage').style.display = 'none';
+    tx('successRef', '#' + String(bookingId).slice(0, 8).toUpperCase());
+    $('successWrap').classList.add('show');
+    document.title = 'Request Sent — AfriStay';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch(err) {
+    console.error('❌ [REQUEST]', err.message);
+    showErr(err.message || 'Something went wrong. Please try again.');
+    setBusy(false);
+  }
+}
+</script>
+<script src="/js/maintenance.js"></script>
+<script src="/js/scroll-animations.js"></script>
+</body>
+</html>

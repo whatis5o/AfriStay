@@ -2559,10 +2559,12 @@ async function approveBooking(bookingId) {
 
         console.log('✅ [APPROVE] Done:', data);
 
+        // approve-booking edge function already emails the guest — no duplicate send needed
+
         if (data.dpo_active) {
             toast('✅ Approved! Guest received a payment link.', 'success');
         } else {
-            toast('✅ Approved! Guest received a confirmation email.', 'success');
+            toast('✅ Approved! Guest received an email with payment link.', 'success');
         }
 
         logAudit({ action: 'booking_approved', entityType: 'booking', entityId: bookingId, description: 'Booking approved for "' + (booking.listings?.title || bookingId) + '"' });
@@ -2626,8 +2628,10 @@ async function rejectBooking(bookingId) {
             .eq('booking_id', bookingId)
             .is('cancelled_at', null); // only if not already cancelled
 
+        // reject-booking edge function already emails the guest — no duplicate send needed
+
         logAudit({ action: 'booking_rejected', entityType: 'booking', entityId: bookingId, description: 'Booking rejected for "' + title + '"' + (reason ? ' — reason: ' + reason : '') });
-        toast('Booking rejected. Guest has been notified.', 'success');
+        toast('Booking rejected. Guest notified by email.', 'success');
         await loadBookingsTable();
         await filterListings();
 
@@ -5954,6 +5958,89 @@ window.loadReceiptsSearch = async function(page = 0) {
     } catch (err) {
         console.error('[RECEIPTS]', err);
         tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:28px;color:#e74c3c;font-size:13px;">Failed to load: ${escapeHtml(err.message)}</td></tr>`;
+    }
+};
+
+/* ── Download ALL confirmed receipts as a ZIP of HTML files ── */
+window.downloadAllReceiptsZip = async function() {
+    if (CURRENT_ROLE !== 'admin') return;
+    const btn = document.getElementById('dlZipBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Generating…'; }
+
+    try {
+        const { data: bookings, error } = await _supabase
+            .from('bookings')
+            .select(`
+                id, booking_reference, guest_name, guest_email, guest_phone,
+                start_date, end_date, nights, total_amount, currency,
+                created_at, payment_method, category_slug,
+                listings(title, address)
+            `)
+            .in('status', ['confirmed', 'completed'])
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        if (!bookings || bookings.length === 0) { toast('No confirmed bookings found.', 'warning'); return; }
+
+        const zip = new JSZip();
+        const fmtDate = d => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+        const fmtAmt  = (n, cur) => Number(n).toLocaleString('en-RW') + ' ' + (cur || 'RWF');
+        const today   = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+        for (const b of bookings) {
+            const ref    = b.booking_reference || 'RCP-' + b.id.slice(0,8).toUpperCase();
+            const nights = b.nights || Math.max(1, Math.ceil((new Date(b.end_date) - new Date(b.start_date)) / 86400000));
+            const isVeh  = b.category_slug === 'vehicle';
+            const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Receipt ${ref}</title>
+<style>
+  body{font-family:Arial,sans-serif;max-width:600px;margin:40px auto;color:#1a1a1a;font-size:14px}
+  .logo{font-size:22px;font-weight:900;color:#EB6753;letter-spacing:-1px;margin-bottom:4px}
+  .sub{font-size:12px;color:#888;margin-bottom:28px}
+  h2{font-size:18px;margin:0 0 20px;padding-bottom:12px;border-bottom:2px solid #EB6753}
+  table{width:100%;border-collapse:collapse;margin-bottom:20px}
+  td{padding:9px 12px;border-bottom:1px solid #f0f0f0;font-size:13px}
+  td:first-child{color:#888;width:40%}
+  td:last-child{font-weight:600}
+  .total td{font-size:15px;font-weight:800;border-bottom:none;padding-top:12px}
+  .total td:last-child{color:#EB6753}
+  .footer{margin-top:28px;font-size:11px;color:#aaa;text-align:center;border-top:1px solid #eee;padding-top:14px}
+</style></head><body>
+<div class="logo">AfriStay</div>
+<div class="sub">Official Payment Receipt &nbsp;·&nbsp; Generated ${today}</div>
+<h2>Receipt ${ref}</h2>
+<table>
+  <tr><td>Booking Ref</td><td>${b.booking_reference || ref}</td></tr>
+  <tr><td>Guest Name</td><td>${escapeHtml(b.guest_name||'—')}</td></tr>
+  <tr><td>Guest Email</td><td>${escapeHtml(b.guest_email||'—')}</td></tr>
+  <tr><td>Property</td><td>${escapeHtml(b.listings?.title||'AfriStay Listing')}</td></tr>
+  <tr><td>${isVeh?'Pick-up':'Check-in'}</td><td>${fmtDate(b.start_date)}</td></tr>
+  <tr><td>${isVeh?'Return':'Check-out'}</td><td>${fmtDate(b.end_date)}</td></tr>
+  <tr><td>Duration</td><td>${nights} ${isVeh?'day':'night'}${nights!==1?'s':''}</td></tr>
+  <tr><td>Payment Method</td><td>${(b.payment_method||'').replace(/_/g,' ')}</td></tr>
+</table>
+<table class="total">
+  <tr><td>Total Paid</td><td>${fmtAmt(b.total_amount, b.currency)}</td></tr>
+</table>
+<div class="footer">AfriStay &nbsp;·&nbsp; Rwanda's Premier Rental Platform &nbsp;·&nbsp; afristay.rw &nbsp;·&nbsp; info@afristay.rw</div>
+</body></html>`;
+            zip.file(`receipt-${ref}.html`, html);
+        }
+
+        const blob    = await zip.generateAsync({ type: 'blob' });
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const a       = document.createElement('a');
+        a.href        = URL.createObjectURL(blob);
+        a.download    = `afristay-receipts-${dateStr}.zip`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast(`Downloaded ${bookings.length} receipt${bookings.length !== 1 ? 's' : ''} as ZIP.`, 'success');
+
+    } catch (err) {
+        console.error('[RECEIPTS ZIP]', err);
+        toast('Failed to generate ZIP: ' + err.message, 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-file-zipper"></i> Download All (ZIP)'; }
     }
 };
 
