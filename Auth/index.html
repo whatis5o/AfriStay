@@ -130,6 +130,43 @@
                     </div>
                 </div>
 
+                <!-- Account setup: invited users complete their profile -->
+                <div id="setupGroup" class="hidden">
+                    <p style="font-size:14px;color:#666;margin-bottom:16px;line-height:1.5;">
+                        Welcome! Finish setting up your account.
+                    </p>
+                    <div class="input-group">
+                        <input type="text" id="setupName" placeholder="Full Name" autocomplete="name">
+                    </div>
+                    <div class="input-group" style="display:flex;gap:8px;">
+                        <select id="setupCountryCode" style="width:110px;border:1.5px solid #e5e5e5;border-radius:10px;padding:12px 8px;font-size:14px;background:#fff;color:#333;flex-shrink:0;">
+                            <option value="+250">🇷🇼 +250</option>
+                            <option value="+1">🇺🇸 +1</option>
+                            <option value="+44">🇬🇧 +44</option>
+                            <option value="+33">🇫🇷 +33</option>
+                            <option value="+49">🇩🇪 +49</option>
+                            <option value="+254">🇰🇪 +254</option>
+                            <option value="+255">🇹🇿 +255</option>
+                            <option value="+256">🇺🇬 +256</option>
+                            <option value="+243">🇨🇩 +243</option>
+                            <option value="+27">🇿🇦 +27</option>
+                        </select>
+                        <input type="tel" id="setupPhone" placeholder="Phone number" autocomplete="tel" style="flex:1;">
+                    </div>
+                    <div class="input-group pw-wrap">
+                        <input type="password" id="setupPassword" placeholder="Create a password (min. 6 chars)">
+                        <button type="button" class="pw-eye" onclick="_togglePwVisibility('setupPassword',this)" tabindex="-1">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="input-group pw-wrap">
+                        <input type="password" id="setupConfirmPassword" placeholder="Confirm password">
+                        <button type="button" class="pw-eye" onclick="_togglePwVisibility('setupConfirmPassword',this)" tabindex="-1">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
                 <button type="submit" id="submitBtn">Login</button>
 
                 <div id="authError" class="error-msg"></div>

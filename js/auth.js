@@ -9,6 +9,7 @@
     const passwordGroup   = document.getElementById('passwordGroup');
     const forgotGroup     = document.getElementById('forgotGroup');
     const resetGroup      = document.getElementById('resetGroup');
+    const setupGroup      = document.getElementById('setupGroup');
     const forgotLink      = document.getElementById('forgotLink');
 
     const authForm        = document.getElementById('authForm');
@@ -71,6 +72,8 @@
         const termsNote = document.getElementById('termsNote');
         if (termsNote) termsNote.style.display = (mode === 'signup') ? 'block' : 'none';
 
+        if (setupGroup) setupGroup.classList.add('hidden');
+
         if (mode === 'signup') {
             toggleSignup.classList.add('active');
             signupGroup.classList.remove('hidden');
@@ -88,6 +91,12 @@
             resetGroup.classList.remove('hidden');
             formTitle.innerText = 'New Password';
             submitBtn.innerText = 'Save New Password';
+        } else if (mode === 'setup') {
+            authToggleCont.classList.add('hidden');
+            passwordGroup.classList.add('hidden');
+            if (setupGroup) setupGroup.classList.remove('hidden');
+            formTitle.innerText = 'Complete Your Profile';
+            submitBtn.innerText = 'Save & Continue';
         } else {
             toggleSignin.classList.add('active');
             loginGroup.classList.remove('hidden');
@@ -102,8 +111,17 @@
     (function waitForSupabase() {
         const client = window.supabaseClient;
         if (!client) { setTimeout(waitForSupabase, 100); return; }
-        client.auth.onAuthStateChange((event) => {
-            if (event === 'PASSWORD_RECOVERY') toggleAuth('reset');
+        client.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'PASSWORD_RECOVERY') { toggleAuth('reset'); return; }
+            if (event === 'SIGNED_IN' && session) {
+                const params = new URLSearchParams(window.location.search);
+                const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+                const type = params.get('type') || hashParams.get('type');
+                const code = params.get('code');
+                if (type === 'invite' || type === 'magiclink' || code) {
+                    toggleAuth('setup');
+                }
+            }
         });
     })();
 
@@ -207,15 +225,18 @@
 
                 if (error) {
                     const msg = error.message || '';
-                    if (msg.toLowerCase().includes('already registered') ||
-                        msg.toLowerCase().includes('already exists') ||
-                        error.status === 422) {
+                    const msgLow = msg.toLowerCase();
+                    if (msgLow.includes('already registered') || msgLow.includes('already exists')) {
                         showError(
                             'An account with this email already exists. ' +
                             '<a href="#" onclick="window.toggleAuth(\'signin\');return false;" ' +
                             'style="color:#EB6753;font-weight:700;text-decoration:none;">Sign in instead?</a>',
                             true
                         );
+                    } else if (msgLow.includes('rate limit') || msgLow.includes('too many') || error.status === 429) {
+                        showError('Too many attempts. Please wait a few minutes and try again.');
+                    } else if (error.status === 422) {
+                        showError('We couldn\'t create your account right now. Please wait a few minutes and try again, or contact support.');
                     } else {
                         showError(msg || 'Sign up failed. Please try again.');
                     }
@@ -240,6 +261,38 @@
                 submitBtn.innerText = 'Send Reset Link';
                 if (error) { showError(error.message || 'Could not send reset email.'); return; }
                 showSuccess('Check your inbox — we sent a password reset link.');
+
+            } else if (mode === 'setup') {
+                const name     = document.getElementById('setupName')?.value?.trim();
+                const phone    = document.getElementById('setupPhone')?.value?.trim();
+                const cc       = document.getElementById('setupCountryCode')?.value || '+250';
+                const newPwd   = document.getElementById('setupPassword')?.value;
+                const confPwd  = document.getElementById('setupConfirmPassword')?.value;
+
+                if (!name)                       { showError('Please enter your full name.'); return; }
+                if (!phone)                      { showError('Please enter your phone number.'); return; }
+                if (!newPwd || newPwd.length < 6){ showError('Password must be at least 6 characters.'); return; }
+                if (newPwd !== confPwd)          { showError('Passwords do not match.'); return; }
+
+                submitBtn.innerText = 'Saving...';
+
+                const { data: { user }, error: pwErr } = await client.auth.updateUser({ password: newPwd });
+                if (pwErr) { showError(pwErr.message || 'Could not set password.'); submitBtn.innerText = 'Save & Continue'; return; }
+
+                const { error: profileErr } = await client
+                    .from('profiles')
+                    .upsert({
+                        id: user.id,
+                        full_name: name,
+                        phone: cc + phone,
+                        country_code: cc,
+                        email: user.email,
+                        updated_at: new Date().toISOString(),
+                    }, { onConflict: 'id' });
+
+                if (profileErr) { showError('Profile could not be saved. Please try again.'); submitBtn.innerText = 'Save & Continue'; return; }
+
+                await handleSuccessfulLogin(client, user);
 
             } else if (mode === 'reset') {
                 const newPwd  = document.getElementById('newPassword')?.value;

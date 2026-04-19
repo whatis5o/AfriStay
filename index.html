@@ -360,6 +360,17 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="/js/config.js"></script>
+    <script>
+      (function(){
+        var p = new URLSearchParams(window.location.search);
+        var h = new URLSearchParams(window.location.hash.replace('#',''));
+        var type = p.get('type') || h.get('type');
+        var code = p.get('code');
+        if (type === 'invite' || type === 'recovery' || type === 'magiclink' || code) {
+          window.location.replace('/Auth/' + window.location.search + window.location.hash);
+        }
+      })();
+    </script>
     <script src="/js/utils.js"></script>
     <script src="/js/maintenance.js"></script>
     <script src="/js/scroll-animations.js"></script>
