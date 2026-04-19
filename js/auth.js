@@ -111,16 +111,24 @@
     (function waitForSupabase() {
         const client = window.supabaseClient;
         if (!client) { setTimeout(waitForSupabase, 100); return; }
+
+        const urlParams  = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+        const urlType    = urlParams.get('type') || hashParams.get('type');
+        const urlCode    = urlParams.get('code');
+        const isAuthCallback = urlType === 'invite' || urlType === 'magiclink' || !!urlCode;
+
+        // Code may have already been exchanged before listener attached — check session immediately
+        if (isAuthCallback) {
+            client.auth.getSession().then(({ data: { session } }) => {
+                if (session) toggleAuth('setup');
+            });
+        }
+
         client.auth.onAuthStateChange(async (event, session) => {
             if (event === 'PASSWORD_RECOVERY') { toggleAuth('reset'); return; }
-            if (event === 'SIGNED_IN' && session) {
-                const params = new URLSearchParams(window.location.search);
-                const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-                const type = params.get('type') || hashParams.get('type');
-                const code = params.get('code');
-                if (type === 'invite' || type === 'magiclink' || code) {
-                    toggleAuth('setup');
-                }
+            if (event === 'SIGNED_IN' && session && isAuthCallback) {
+                toggleAuth('setup');
             }
         });
     })();
