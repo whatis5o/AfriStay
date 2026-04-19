@@ -1,5 +1,12 @@
 // auth.js — AfriStay (Email-only login & signup)
 (function () {
+    // Capture URL params immediately — Supabase clears the hash after token exchange
+    const _initSearch = new URLSearchParams(window.location.search);
+    const _initHash   = new URLSearchParams(window.location.hash.replace('#', ''));
+    const _initType   = _initSearch.get('type') || _initHash.get('type');
+    const _initCode   = _initSearch.get('code');
+    const _isAuthCallback = _initType === 'invite' || _initType === 'magiclink' || !!_initCode || !!_initHash.get('access_token');
+
     const toggleSignin    = document.getElementById('btn-signin');
     const toggleSignup    = document.getElementById('btn-signup');
     const authToggleCont  = document.getElementById('authToggleContainer');
@@ -112,14 +119,8 @@
         const client = window.supabaseClient;
         if (!client) { setTimeout(waitForSupabase, 100); return; }
 
-        const urlParams  = new URLSearchParams(window.location.search);
-        const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-        const urlType    = urlParams.get('type') || hashParams.get('type');
-        const urlCode    = urlParams.get('code');
-        const isAuthCallback = urlType === 'invite' || urlType === 'magiclink' || !!urlCode;
-
-        // Code may have already been exchanged before listener attached — check session immediately
-        if (isAuthCallback) {
+        // Check session immediately — token may already be exchanged before listener attaches
+        if (_isAuthCallback) {
             client.auth.getSession().then(({ data: { session } }) => {
                 if (session) toggleAuth('setup');
             });
@@ -127,7 +128,7 @@
 
         client.auth.onAuthStateChange(async (event, session) => {
             if (event === 'PASSWORD_RECOVERY') { toggleAuth('reset'); return; }
-            if (event === 'SIGNED_IN' && session && isAuthCallback) {
+            if (event === 'SIGNED_IN' && session && _isAuthCallback) {
                 toggleAuth('setup');
             }
         });
@@ -140,16 +141,16 @@
             .eq('id', user.id)
             .maybeSingle();
 
-        // Profile missing — trigger didn't fire at signup, create it now
+        // Profile missing — trigger didn't fire at signup, create it now (INSERT only, never overwrite existing role)
         if (!profile && !pErr) {
             const { data: newProfile, error: insertErr } = await client
                 .from('profiles')
-                .upsert({
+                .insert({
                     id:        user.id,
                     email:     user.email,
                     full_name: user.user_metadata?.full_name || '',
-                    role:      user.user_metadata?.role === 'owner' ? 'owner' : 'user',
-                }, { onConflict: 'id' })
+                    role:      'user',
+                })
                 .select('full_name, role, banned, email')
                 .maybeSingle();
             if (insertErr) { showError('Could not set up your profile. Please contact support.'); return; }
@@ -176,8 +177,9 @@
         localStorage.setItem('afriStay_role', role);
         localStorage.setItem('afriStay_firstName', firstName);
 
+        const dest = role === 'admin' ? '/Dashboards/Admin/' : role === 'owner' ? '/Dashboards/Owner/' : '/Dashboards/Profile/';
         showSuccess('Welcome back, ' + firstName + '! Redirecting...');
-        setTimeout(() => { window.location.href = '/'; }, 1000);
+        setTimeout(() => { window.location.href = dest; }, 1000);
     }
 
     authForm.addEventListener('submit', async (e) => {

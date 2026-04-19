@@ -203,9 +203,9 @@
     <!-- Immediate role guard — runs before anything renders -->
     <script>
         (function(){
-            var r = localStorage.getItem('afriStay_role');
-            if (r === 'owner') { window.location.replace('/Dashboards/Owner/'); }
-            else if (r && r !== 'admin') { window.location.replace('/'); }
+            // Only hard-block if no session at all — role check is done by admin.js after DB verify
+            var hasSession = Object.keys(localStorage).some(function(k){ return k.startsWith('sb-') && k.endsWith('-auth-token'); });
+            if (!hasSession) { window.location.replace('/Auth/?redirect=' + encodeURIComponent(window.location.href)); }
         })();
     </script>
 </head>
