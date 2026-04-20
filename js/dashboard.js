@@ -5158,11 +5158,9 @@ async function loadNewBookings(page = 0) {
             const pmLabel = (b.payment_method || '').replace(/_/g,' ').replace(/\b\w/g, c=>c.toUpperCase()) || 'Pay on Arrival';
             const row = document.createElement('div');
             row.style.cssText = 'background:#fff;border-radius:14px;padding:18px 20px;margin-bottom:12px;display:flex;align-items:center;gap:16px;box-shadow:0 3px 12px rgba(0,0,0,0.07);flex-wrap:wrap;border-left:4px solid #f39c12;';
-            const actionBtns = isAdmin
-                ? '<div style="display:flex;gap:8px;">' +
+            const actionBtns = '<div style="display:flex;gap:8px;">' +
                   '<button onclick="approveBooking(\'' + b.id + '\')" style="background:#e8f8f0;color:#27ae60;border:1px solid #b8e6ce;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-check"></i> Approve</button>' +
-                  '<button onclick="rejectBooking(\'' + b.id + '\')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-xmark"></i> Reject</button></div>'
-                : '<span style="font-size:11px;font-weight:700;background:#fff8e1;color:#c47f2a;padding:4px 10px;border-radius:20px;border:1px solid #f5cc6e;">Awaiting Approval</span>';
+                  '<button onclick="rejectBooking(\'' + b.id + '\')" style="background:#fde8e8;color:#e74c3c;border:1px solid #f5c6c6;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;"><i class="fa-solid fa-xmark"></i> Reject</button></div>';
             row.innerHTML =
                 '<div style="flex:1;min-width:160px;">' +
                 '<p style="font-size:14px;font-weight:700;color:#1a1a1a;margin:0 0 3px;">' + escapeHtml(lstM[b.listing_id]||'Unknown listing') + '</p>' +

@@ -234,7 +234,7 @@ async function doApprove(sb: ReturnType<typeof createClient>, bookingId: string)
     }
 
     paymentUrl = invoice.payment_url;
-    await sb.from('bookings').update({ irembo_reference: invoice.invoice_number }).eq('id', bookingId);
+    await sb.from('bookings').update({ irembo_reference: invoice.invoice_number, payment_link_url: invoice.payment_url }).eq('id', bookingId);
   }
 
   if (guestEmail && paymentUrl) {

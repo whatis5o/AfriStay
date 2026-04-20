@@ -177,7 +177,17 @@
         localStorage.setItem('afriStay_role', role);
         localStorage.setItem('afriStay_firstName', firstName);
 
-        const dest = role === 'admin' ? '/Dashboards/Admin/' : role === 'owner' ? '/Dashboards/Owner/' : '/Dashboards/Profile/';
+        // Go back to where they were — ?redirect= param, then referrer, then home
+        const params   = new URLSearchParams(window.location.search);
+        const redirect = params.get('redirect');
+        const referrer = document.referrer;
+        const siteOrigin = (typeof CONFIG !== 'undefined' && CONFIG.SITE_URL) ? CONFIG.SITE_URL : window.location.origin;
+        let dest = '/';
+        if (redirect && redirect.startsWith('/')) {
+            dest = redirect;
+        } else if (referrer && referrer.startsWith(siteOrigin) && !referrer.includes('/Auth/')) {
+            dest = referrer.replace(siteOrigin, '');
+        }
         showSuccess('Welcome back, ' + firstName + '! Redirecting...');
         setTimeout(() => { window.location.href = dest; }, 1000);
     }

@@ -179,7 +179,7 @@ async function loadActiveBookings() {
 
     const { data, error } = await _sb
         .from('bookings')
-        .select('id, listing_id, start_date, end_date, total_amount, status, payment_method, created_at, payment_deadline')
+        .select('id, listing_id, start_date, end_date, total_amount, status, payment_method, payment_status, payment_link_url, created_at, payment_deadline')
         .eq('user_id', _user.id)
         .in('status', ['pending', 'awaiting_approval', 'approved', 'confirmed'])
         .order('created_at', { ascending: false });
@@ -323,6 +323,11 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
             ? `<button class="cancel-booking-btn" onclick="event.stopPropagation();cancelBooking('${b.id}',this)"><i class="fa-solid fa-xmark"></i> Cancel</button>`
             : '';
 
+        const needsPay = b.status === 'approved' && b.payment_status !== 'paid' && b.payment_link_url;
+        const payBtnHtml = needsPay
+            ? `<a class="pay-now-btn" href="${esc(b.payment_link_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"><i class="fa-solid fa-credit-card"></i> Pay Now</a>`
+            : '';
+
         const viewBtnHtml = `<a class="booking-view-btn" href="/Listings/Detail/?id=${b.listing_id}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i> View</a>`;
 
         // Use div (not <a>) so button clicks don't accidentally navigate
@@ -345,6 +350,7 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
                     <div class="booking-price">${priceFmt} <span>${currency}</span></div>
                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                         ${viewBtnHtml}
+                        ${payBtnHtml}
                         ${receiptBtnHtml}
                         ${cancelBtnHtml}
                         <span class="status-pill status-${b.status}" id="pill-${b.id}">${statusLabel}</span>
