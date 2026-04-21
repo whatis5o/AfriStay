@@ -640,7 +640,7 @@ serve(async (req) => {
 
     // ── custom ────────────────────────────────────────────────────
     } else if (type === 'custom') {
-      const { to, subject, body: emailBody, sender_name, sender_email, sender_title, sender_phone, attachment } = body;
+      const { to, subject, body: emailBody, sender_name, sender_email, sender_title, sender_phone, attachments, attachment } = body;
       if (!to || !subject || !emailBody) return json({ error: 'Missing fields: to, subject, body' }, 400);
 
       const payload: any = {
@@ -649,9 +649,16 @@ serve(async (req) => {
         subject,
         html:    customEmailHtml({ subject, body: emailBody, sender_name, sender_email, sender_title, sender_phone }),
       };
-      if (attachment?.filename && attachment?.content) {
-        payload.attachments = [{ filename: attachment.filename, content: attachment.content }];
+
+      // Support both legacy single attachment and new multi-attachment array
+      const attachList: { filename: string; content: string; content_type?: string }[] = [];
+      if (Array.isArray(attachments)) {
+        attachments.forEach((a: any) => { if (a?.filename && a?.content) attachList.push({ filename: a.filename, content: a.content, content_type: a.content_type }); });
+      } else if (attachment?.filename && attachment?.content) {
+        attachList.push({ filename: attachment.filename, content: attachment.content, content_type: attachment.content_type });
       }
+      if (attachList.length) payload.attachments = attachList;
+
       const result = await sendEmail(RESEND_API_KEY, payload);
       return json({ ok: true, id: result.id });
 

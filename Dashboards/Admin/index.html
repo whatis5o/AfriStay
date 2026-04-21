@@ -573,9 +573,9 @@
                             <textarea class="fi" id="customBody" style="min-height:160px;resize:vertical;" placeholder="Write your message here..."></textarea>
                         </div>
                         <div class="fg">
-                            <label>Attachment <span style="font-size:11px;color:#aaa;font-weight:400;">(optional — PDF, image, Word, etc. Max 10 MB)</span></label>
-                            <input type="file" id="customAttachment" class="fi" style="padding:8px 12px;cursor:pointer;" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp">
-                            <div id="attachmentPreview" style="margin-top:6px;font-size:12px;color:#888;"></div>
+                            <label>Attachments <span style="font-size:11px;color:#aaa;font-weight:400;">(optional — PDF, image, Word, etc. Max 10 MB each, up to 5 files)</span></label>
+                            <input type="file" id="customAttachment" class="fi" style="padding:8px 12px;cursor:pointer;" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp" multiple>
+                            <div id="attachmentPreview" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
                         </div>
                         <button class="btn-p" id="sendCustomBtn" onclick="sendCustomEmail()">
                             <i class="fa-solid fa-paper-plane"></i> Send Email

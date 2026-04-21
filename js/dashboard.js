@@ -4670,19 +4670,21 @@ async function sendOwnerInvite() {
 window.sendOwnerInvite = sendOwnerInvite;
 
 async function sendCustomEmail() {
-    const btn      = document.getElementById('sendCustomBtn');
-    const statusEl = document.getElementById('customEmailStatus');
-    const to       = document.getElementById('customTo')?.value.trim();
-    const subject  = document.getElementById('customSubject')?.value.trim();
-    const body     = document.getElementById('customBody')?.value.trim();
+    const btn       = document.getElementById('sendCustomBtn');
+    const statusEl  = document.getElementById('customEmailStatus');
+    const to        = document.getElementById('customTo')?.value.trim();
+    const subject   = document.getElementById('customSubject')?.value.trim();
+    const body      = document.getElementById('customBody')?.value.trim();
     const fileInput = document.getElementById('customAttachment');
-    const file     = fileInput?.files?.[0] || null;
+    const files     = Array.from(fileInput?.files || []);
 
     if (!to)      { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a recipient email.</p>'; return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(to)) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a valid email address (e.g. name@example.com).</p>'; return; }
     if (!subject) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a subject.</p>'; return; }
     if (!body)    { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please write a message body.</p>'; return; }
-    if (file && file.size > 10 * 1024 * 1024) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Attachment must be under 10 MB.</p>'; return; }
+    if (files.length > 5) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Max 5 attachments at a time.</p>'; return; }
+    const oversized = files.find(f => f.size > 10 * 1024 * 1024);
+    if (oversized) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">"' + escapeHtml(oversized.name) + '" exceeds 10 MB limit.</p>'; return; }
 
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending…'; }
     if (statusEl) statusEl.innerHTML = '';
@@ -4691,17 +4693,19 @@ async function sendCustomEmail() {
         const { data: { session } } = await _supabase.auth.getSession();
         if (!session) throw new Error('Not logged in');
 
-        // Read file as base64 if provided
-        let attachment = null;
-        if (file) {
-            const base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload  = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-            attachment = { filename: file.name, content: base64 };
-        }
+        // Read all files as base64, preserving content_type for Resend
+        const toBase64 = file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUrl     = reader.result;
+                const contentType = dataUrl.split(';')[0].split(':')[1] || 'application/octet-stream';
+                const content     = dataUrl.split(',')[1];
+                resolve({ filename: file.name, content, content_type: contentType });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+        const attachments = files.length ? await Promise.all(files.map(toBase64)) : [];
 
         const res = await fetch(CONFIG.FUNCTIONS_BASE + '/send-email', {
             method:  'POST',
@@ -4715,7 +4719,7 @@ async function sendCustomEmail() {
                 to,
                 subject,
                 body,
-                attachment,
+                attachments,
                 sender_name:  CURRENT_PROFILE?.full_name || 'AfriStay Team',
                 sender_email: CURRENT_PROFILE?.email || 'team@afristay.rw',
                 sender_title: localStorage.getItem('afristay_sender_title') || 'AfriStay Team',
@@ -4729,7 +4733,7 @@ async function sendCustomEmail() {
         toast('Email sent to ' + to + '!', 'success');
         ['customTo','customSubject','customBody'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
         if (fileInput) fileInput.value = '';
-        const prev = document.getElementById('attachmentPreview'); if (prev) prev.textContent = '';
+        const prev = document.getElementById('attachmentPreview'); if (prev) prev.innerHTML = '';
     } catch (err) {
         if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">' + sanitizeError(err) + '</p>';
         toast(sanitizeError(err), 'error');
@@ -4738,20 +4742,21 @@ async function sendCustomEmail() {
     }
 }
 
-// Show filename preview when file is selected
+// Show file chips preview when files are selected
 document.addEventListener('change', function(e) {
     if (e.target.id !== 'customAttachment') return;
-    const file = e.target.files?.[0];
-    const prev = document.getElementById('attachmentPreview');
+    const files = Array.from(e.target.files || []);
+    const prev  = document.getElementById('attachmentPreview');
     if (!prev) return;
-    if (file) {
-        const size = file.size < 1024 * 1024
-            ? (file.size / 1024).toFixed(1) + ' KB'
-            : (file.size / (1024 * 1024)).toFixed(1) + ' MB';
-        prev.innerHTML = '<i class="fa-solid fa-paperclip" style="margin-right:4px;color:#EB6753;"></i>' + escapeHtml(file.name) + ' <span style="color:#ccc;">(' + size + ')</span>';
-    } else {
-        prev.textContent = '';
-    }
+    if (!files.length) { prev.innerHTML = ''; return; }
+    const fmtSize = s => s < 1024 * 1024 ? (s/1024).toFixed(1) + ' KB' : (s/(1024*1024)).toFixed(1) + ' MB';
+    prev.innerHTML = files.map(f =>
+        '<span style="display:inline-flex;align-items:center;gap:5px;background:#fff0ee;color:#EB6753;border:1px solid #f5c6bc;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;">' +
+        '<i class="fa-solid fa-paperclip" style="font-size:10px;"></i>' +
+        escapeHtml(f.name) +
+        '<span style="color:#ccc;font-weight:400;">(' + fmtSize(f.size) + ')</span>' +
+        '</span>'
+    ).join('');
 });
 window.sendCustomEmail = sendCustomEmail;
 
