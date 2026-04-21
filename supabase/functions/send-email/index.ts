@@ -31,6 +31,7 @@ const CAT: Record<string, string> = {
 
 async function sendEmail(apiKey: string, payload: {
   from: string; to: string; subject: string; html: string;
+  attachments?: { filename: string; content: string }[];
 }) {
   const res = await fetch('https://api.resend.com/emails', {
     method:  'POST',
@@ -255,7 +256,7 @@ function bookingRequestHtml(p: {
       <p style="margin:0 0 10px;font-size:11px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:1px;">Owner to Contact</p>
       <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#1a1a1a;">${p.owner_name}</p>
       ${p.owner_email ? `<a href="mailto:${p.owner_email}" style="color:#EB6753;font-size:13px;text-decoration:none;display:block;">${p.owner_email}</a>` : ''}
-      ${p.owner_phone ? `<p style="margin:4px 0 0;font-size:13px;color:#555;">📞 ${p.owner_phone}</p>` : ''}
+      ${p.owner_phone ? `<p style="margin:4px 0 0;font-size:13px;color:#555;">${p.owner_phone}</p>` : ''}
       <p style="margin:12px 0 0;font-size:13px;color:#92400e;line-height:1.6;">
         <strong>Action needed:</strong> Please contact the owner and remind them to respond to this booking request as soon as possible. The booking expires in 12 hours.
       </p>
@@ -639,15 +640,19 @@ serve(async (req) => {
 
     // ── custom ────────────────────────────────────────────────────
     } else if (type === 'custom') {
-      const { to, subject, body: emailBody, sender_name, sender_email, sender_title, sender_phone } = body;
+      const { to, subject, body: emailBody, sender_name, sender_email, sender_title, sender_phone, attachment } = body;
       if (!to || !subject || !emailBody) return json({ error: 'Missing fields: to, subject, body' }, 400);
 
-      const result = await sendEmail(RESEND_API_KEY, {
+      const payload: any = {
         from:    `${sender_name} via AfriStay <${sender_email}>`,
         to,
         subject,
         html:    customEmailHtml({ subject, body: emailBody, sender_name, sender_email, sender_title, sender_phone }),
-      });
+      };
+      if (attachment?.filename && attachment?.content) {
+        payload.attachments = [{ filename: attachment.filename, content: attachment.content }];
+      }
+      const result = await sendEmail(RESEND_API_KEY, payload);
       return json({ ok: true, id: result.id });
 
     // ── booking_request (single recipient) ────────────────────────
@@ -821,7 +826,7 @@ serve(async (req) => {
       const result = await sendEmail(RESEND_API_KEY, {
         from:    'AfriStay Bookings <info@afristay.rw>',
         to,
-        subject: `✅ Booking approved — ${listing_title}`,
+        subject: `Booking approved — ${listing_title}`,
         html:    bookingApprovedUserHtml({ guest_name, listing_title, start_date, end_date, nights: nights || 1, total: total || 0, currency: currency || 'RWF', booking_id, checkout_url, category_slug }),
       });
       return json({ ok: true, id: result.id });

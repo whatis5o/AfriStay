@@ -39,7 +39,7 @@
 
         // Mark hearts that are already favorited
         _syncAllHearts();
-        console.log('❤️ [FAV] Loaded', Object.keys(_favMap).length, 'favorites');
+        console.log(' [FAV] Loaded', Object.keys(_favMap).length, 'favorites');
     };
 
     /* ─────────────────────────────────────────
@@ -68,7 +68,7 @@
             const favId = _favMap[listingId];
             const { error } = await SB().from('favorites').delete().eq('id', favId).eq('user_id', _user.id);
             if (error) {
-                console.error('❌ [FAV] Remove error:', error.message);
+                console.error(' [FAV] Remove error:', error.message);
                 _setHeart(icon, true); // revert
                 showFavToast('Failed to remove: ' + error.message, 'error');
             } else {
@@ -83,7 +83,7 @@
                 .select('id')
                 .single();
             if (error) {
-                console.error('❌ [FAV] Add error:', error.message);
+                console.error(' [FAV] Add error:', error.message);
                 _setHeart(icon, false); // revert
                 showFavToast('Failed to save: ' + error.message, 'error');
             } else {

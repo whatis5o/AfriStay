@@ -42,14 +42,13 @@ function guestReceiptHtml(p: {
 
   <!-- Hero -->
   <tr><td style="background:linear-gradient(135deg,#16a34a,#15803d);padding:36px 40px;text-align:center;">
-    <div style="font-size:52px;margin-bottom:10px;">🎉</div>
     <div style="color:#fff;font-size:26px;font-weight:900;margin-bottom:6px;">You're all set!</div>
     <div style="color:rgba(255,255,255,.88);font-size:15px;line-height:1.6;">Payment received · Booking confirmed · Adventure awaits</div>
   </td></tr>
 
   <!-- Body -->
   <tr><td style="background:#fff;padding:36px 40px;">
-    <p style="margin:0 0 6px;font-size:17px;font-weight:800;color:#1a1a1a;">Hey ${p.guestName}! 👋</p>
+    <p style="margin:0 0 6px;font-size:17px;font-weight:800;color:#1a1a1a;">Hi ${p.guestName},</p>
     <p style="margin:0 0 28px;font-size:15px;color:#555;line-height:1.8;">
       Your payment went through and your stay at <strong style="color:#1a1a1a;">${p.listingTitle}</strong> is officially locked in.
       We can't wait to host you — this is going to be great!
@@ -136,14 +135,13 @@ function ownerNotificationHtml(p: {
 
   <!-- Hero -->
   <tr><td style="background:linear-gradient(135deg,#1d4ed8,#1e40af);padding:32px 40px;text-align:center;">
-    <div style="font-size:48px;margin-bottom:10px;">💰</div>
-    <div style="color:#fff;font-size:24px;font-weight:900;margin-bottom:6px;">Payment Received!</div>
+    <div style="color:#fff;font-size:24px;font-weight:900;margin-bottom:6px;">Payment Received</div>
     <div style="color:rgba(255,255,255,.88);font-size:14px;">A guest just paid for a stay at your listing</div>
   </td></tr>
 
   <!-- Body -->
   <tr><td style="background:#fff;padding:36px 40px;">
-    <p style="margin:0 0 6px;font-size:17px;font-weight:800;color:#1a1a1a;">Hi ${p.ownerName}! 👋</p>
+    <p style="margin:0 0 6px;font-size:17px;font-weight:800;color:#1a1a1a;">Hi ${p.ownerName},</p>
     <p style="margin:0 0 28px;font-size:15px;color:#555;line-height:1.8;">
       Great news — <strong>${p.guestName}</strong> just completed payment for <strong style="color:#1a1a1a;">${p.listingTitle}</strong>.
       The booking is now fully confirmed.
@@ -230,6 +228,16 @@ serve(async (req) => {
     return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } });
   }
 
+  // Block direct calls — only allow requests coming through api.afristay.rw proxy
+  const proxySecret = Deno.env.get('PROXY_SECRET');
+  if (proxySecret) {
+    const callerSecret = req.headers.get('x-afristay-proxy-secret') || '';
+    if (callerSecret !== proxySecret) {
+      console.warn('[WEBHOOK] Rejected direct call — missing or wrong proxy secret');
+      return new Response('Not Found', { status: 404 });
+    }
+  }
+
   const body      = await req.text();
   const sigHeader = req.headers.get('irembopay-signature') || '';
   const secret    = Deno.env.get('IREMBO_SECRET_KEY');
@@ -314,7 +322,7 @@ serve(async (req) => {
     await sendEmail(
       resendKey,
       guestEmail,
-      `🎉 Booking confirmed — ${listingTitle} (#${bookingRef})`,
+      `Booking confirmed — ${listingTitle} (#${bookingRef})`,
       guestReceiptHtml({
         guestName:    booking.guest_name || 'Guest',
         listingTitle,
@@ -342,7 +350,7 @@ serve(async (req) => {
       await sendEmail(
         resendKey,
         owner.email,
-        `💰 Payment received — ${listingTitle} booked by ${booking.guest_name || 'a guest'}`,
+        `Payment received — ${listingTitle} booked by ${booking.guest_name || 'a guest'}`,
         ownerNotificationHtml({
           ownerName:     owner.full_name || 'Host',
           guestName:     booking.guest_name || 'Guest',

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback — AfriStay</title>
+    <meta property="og:title" content="Share Feedback — AfriStay">
+    <meta property="og:description" content="Found a bug, have a suggestion, or something confused you? Let us know.">
+    <link rel="icon" type="image/x-icon" href="/Pictures/favicon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary:#EB6753; --ps:#fff0ee; }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body { font-family:'Inter',sans-serif; background:#f5f6fa; min-height:100vh; display:flex; flex-direction:column; }
+
+        /* NAV */
+        nav { background:#fff; border-bottom:1px solid #f0f0f0; padding:0 24px; height:60px; display:flex; align-items:center; justify-content:space-between; }
+        .nav-logo img { height:26px; }
+        .nav-links { display:flex; gap:16px; align-items:center; }
+        .nav-links a { font-size:13px; font-weight:600; color:#555; text-decoration:none; transition:color .2s; }
+        .nav-links a:hover { color:var(--primary); }
+        .btn-nav { background:var(--primary); color:#fff; padding:8px 18px; border-radius:10px; font-size:13px; font-weight:700; text-decoration:none; transition:opacity .2s; }
+        .btn-nav:hover { opacity:.88; color:#fff; }
+
+        /* HERO */
+        .hero { text-align:center; padding:60px 20px 40px; }
+        .hero-icon { width:72px; height:72px; background:var(--ps); border-radius:20px; display:inline-flex; align-items:center; justify-content:center; font-size:32px; color:var(--primary); margin-bottom:20px; }
+        .hero h1 { font-size:32px; font-weight:800; color:#1a1a1a; margin-bottom:10px; }
+        .hero p { font-size:15px; color:#888; max-width:500px; margin:0 auto; line-height:1.7; }
+
+        /* FORM */
+        .form-wrap { max-width:620px; margin:0 auto 60px; padding:0 20px; }
+        .card { background:#fff; border-radius:20px; padding:32px; box-shadow:0 2px 20px rgba(0,0,0,.07); }
+
+        /* TYPE SELECTOR */
+        .type-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:24px; }
+        .type-btn { border:2px solid #ebebeb; background:#fff; border-radius:14px; padding:14px 8px; cursor:pointer; text-align:center; transition:all .2s; font-family:'Inter',sans-serif; }
+        .type-btn:hover { border-color:var(--primary); background:var(--ps); }
+        .type-btn.active { border-color:var(--primary); background:var(--ps); }
+        .type-btn i { display:block; font-size:22px; margin-bottom:6px; color:#bbb; transition:color .2s; }
+        .type-btn.active i, .type-btn:hover i { color:var(--primary); }
+        .type-btn span { font-size:12px; font-weight:700; color:#555; display:block; }
+        .type-btn.active span { color:var(--primary); }
+
+        .fg { display:flex; flex-direction:column; gap:6px; margin-bottom:18px; }
+        .fg label { font-size:11px; font-weight:700; color:#bbb; text-transform:uppercase; letter-spacing:.6px; }
+        .fi { width:100%; padding:12px 14px; border:1.5px solid #e8e8e8; border-radius:11px; font-size:14px; font-family:'Inter',sans-serif; outline:none; transition:border-color .2s; background:#fff; color:#1a1a1a; }
+        .fi:focus { border-color:var(--primary); }
+        textarea.fi { min-height:120px; resize:vertical; }
+
+        .g2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+        .btn-submit { width:100%; padding:16px; background:var(--primary); color:#fff; border:none; border-radius:12px; font-size:16px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer; transition:all .2s; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:8px; }
+        .btn-submit:hover { opacity:.88; transform:translateY(-1px); }
+        .btn-submit:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+
+        #formStatus { margin-top:14px; padding:12px 16px; border-radius:10px; font-size:13px; font-weight:600; display:none; }
+        #formStatus.success { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+        #formStatus.error   { background:#fdf0f0; color:#991b1b; border:1px solid #fecaca; }
+
+        /* SUCCESS STATE */
+        #successState { display:none; text-align:center; padding:40px 20px; }
+        .success-icon { width:72px; height:72px; background:#f0fdf4; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:32px; color:#27ae60; margin-bottom:20px; }
+        #successState h2 { font-size:24px; font-weight:800; color:#1a1a1a; margin-bottom:10px; }
+        #successState p { font-size:14px; color:#888; line-height:1.7; margin-bottom:24px; }
+        .btn-back { display:inline-flex; align-items:center; gap:8px; padding:12px 24px; background:var(--primary); color:#fff; border-radius:12px; font-size:14px; font-weight:700; text-decoration:none; transition:opacity .2s; }
+        .btn-back:hover { opacity:.88; }
+
+        @media(max-width:500px) {
+            .type-grid { grid-template-columns:repeat(2,1fr); }
+            .g2 { grid-template-columns:1fr; }
+            .hero h1 { font-size:24px; }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <a href="/" class="nav-logo"><img src="/Pictures/light-afri1.png" alt="AfriStay"></a>
+    <div class="nav-links">
+        <a href="/Listings/">Browse</a>
+        <a href="/contact.html">Contact</a>
+        <a href="/Auth/" class="btn-nav">Sign In</a>
+    </div>
+</nav>
+
+<div class="hero">
+    <div class="hero-icon"><i class="fa-solid fa-comments"></i></div>
+    <h1>Share Your Feedback</h1>
+    <p>Found something broken? Have a suggestion? Something confused you? We read every submission and use it to improve AfriStay.</p>
+</div>
+
+<div class="form-wrap">
+    <div class="card">
+        <div id="formState">
+            <!-- Type selector -->
+            <div class="fg">
+                <label>What kind of feedback is this?</label>
+                <div class="type-grid">
+                    <button type="button" class="type-btn active" data-type="bug" onclick="selectType(this,'bug')">
+                        <i class="fa-solid fa-bug"></i><span>Bug</span>
+                    </button>
+                    <button type="button" class="type-btn" data-type="suggestion" onclick="selectType(this,'suggestion')">
+                        <i class="fa-solid fa-lightbulb"></i><span>Suggestion</span>
+                    </button>
+                    <button type="button" class="type-btn" data-type="confusion" onclick="selectType(this,'confusion')">
+                        <i class="fa-solid fa-circle-question"></i><span>Confusion</span>
+                    </button>
+                    <button type="button" class="type-btn" data-type="other" onclick="selectType(this,'other')">
+                        <i class="fa-solid fa-comment"></i><span>Other</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="fg">
+                <label id="descLabel">Describe the bug *</label>
+                <textarea class="fi" id="feedbackDesc" placeholder="What happened? What did you expect to happen?" required></textarea>
+            </div>
+
+            <!-- Page URL -->
+            <div class="fg">
+                <label>Which page were you on? <span style="font-weight:400;color:#bbb;">(optional)</span></label>
+                <input type="text" class="fi" id="feedbackPage" placeholder="e.g. /Listings/Checkout or just describe the page">
+            </div>
+
+            <!-- Name + Email -->
+            <div class="g2">
+                <div class="fg">
+                    <label>Your Name <span style="font-weight:400;color:#bbb;">(optional)</span></label>
+                    <input type="text" class="fi" id="feedbackName" placeholder="John Doe">
+                </div>
+                <div class="fg">
+                    <label>Email <span style="font-weight:400;color:#bbb;">(optional — for follow-up)</span></label>
+                    <input type="email" class="fi" id="feedbackEmail" placeholder="you@example.com">
+                </div>
+            </div>
+
+            <div id="formStatus"></div>
+
+            <button class="btn-submit" id="submitBtn" onclick="submitFeedback()">
+                <i class="fa-solid fa-paper-plane"></i> Submit Feedback
+            </button>
+        </div>
+
+        <div id="successState">
+            <div class="success-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <h2>Feedback received!</h2>
+            <p>Thank you for taking the time. Our team will review it and use it to improve AfriStay. If you left your email we may follow up.</p>
+            <a href="/" class="btn-back"><i class="fa-solid fa-arrow-left"></i> Back to AfriStay</a>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
+<script>
+let _selectedType = 'bug';
+
+function selectType(btn, type) {
+    _selectedType = type;
+    document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const labels = { bug: 'Describe the bug *', suggestion: 'Your suggestion *', confusion: 'What confused you? *', other: 'Your message *' };
+    const placeholders = {
+        bug: 'What happened? What did you expect to happen? Steps to reproduce?',
+        suggestion: 'What would you like AfriStay to add or improve?',
+        confusion: "What didn't make sense? Where did you get lost?",
+        other: 'Tell us anything on your mind...'
+    };
+    const lbl = document.getElementById('descLabel');
+    const ta  = document.getElementById('feedbackDesc');
+    if (lbl) lbl.textContent = labels[type] || 'Description *';
+    if (ta)  ta.placeholder  = placeholders[type] || '';
+}
+
+async function submitFeedback() {
+    const desc  = (document.getElementById('feedbackDesc')?.value || '').trim();
+    const page  = (document.getElementById('feedbackPage')?.value || '').trim();
+    const name  = (document.getElementById('feedbackName')?.value || '').trim();
+    const email = (document.getElementById('feedbackEmail')?.value || '').trim();
+    const btn   = document.getElementById('submitBtn');
+    const stat  = document.getElementById('formStatus');
+
+    if (!desc) {
+        stat.className = 'error'; stat.style.display = 'block';
+        stat.textContent = 'Please describe your feedback before submitting.';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending...';
+    stat.style.display = 'none';
+
+    const client = window.supabaseClient;
+    if (!client) {
+        stat.className = 'error'; stat.style.display = 'block';
+        stat.textContent = 'Connection error. Please refresh and try again.';
+        btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Feedback';
+        return;
+    }
+
+    try {
+        const { error } = await client.from('feedback').insert({
+            type:        _selectedType,
+            description: desc,
+            page_url:    page || window.document.referrer || null,
+            user_name:   name  || null,
+            user_email:  email || null,
+        });
+
+        if (error) throw error;
+
+        document.getElementById('formState').style.display   = 'none';
+        document.getElementById('successState').style.display = 'block';
+    } catch(err) {
+        stat.className = 'error'; stat.style.display = 'block';
+        stat.textContent = 'Something went wrong: ' + err.message + '. Try again.';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Feedback';
+    }
+}
+
+// Pre-fill page URL from referrer
+window.addEventListener('DOMContentLoaded', () => {
+    const pageInput = document.getElementById('feedbackPage');
+    if (pageInput && document.referrer && document.referrer.includes(location.hostname)) {
+        pageInput.value = new URL(document.referrer).pathname;
+    }
+
+    // supabaseClient is set by config.js automatically
+});
+</script>
+</body>
+</html>

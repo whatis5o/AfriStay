@@ -14,7 +14,7 @@ let _user = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
     _sb = window.supabaseClient;
-    if (!_sb) { console.error('❌ [FAV] Supabase client missing'); return; }
+    if (!_sb) { console.error(' [FAV] Supabase client missing'); return; }
 
     // ── Auth guard ──
     const { data: { user } } = await _sb.auth.getUser();
@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
     _user = user;
-    console.log('✅ [FAV] Logged in:', user.email);
+    console.log(' [FAV] Logged in:', user.email);
 
     // Update nav
     const authBtn = document.getElementById('auth-btn');
@@ -48,7 +48,7 @@ const FAV_PAGE_SIZE = 15;
 
 /* ── LOAD FAVORITES ── */
 async function loadFavorites(page = 0) {
-    console.log('❤️ [FAV] Fetching favorites page', page);
+    console.log(' [FAV] Fetching favorites page', page);
 
     const start = page * FAV_PAGE_SIZE, end = start + FAV_PAGE_SIZE - 1;
 
@@ -61,7 +61,7 @@ async function loadFavorites(page = 0) {
         .range(start, end);
 
     if (favErr) {
-        console.error('❌ [FAV] Error fetching favorites:', favErr.message);
+        console.error(' [FAV] Error fetching favorites:', favErr.message);
         showError('Could not load your favorites. ' + favErr.message);
         return;
     }
@@ -80,7 +80,7 @@ async function loadFavorites(page = 0) {
         .select('id, title, price, price_display, price_outside_kigali_display, currency, availability_status, category_slug, address, province_id, district_id, owner_id')
         .in('id', listingIds);
 
-    if (listErr) { console.error('❌ [FAV] Listings error:', listErr.message); showError(listErr.message); return; }
+    if (listErr) { console.error(' [FAV] Listings error:', listErr.message); showError(listErr.message); return; }
 
     // 3. Fetch images from table
     const imgMap = await resolveImages(listingIds);
@@ -209,7 +209,7 @@ async function loadFavorites(page = 0) {
         renderPagination('favPagination', page, pageCount, favCount, FAV_PAGE_SIZE, (p) => loadFavorites(p));
     }
 
-    console.log('✅ [FAV] Favorites rendered:', favRows.length);
+    console.log(' [FAV] Favorites rendered:', favRows.length);
 }
 
 /* ── REMOVE FAVORITE ── */
@@ -226,7 +226,7 @@ window.removeFavorite = async function(e, favId, listingId) {
         .eq('user_id', _user.id);
 
     if (error) {
-        console.error('❌ [FAV] Remove error:', error.message);
+        console.error(' [FAV] Remove error:', error.message);
         showToast('Failed to remove: ' + error.message, 'error');
         if (btn) { btn.classList.remove('removing'); btn.innerHTML = '<i class="fa-solid fa-heart-crack"></i> Remove'; }
         return;
@@ -249,7 +249,7 @@ window.removeFavorite = async function(e, favId, listingId) {
     }
 
     showToast('Removed from favorites.', 'success');
-    console.log('✅ [FAV] Removed favorite:', favId);
+    console.log(' [FAV] Removed favorite:', favId);
 
     // Update count badge
     const countEl = document.getElementById('favCount');

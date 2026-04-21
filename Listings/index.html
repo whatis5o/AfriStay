@@ -723,7 +723,7 @@
                         const file = (files || []).find(f => f.name && !f.id?.endsWith('/'));
                         if (file) {
                             imgMap[id] = STORAGE_BASE + '/listing-images/' + id + '/' + file.name;
-                            console.log('  ✅ [LISTINGS] Storage img found:', id, file.name);
+                            console.log('   [LISTINGS] Storage img found:', id, file.name);
                         }
                     } catch(e) {}
                 }));

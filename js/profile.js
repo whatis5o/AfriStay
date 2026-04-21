@@ -25,7 +25,7 @@ let _profile = null;
    ══════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', async () => {
     _sb = window.supabaseClient;
-    if (!_sb) { console.error('❌ [PROFILE] No Supabase client'); return; }
+    if (!_sb) { console.error(' [PROFILE] No Supabase client'); return; }
 
     // ── Auth guard ──
     const { data: { user } } = await _sb.auth.getUser();
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
     _user = user;
-    console.log('✅ [PROFILE] Logged in as', user.email);
+    console.log(' [PROFILE] Logged in as', user.email);
 
     // ── Load profile ──
     const { data: prof } = await _sb
@@ -489,7 +489,7 @@ window.saveProfile = async function() {
         updateSidebar();
 
     } catch (err) {
-        console.error('❌ [PROFILE] Save error:', err);
+        console.error(' [PROFILE] Save error:', err);
         toast('Failed to save: ' + err.message, 'error');
     }
 
@@ -573,7 +573,7 @@ window.handleLogout = async function() {
     await _sb.auth.signOut();
     localStorage.removeItem('afriStay_role');
     localStorage.removeItem('afriStay_firstName');
-    toast('Logged out. See you soon! 👋', 'success');
+    toast('Logged out. See you soon! ', 'success');
     setTimeout(() => window.location.href = '/', 1500);
 };
 
@@ -692,7 +692,7 @@ window.downloadReceipt = async function(bookingId) {
 
         secHead(isVeh ? 'VEHICLE' : 'PROPERTY');
         doc.setTextColor(20,20,20); doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.text(l?.title || '—', M, y); y += 7;
-        doc.setTextColor(100,100,100); doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.text('📍 ' + loc, M, y); y += 14;
+        doc.setTextColor(100,100,100); doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.text(' ' + loc, M, y); y += 14;
 
         secHead('BOOKING DETAILS');
         row(isVeh ? 'Pick-up Date' : 'Check-in',   fmt(b.start_date));
@@ -729,10 +729,10 @@ window.downloadReceipt = async function(bookingId) {
         doc.text('© ' + new Date().getFullYear() + ' AfriStay · afristay.rw', W/2, pH-8, { align: 'center' });
 
         doc.save(`AfriStay-Receipt-${receiptNo}.pdf`);
-        toast('📄 Receipt downloaded!', 'success');
+        toast(' Receipt downloaded!', 'success');
 
     } catch (err) {
-        console.error('❌ [RECEIPT] Error:', err);
+        console.error(' [RECEIPT] Error:', err);
         toast('Could not generate receipt: ' + err.message, 'error');
     }
 };
@@ -833,7 +833,7 @@ window.cancelBooking = async function(bookingId, btn) {
         .eq('user_id', _user.id);  // safety: only cancel own bookings
 
     if (error) {
-        console.error('❌ [CANCEL] Error:', error.message);
+        console.error(' [CANCEL] Error:', error.message);
         toast('Failed to cancel: ' + error.message, 'error');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-xmark"></i> Cancel';
@@ -858,7 +858,7 @@ window.cancelBooking = async function(bookingId, btn) {
     }
 
     toast('Booking cancelled.', 'success');
-    console.log('✅ [CANCEL] Booking cancelled:', bookingId);
+    console.log(' [CANCEL] Booking cancelled:', bookingId);
 };
 /* ══════════════════════════════════════════════
    OWNER APPLICATION

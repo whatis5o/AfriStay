@@ -45,7 +45,7 @@ function getListingLabels(categorySlug) {
         thing:       isVeh ? 'vehicle' : 'property',
         verb:        isVeh ? 'rented'  : 'stayed at',
         reviewVerb:  isVeh ? 'rented this vehicle' : 'stayed here',
-        icon:        isVeh ? '🚗'      : '🏠',
+        icon:        isVeh ? ''      : '',
         priceLabel:  isVeh ? '/day'    : '/night',
     };
 }
@@ -116,4 +116,4 @@ window.renderPagination = renderPagination;
 
 // Maintenance check is handled by js/maintenance.js (loaded on every page)
 
-console.log("✅ [UTILS] Utilities loaded");
+console.log(" [UTILS] Utilities loaded");

@@ -158,7 +158,7 @@ body{font-family:'Sora',sans-serif;background:var(--bg);min-height:100vh;color:v
 </nav>
 
 <div class="ticker-bar" aria-hidden="true">
-  <span class="ticker-inner">⚠&nbsp; PAYMENT SERVICES NOT AVAILABLE YET &nbsp;&nbsp;|&nbsp;&nbsp; LAUNCHING SOON &nbsp;&nbsp;|&nbsp;&nbsp; STAY TUNED &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ⚠&nbsp; PAYMENT SERVICES NOT AVAILABLE YET &nbsp;&nbsp;|&nbsp;&nbsp; LAUNCHING SOON &nbsp;&nbsp;|&nbsp;&nbsp; STAY TUNED &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+  <span class="ticker-inner">!&nbsp; PAYMENT SERVICES NOT AVAILABLE YET &nbsp;&nbsp;|&nbsp;&nbsp; LAUNCHING SOON &nbsp;&nbsp;|&nbsp;&nbsp; STAY TUNED &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; !&nbsp; PAYMENT SERVICES NOT AVAILABLE YET &nbsp;&nbsp;|&nbsp;&nbsp; LAUNCHING SOON &nbsp;&nbsp;|&nbsp;&nbsp; STAY TUNED &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
 </div>
 
 <div class="page" id="mainPage">
@@ -555,7 +555,7 @@ async function pay() {
     showConfirmation(data.booking_id || data.id, iremboRef);
 
   } catch(err) {
-    console.error('❌ [CHECKOUT]', err.message);
+    console.error(' [CHECKOUT]', err.message);
     showErr(err.message || 'Something went wrong. Please try again.');
     setBusy(false);
   }

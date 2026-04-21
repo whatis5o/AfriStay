@@ -308,6 +308,18 @@
             <!-- Wallet status notice -->
             <div id="earningsWalletNotice" style="margin-bottom:20px;"></div>
 
+            <!-- Earnings chart -->
+            <div class="data-section" style="margin-bottom:20px;">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-chart-bar" style="color:var(--primary);margin-right:8px;"></i>Monthly Earnings (Last 6 Months)</h2>
+                </div>
+                <div class="sec-body">
+                    <div style="position:relative;height:220px;">
+                        <canvas id="ownerEarningsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
             <!-- Payout history -->
             <div class="data-section">
                 <div class="sec-head">
@@ -484,6 +496,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="/js/config.js"></script>
 <script src="/js/utils.js"></script>
     <script src="/js/maintenance.js"></script>
@@ -762,7 +775,7 @@ async function loadEarnings() {
 
         // Stat cards — always show a value, 0 if nothing
         const balance   = wallet?.balance ?? 0;
-        const totalPaid = payouts.filter(p => p.status === 'completed').reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        const totalPaid = payouts.filter(p => p.status === 'completed').reduce((s, p) => s + (Number(p.payout_amount) || 0), 0);
         _set('earningsBalance',  fmtMoney(balance));
         _set('earningsPaid',     fmtMoney(totalPaid));
         _set('earningsBookings', completedCount);
@@ -779,6 +792,55 @@ async function loadEarnings() {
                        <i class="fa-solid fa-triangle-exclamation"></i>
                        <span>No payout wallet set up. <a href="#" onclick="document.querySelector('[data-tab=settings]').click();return false;" style="color:#9a3412;font-weight:700;">Add payout details in Settings</a> to receive payouts.</span>
                    </div>`;
+        }
+
+        // Earnings chart — last 6 months from completed bookings
+        if (listingIds.length) {
+            const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5); sixMonthsAgo.setDate(1);
+            const { data: chartBks } = await _s.from('bookings')
+                .select('total_amount, confirmed_at, paid_at, created_at')
+                .in('listing_id', listingIds)
+                .eq('payment_status', 'paid')
+                .gte('created_at', sixMonthsAgo.toISOString());
+
+            const months = [];
+            const amounts = [];
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(); d.setMonth(d.getMonth() - i); d.setDate(1);
+                const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                const ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+                const sum = (chartBks || [])
+                    .filter(b => (b.paid_at || b.confirmed_at || b.created_at || '').slice(0,7) === ym)
+                    .reduce((s, b) => s + (Number(b.total_amount) || 0), 0);
+                months.push(label);
+                amounts.push(Math.round(sum / 1000)); // in thousands RWF
+            }
+            const canvas = document.getElementById('ownerEarningsChart');
+            if (canvas && window.Chart) {
+                if (canvas._chartInstance) canvas._chartInstance.destroy();
+                canvas._chartInstance = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: months,
+                        datasets: [{
+                            label: 'Earnings (K RWF)',
+                            data: amounts,
+                            backgroundColor: '#EB675333',
+                            borderColor: '#EB6753',
+                            borderWidth: 2,
+                            borderRadius: 8,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: '#f5f5f5' }, ticks: { callback: v => v + 'K' } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            }
         }
 
         // Payout rows

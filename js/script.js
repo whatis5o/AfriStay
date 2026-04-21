@@ -272,7 +272,7 @@ window.fetchAndRenderSharedListings = async function(options) {
         });
         refreshAllHearts();
         var found = document.querySelectorAll('.card-heart[data-lid]').length;
-        console.log('✅ [FAV] Hearts refreshed, found:', found);
+        console.log(' [FAV] Hearts refreshed, found:', found);
     }, 150);
 };
 
@@ -336,7 +336,7 @@ async function loadFavCache(sb, userId) {
         _favCache.add(r.listing_id);
         _favRowIds[r.listing_id] = r.id;
     });
-    console.log('❤️ [FAV] Loaded', _favCache.size, 'saved listings');
+    console.log(' [FAV] Loaded', _favCache.size, 'saved listings');
 }
 
 // ── set a heart button to filled or outline ──
@@ -366,7 +366,7 @@ async function initFavoriteHearts() {
     console.log('🚀 [FAV] initFavoriteHearts() called');
     var sb = window.supabaseClient;
     if (!sb) {
-        console.error('❌ [FAV] initFavoriteHearts: no Supabase client');
+        console.error(' [FAV] initFavoriteHearts: no Supabase client');
         return;
     }
     var authResult = await sb.auth.getUser().catch(function() { return { data: {} }; });
@@ -380,7 +380,7 @@ async function initFavoriteHearts() {
     }
     refreshAllHearts();
     var hearts = document.querySelectorAll('.card-heart');
-    console.log('❤️ [FAV] init: found', hearts.length, 'heart buttons on page');
+    console.log(' [FAV] init: found', hearts.length, 'heart buttons on page');
     var tagged = document.querySelectorAll('.card-heart[data-lid]');
     console.log('🏷️ [FAV] init:', tagged.length, 'hearts have data-lid tag');
 }
@@ -425,13 +425,13 @@ window.toggleFavorite = async function(event, btnEl, listingId) {
 
     var sb = window.supabaseClient;
     if (!sb) {
-        console.error('❌ [FAV] No Supabase client! Is config.js loaded before script.js?');
+        console.error(' [FAV] No Supabase client! Is config.js loaded before script.js?');
         return;
     }
-    console.log('✅ [FAV] Supabase client OK');
+    console.log(' [FAV] Supabase client OK');
 
     var authResult = await sb.auth.getUser().catch(function(e) {
-        console.error('❌ [FAV] getUser() threw:', e);
+        console.error(' [FAV] getUser() threw:', e);
         return { data: {} };
     });
     var user = authResult.data && authResult.data.user;
@@ -443,7 +443,7 @@ window.toggleFavorite = async function(event, btnEl, listingId) {
         if (hasPendingFav(listingId)) {
             removePendingFav(listingId);
             setHeartState(btn, false);
-            showFavToast('💔 Removed from saved.', 'info');
+            showFavToast(' Removed from saved.', 'info');
             console.log('🗑️ [FAV] Removed from localStorage');
         } else {
             addPendingFav(listingId);
@@ -451,10 +451,10 @@ window.toggleFavorite = async function(event, btnEl, listingId) {
             var count = getPendingFavs().length;
             var label = count === 1 ? 'favorite' : count + ' favorites';
             showFavToast(
-                '❤️ Saved! <a href="/Auth" style="color:#fff;font-weight:800;text-decoration:underline;margin-left:5px;">Sign in</a> to keep your ' + label + '.',
+                ' Saved! <a href="/Auth" style="color:#fff;font-weight:800;text-decoration:underline;margin-left:5px;">Sign in</a> to keep your ' + label + '.',
                 'warning'
             );
-            console.log('✅ [FAV] Saved to localStorage. Pending:', getPendingFavs());
+            console.log(' [FAV] Saved to localStorage. Pending:', getPendingFavs());
         }
         return;
     }
@@ -470,30 +470,30 @@ window.toggleFavorite = async function(event, btnEl, listingId) {
         var deleteResult = await sb.from('favorites').delete().eq('id', favId).eq('user_id', user.id);
         console.log('🔁 [FAV] Delete result:', deleteResult);
         if (deleteResult.error) {
-            console.error('❌ [FAV] Delete failed:', deleteResult.error);
-            showFavToast('❌ Could not remove: ' + deleteResult.error.message, 'error');
+            console.error(' [FAV] Delete failed:', deleteResult.error);
+            showFavToast(' Could not remove: ' + deleteResult.error.message, 'error');
             return;
         }
         _favCache.delete(listingId);
         delete _favRowIds[listingId];
         setHeartState(btn, false);
-        showFavToast('💔 Removed from favorites.', 'info');
-        console.log('✅ [FAV] Removed from favorites');
+        showFavToast(' Removed from favorites.', 'info');
+        console.log(' [FAV] Removed from favorites');
 
     } else {
         console.log('➕ [FAV] Not saved yet — inserting into Supabase...');
         var insertResult = await sb.from('favorites').insert({ listing_id: listingId, user_id: user.id }).select('id').single();
         console.log('🔁 [FAV] Insert result:', insertResult);
         if (insertResult.error) {
-            console.error('❌ [FAV] Insert failed:', insertResult.error);
-            showFavToast('❌ Could not save: ' + insertResult.error.message, 'error');
+            console.error(' [FAV] Insert failed:', insertResult.error);
+            showFavToast(' Could not save: ' + insertResult.error.message, 'error');
             return;
         }
         _favCache.add(listingId);
         _favRowIds[listingId] = insertResult.data.id;
         setHeartState(btn, true);
-        showFavToast('❤️ Added to favorites!', 'success');
-        console.log('✅ [FAV] Saved to Supabase! Row ID:', insertResult.data.id);
+        showFavToast(' Added to favorites!', 'success');
+        console.log(' [FAV] Saved to Supabase! Row ID:', insertResult.data.id);
     }
 };
 
@@ -509,9 +509,9 @@ window.syncPendingFavorites = async function(userId) {
     if (!result.error) {
         setPendingFavs([]);
         _favCache = null; // force reload next time
-        console.log('✅ [FAV] Sync done');
+        console.log(' [FAV] Sync done');
     } else {
-        console.error('❌ [FAV] Sync failed:', result.error.message);
+        console.error(' [FAV] Sync failed:', result.error.message);
     }
 };
 

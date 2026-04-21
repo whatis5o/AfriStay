@@ -13,13 +13,13 @@ let REVIEWS_OPEN = false; // set from platform_config key='open_reviews' value='
 
 document.addEventListener('DOMContentLoaded', async () => {
     _supabase = window.supabaseClient;
-    if (!_supabase) { console.error('❌ [DETAIL] Supabase client missing'); return; }
+    if (!_supabase) { console.error(' [DETAIL] Supabase client missing'); return; }
 
     const params = new URLSearchParams(window.location.search);
     LISTING_ID = params.get('id');
 
     if (!LISTING_ID) {
-        console.error('❌ [DETAIL] No ?id= in URL. Current URL:', window.location.href);
+        console.error(' [DETAIL] No ?id= in URL. Current URL:', window.location.href);
         showDetailError('No listing ID found. Please go back and try again.');
         return;
     }
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.body.prepend(msg);
         }
     }
-    console.log(CURRENT_USER ? `✅ [DETAIL] Logged in: ${CURRENT_USER.email}` : 'ℹ️ [DETAIL] Not logged in');
+    console.log(CURRENT_USER ? ` [DETAIL] Logged in: ${CURRENT_USER.email}` : 'ℹ️ [DETAIL] Not logged in');
     console.log(`ℹ️ [DETAIL] Reviews open: ${REVIEWS_OPEN}`);
 
     if (CURRENT_USER) {
@@ -98,7 +98,7 @@ async function loadListingDetails(today) {
     ]);
 
     if (error || !listing) {
-        console.error('❌ [DETAIL] Not found:', error?.message);
+        console.error(' [DETAIL] Not found:', error?.message);
         showDetailError('This listing could not be found.');
         return;
     }
@@ -110,12 +110,12 @@ async function loadListingDetails(today) {
     const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
     if (!isPreview) {
         if (listing.status !== 'approved') {
-            console.warn('🚫 [DETAIL] Listing not approved — redirecting');
+            console.warn(' [DETAIL] Listing not approved — redirecting');
             window.location.replace('/Listings/?msg=not_available');
             return;
         }
         if (listing.availability_status === 'unavailable') {
-            console.warn('🚫 [DETAIL] Listing unavailable — redirecting');
+            console.warn(' [DETAIL] Listing unavailable — redirecting');
             window.location.replace('/Listings/?msg=not_available');
             return;
         }
@@ -161,8 +161,8 @@ async function loadListingDetails(today) {
             const oStr = Number(oDP).toLocaleString('en-RW');
             priceEl.innerHTML =
                 '<div style="font-size:13px;line-height:2.2;">' +
-                '🏙️ Kigali: <strong>' + price + ' <small>' + currency + '</small><span style="font-size:12px;color:#bbb;font-weight:400;"> /day</span></strong><br>' +
-                '🌍 Outside Kigali: <strong>' + oStr + ' <small>' + currency + '</small><span style="font-size:12px;color:#bbb;font-weight:400;"> /day</span></strong>' +
+                ' Kigali: <strong>' + price + ' <small>' + currency + '</small><span style="font-size:12px;color:#bbb;font-weight:400;"> /day</span></strong><br>' +
+                ' Outside Kigali: <strong>' + oStr + ' <small>' + currency + '</small><span style="font-size:12px;color:#bbb;font-weight:400;"> /day</span></strong>' +
                 '</div>';
         } else if (promoData && promoData.discount) {
             const discounted = Math.round(dp * (1 - promoData.discount / 100));
@@ -205,7 +205,7 @@ async function loadListingDetails(today) {
 
     document.getElementById('skelEl').style.display = 'none';
     document.getElementById('contentEl').style.display = 'grid';
-    console.log('✅ [DETAIL] Page rendered');
+    console.log(' [DETAIL] Page rendered');
 
     _injectShareButton(LISTING_ID, listing.title);
     loadSimilarListings(listing.province_id, listing.category_slug);
@@ -435,7 +435,7 @@ async function loadReviews() {
         .eq('listing_id', LISTING_ID)
         .order('created_at', { ascending: false });
 
-    if (error) { console.error('❌ [DETAIL] Reviews error:', error.message); return; }
+    if (error) { console.error(' [DETAIL] Reviews error:', error.message); return; }
     console.log('💬 [DETAIL] ' + (reviews?.length || 0) + ' reviews');
     renderReviews(reviews || []);
 }
@@ -603,7 +603,7 @@ window.submitReview = async () => {
     const { error } = await _supabase.from('reviews').insert({ listing_id: LISTING_ID, user_id: CURRENT_USER.id, rating: selectedRating, comment: comment || null });
 
     if (error) {
-        console.error('❌ [DETAIL] Review error:', error.message);
+        console.error(' [DETAIL] Review error:', error.message);
         const isTrigger = error.message.toLowerCase().includes('approved') || error.message.toLowerCase().includes('booking');
         if (msgEl) {
             msgEl.innerHTML = isTrigger
@@ -614,7 +614,7 @@ window.submitReview = async () => {
     }
 
     showToast('Review submitted! Thank you ⭐', 'success');
-    if (msgEl) { msgEl.style.color = '#2ecc71'; msgEl.textContent = '✅ Review submitted! Thank you.'; }
+    if (msgEl) { msgEl.style.color = '#2ecc71'; msgEl.textContent = ' Review submitted! Thank you.'; }
     await loadReviews();
     const { data: updated } = await _supabase.from('listings').select('avg_rating, reviews_count').eq('id', LISTING_ID).single();
     if (updated) renderRatingBadge(updated.avg_rating, updated.reviews_count);
@@ -778,10 +778,10 @@ async function initBookingForm() {
             '<p style="font-weight:700;color:#555;margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;">Zone</p>' +
             '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:7px;">' +
             '<input type="radio" name="zone" value="kigali" checked> ' +
-            '🏙️ Within Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price_display || CURRENT_LISTING.price).toLocaleString('en-RW') + ' RWF/day</span></label>' +
+            ' Within Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price_display || CURRENT_LISTING.price).toLocaleString('en-RW') + ' RWF/day</span></label>' +
             '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
             '<input type="radio" name="zone" value="outside_kigali"> ' +
-            '🌍 Outside Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price_outside_kigali_display || CURRENT_LISTING.price_outside_kigali).toLocaleString('en-RW') + ' RWF/day</span></label>';
+            ' Outside Kigali <span style="margin-left:auto;font-weight:700;color:#EB6753;">' + Number(CURRENT_LISTING.price_outside_kigali_display || CURRENT_LISTING.price_outside_kigali).toLocaleString('en-RW') + ' RWF/day</span></label>';
         const totalEl2 = document.getElementById('bookingTotal');
         if (totalEl2) totalEl2.before(zoneEl);
         zoneEl.querySelectorAll('input[name="zone"]').forEach(r => r.addEventListener('change', calcTotal));

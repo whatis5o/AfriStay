@@ -109,7 +109,7 @@ function approvedEmail(p: {
     try { return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); }
     catch { return d; }
   };
-  const ctaLabel = p.isIrembo ? '💳 Complete Payment Now' : '✓ Confirm My Stay';
+  const ctaLabel = p.isIrembo ? ' Complete Payment Now' : '✓ Confirm My Stay';
   const ctaBg    = p.isIrembo ? '#EB6753' : '#16a34a';
   const urgency  = p.isIrembo
     ? `Complete your payment within 48 hours to lock in your booking. The payment link will expire after that.`
@@ -124,7 +124,7 @@ function approvedEmail(p: {
     <div style="color:#a6a68d;font-size:11px;margin-top:14px;letter-spacing:2.5px;text-transform:uppercase;font-weight:700;">Booking Approved</div>
   </td></tr>
   <tr><td style="background:#16a34a;padding:26px 40px;text-align:center;">
-    <div style="font-size:38px;margin-bottom:8px;">🎉</div>
+    <div style="font-size:38px;margin-bottom:8px;"></div>
     <div style="color:#fff;font-size:22px;font-weight:800;">Your Stay is Approved!</div>
     <div style="color:rgba(255,255,255,.85);font-size:14px;margin-top:6px;">${p.isIrembo ? 'Complete payment to confirm your booking' : 'Confirm now to lock in your booking'}</div>
   </td></tr>

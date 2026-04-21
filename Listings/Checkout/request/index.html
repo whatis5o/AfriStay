@@ -568,7 +568,7 @@ async function submitRequest() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
   } catch(err) {
-    console.error('❌ [REQUEST]', err.message);
+    console.error(' [REQUEST]', err.message);
     showErr(err.message || 'Something went wrong. Please try again.');
     setBusy(false);
   }

@@ -77,7 +77,7 @@
                     'font-family:Inter,system-ui,sans-serif;font-size:14px;font-weight:600;gap:12px',
                 ].join(';');
                 banner.innerHTML =
-                    '<span>⚠️ Maintenance mode is ON — users see a blocked page.' +
+                    '<span>! Maintenance mode is ON — users see a blocked page.' +
                     ' <a href="/Dashboards/Admin/?tab=settings" style="color:#fff;text-decoration:underline;margin-left:8px;">Turn off in Settings</a></span>' +
                     '<button onclick="this.parentElement.remove()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;line-height:1;">&times;</button>';
                 document.body.prepend(banner);
@@ -94,7 +94,7 @@
                 ].join(';');
                 overlay.innerHTML =
                     '<div style="text-align:center;max-width:480px;color:#fff;">' +
-                    '<div style="font-size:72px;margin-bottom:24px;line-height:1;">🔧</div>' +
+                    '<div style="font-size:72px;margin-bottom:24px;line-height:1;"></div>' +
                     '<h1 style="font-size:28px;font-weight:800;margin:0 0 16px;letter-spacing:-.5px;">Under Maintenance</h1>' +
                     '<p style="font-size:15px;color:rgba(255,255,255,.72);line-height:1.75;margin:0 0 28px;">' + _escHtml(msg) + '</p>' +
                     '<div style="background:rgba(235,103,83,.15);border:1px solid rgba(235,103,83,.3);border-radius:14px;padding:14px 20px;font-size:13px;color:rgba(255,255,255,.55);">' +

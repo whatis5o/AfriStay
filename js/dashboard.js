@@ -326,10 +326,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Step 0: Get Supabase client
     if (window.supabaseClient) {
         _supabase = window.supabaseClient;
-        console.log("✅ [ADMIN] Supabase client found!");
+        console.log(" [ADMIN] Supabase client found!");
     } else {
-        console.error("❌ [ADMIN] Supabase client not found! Make sure config.js loaded properly.");
-        alert("⚠️ Database connection failed. Check console for details.");
+        console.error(" [ADMIN] Supabase client not found! Make sure config.js loaded properly.");
+        alert("! Database connection failed. Check console for details.");
         return;
     }
     
@@ -361,7 +361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const qa = $('.quick-actions');
     if (qa) {
         qa.style.display = 'flex';
-        console.log("✅ [SPECIAL USER] Quick actions initialized");
+        console.log(" [SPECIAL USER] Quick actions initialized");
     }
     
     // Step 6: Show default panel (dashboard)
@@ -758,7 +758,7 @@ function bindUIInteractions() {
     _bindSearch('reqSearchInput',     q => loadListingRequests(q));
     _bindSearch('finSearchInput',     q => loadFinancialData(0, q));
 
-    console.log("✅ [ADMIN] All UI interactions bound");
+    console.log(" [ADMIN] All UI interactions bound");
 }
 
 /* ===========================
@@ -973,7 +973,7 @@ function updateFormLabels() {
                 lbl = document.createElement('p');
                 lbl.className = 'vehicle-note';
                 lbl.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(235,103,83,0.12);color:var(--primary,#EB6753);font-weight:600;font-size:13px;padding:6px 14px;border-radius:8px;white-space:nowrap;pointer-events:none;';
-                lbl.textContent = '📍 Location not required for vehicles';
+                lbl.textContent = ' Location not required for vehicles';
                 locationBox.appendChild(lbl);
             }
         }
@@ -1210,7 +1210,7 @@ async function loadFilterSectors() {
    PANEL SWITCHING
    =========================== */
 function togglePanels(panelId) {
-    console.log("📄 [PANEL] Switching to:", panelId);
+    console.log(" [PANEL] Switching to:", panelId);
     
     const panels = $$('.content-panel');
     panels.forEach(p => p.classList.remove('active'));
@@ -1218,9 +1218,9 @@ function togglePanels(panelId) {
     const target = document.getElementById(panelId);
     if (target) {
         target.classList.add('active');
-        console.log("✅ [PANEL] Panel activated:", panelId);
+        console.log(" [PANEL] Panel activated:", panelId);
     } else {
-        console.warn("⚠️ [PANEL] Panel not found:", panelId);
+        console.warn("! [PANEL] Panel not found:", panelId);
     }
 }
 
@@ -1237,7 +1237,7 @@ function openModal(modalId) {
             loadAmenityCheckboxes();
         }
     } else {
-        console.warn("⚠️ [MODAL] Modal not found:", modalId);
+        console.warn("! [MODAL] Modal not found:", modalId);
     }
 }
 
@@ -1265,20 +1265,20 @@ async function initAuthAndRole() {
         const { data: userData, error: userErr } = await _supabase.auth.getUser();
         
         if (userErr) {
-            console.error("❌ [AUTH] Error getting user:", userErr);
+            console.error(" [AUTH] Error getting user:", userErr);
             applyRoleToUI(null);
             return;
         }
         
         const user = userData?.user;
         if (!user) {
-            console.warn("⚠️ [AUTH] No logged-in user detected — redirecting to auth");
+            console.warn("! [AUTH] No logged-in user detected — redirecting to auth");
             window.location.replace('/Auth/?redirect=' + encodeURIComponent(window.location.href));
             return;
         }
 
         CURRENT_USER = user;
-        console.log("✅ [AUTH] User authenticated:", user.email);
+        console.log(" [AUTH] User authenticated:", user.email);
         
         // Fetch profile
         const { data: profile, error: pErr } = await _supabase
@@ -1288,14 +1288,14 @@ async function initAuthAndRole() {
             .single();
 
         if (pErr) {
-            console.error("❌ [AUTH] Failed to load profile:", pErr);
+            console.error(" [AUTH] Failed to load profile:", pErr);
             applyRoleToUI(null);
             return;
         }
 
         CURRENT_PROFILE = profile;
         CURRENT_ROLE = (profile.role || 'user');
-        console.log("✅ [AUTH] Profile loaded. Role:", CURRENT_ROLE);
+        console.log(" [AUTH] Profile loaded. Role:", CURRENT_ROLE);
 
         // Enforce page-level role access
         const path = window.location.pathname.toLowerCase();
@@ -1337,7 +1337,7 @@ async function initAuthAndRole() {
         applyRoleToUI(CURRENT_ROLE);
 
     } catch (err) {
-        console.error("❌ [AUTH] Exception in initAuthAndRole:", err);
+        console.error(" [AUTH] Exception in initAuthAndRole:", err);
         applyRoleToUI(null);
     }
     await populatePromoListings();
@@ -1531,7 +1531,7 @@ function applyRoleToUI(role) {
 
     // No role (not logged in)
     if (!role) {
-        console.log("  🚫 No role - limiting UI");
+        console.log("   No role - limiting UI");
         hide('bookings');
         hide('messages');
         if (createListingBtn) createListingBtn.style.display = 'none';
@@ -1553,7 +1553,7 @@ function applyRoleToUI(role) {
     }
     // OWNER: manages listings and bookings
     else if (role === 'owner') {
-        console.log("  🏠 OWNER role - showing owner features");
+        console.log("   OWNER role - showing owner features");
         show('listings');
         show('bookings');
         show('promotions');
@@ -1661,8 +1661,8 @@ async function loadListingsGrid(filters = {}, page = 0) {
 
     const { data, error, count } = await q;
     clearTimeout(_guard);
-    if (error) { container.innerHTML = emptyState('⚠️','Could not load listings', sanitizeError(error)); return; }
-    if (!data || data.length === 0) { container.innerHTML = emptyState('🏠','No listings yet', 'Listings you add will appear here.'); return; }
+    if (error) { container.innerHTML = emptyState('!','Could not load listings', sanitizeError(error)); return; }
+    if (!data || data.length === 0) { container.innerHTML = emptyState('','No listings yet', 'Listings you add will appear here.'); return; }
 
     // Batch-fetch first image per listing (cached 2 min)
     const listingIds = data.map(l => l.id);
@@ -1752,7 +1752,7 @@ async function loadListingsGrid(filters = {}, page = 0) {
     }
     } catch(err) {
         clearTimeout(_guard);
-        container.innerHTML = emptyState('⚠️', 'Could not load listings', sanitizeError(err));
+        container.innerHTML = emptyState('!', 'Could not load listings', sanitizeError(err));
     }
 }
 
@@ -1778,7 +1778,7 @@ async function loadAllCountsAndTables() {
         loadDashPendingListings();
         loadNewBookings();
     }
-    console.log("✅ [DATA] All data loaded");
+    console.log(" [DATA] All data loaded");
 }
 
 async function loadCounts() {
@@ -1868,10 +1868,10 @@ async function loadCounts() {
             setCount('#totalRevenue', '0 RWF');
         }
         
-        console.log("✅ [COUNTS] Dashboard counts updated");
+        console.log(" [COUNTS] Dashboard counts updated");
         loadSparklines();
     } catch (err) {
-        console.error("❌ [COUNTS] Error loading counts:", err);
+        console.error(" [COUNTS] Error loading counts:", err);
     }
 }
 
@@ -2028,7 +2028,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
 
     const tbody = $('#allBookingsBody');
     if (!tbody) {
-        console.warn("⚠️ [BOOKINGS] Table body not found");
+        console.warn("! [BOOKINGS] Table body not found");
         return;
     }
 
@@ -2065,7 +2065,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
         const { data, error, count } = await q.order('created_at', { ascending: false }).range(start, end);
         
         if (error) {
-            console.error("❌ [BOOKINGS] Error loading bookings:", error);
+            console.error(" [BOOKINGS] Error loading bookings:", error);
             tbody.innerHTML = `<tr><td colspan="8">Error: ${error.message}</td></tr>`;
             return;
         }
@@ -2104,13 +2104,13 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
             const statusLabels = {
                 awaiting_approval: '⏳ Awaiting Approval',
                 pending:           '⏳ Pending',
-                payment_pending:   '💳 Charging...',
-                payment_failed:    '❌ Payment Failed',
-                confirmed:         '✅ Confirmed',
-                approved:          '✅ Approved',
-                rejected:          '❌ Rejected',
-                cancelled:         '🚫 Cancelled',
-                completed:         '🏁 Completed',
+                payment_pending:   ' Charging...',
+                payment_failed:    ' Payment Failed',
+                confirmed:         ' Confirmed',
+                approved:          ' Approved',
+                rejected:          ' Rejected',
+                cancelled:         ' Cancelled',
+                completed:         ' Completed',
             };
             const statusLabel = statusLabels[r.status] || r.status;
             const fmtAmt = Number(r.total_amount || 0).toLocaleString('en-RW');
@@ -2125,7 +2125,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
                 <td style="font-size:12px;">
                     <span style="font-size:10px;color:#aaa;">${isVehRow ? 'Pick-up' : 'Check-in'}:</span> ${r.start_date}<br>
                     <span style="font-size:10px;color:#aaa;">${isVehRow ? 'Return' : 'Check-out'}:</span> ${r.end_date}
-                    ${isVehRow && r.price_zone ? `<br><span style="font-size:10px;color:#aaa;">${r.price_zone === 'outside_kigali' ? '🌍 Outside Kigali' : '🏙️ Kigali'}</span>` : ''}
+                    ${isVehRow && r.price_zone ? `<br><span style="font-size:10px;color:#aaa;">${r.price_zone === 'outside_kigali' ? ' Outside Kigali' : ' Kigali'}</span>` : ''}
                 </td>
                 <td style="font-weight:700;color:#EB6753;">${fmtAmt} RWF<br><span style="font-size:11px;color:#aaa;font-weight:400;">${pmLabel}</span></td>
                 <td>
@@ -2153,7 +2153,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
             tbody.appendChild(row);
         }
 
-        console.log("✅ [BOOKINGS] Table populated");
+        console.log(" [BOOKINGS] Table populated");
 
         if (window.renderPagination) {
             const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
@@ -2161,7 +2161,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
         }
 
     } catch (err) {
-        console.error("❌ [BOOKINGS] Exception:", err);
+        console.error(" [BOOKINGS] Exception:", err);
         tbody.innerHTML = '<tr><td colspan="8">Failed to load bookings</td></tr>';
     }
 }
@@ -2246,9 +2246,9 @@ async function loadUsersTable(searchTerm = '', page = 0) {
             renderPagination('dashUsersPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadUsersTable(searchTerm, p));
         }
 
-        console.log("✅ [USERS] Table populated");
+        console.log(" [USERS] Table populated");
     } catch (err) {
-        console.error('❌ [USERS] Exception:', err);
+        console.error(' [USERS] Exception:', err);
         tbody.innerHTML = '<tr><td colspan="8">Failed to load users</td></tr>';
     }
 }
@@ -2319,7 +2319,7 @@ async function loadMessagesPreview() {
     });
 
     if (data.length) showMessageDetail(data[0]);
-    console.log("✅ [MESSAGES] Loaded", data.length, "messages");
+    console.log(" [MESSAGES] Loaded", data.length, "messages");
 }
 
 function _fmtMsgTime(iso) {
@@ -2390,7 +2390,7 @@ function showMessageDetail(m) {
    ACTIONS
    =========================== */
 async function approveListing(listingId) {
-    console.log("✅ [ACTION] Approving listing:", listingId);
+    console.log(" [ACTION] Approving listing:", listingId);
     if (!confirm('Approve this listing?')) return;
     try {
         const { error } = await _supabase
@@ -2404,7 +2404,7 @@ async function approveListing(listingId) {
         loadAttentionItems();
     } catch (err) {
         logAudit({ action: 'listing_approved_failed', entityType: 'listing', entityId: listingId, description: 'Failed to approve listing: ' + err.message, isError: true });
-        console.error("❌ [ACTION] Error approving listing:", err);
+        console.error(" [ACTION] Error approving listing:", err);
         toast(sanitizeError(err), 'error');
     }
 }
@@ -2424,7 +2424,7 @@ async function toggleListingAvailability(listingId, current) {
             toast('Listing is now available!', 'success');
             await filterListings();
         } catch (err) {
-            console.error("❌ [ACTION] Error making listing available:", err);
+            console.error(" [ACTION] Error making listing available:", err);
             toast(sanitizeError(err), 'error');
         }
         return;
@@ -2527,7 +2527,7 @@ window.confirmSetUnavailable = confirmSetUnavailable;
    (When DPO is live: edge function emails a payment link instead)
    ═══════════════════════════════════════════════════════════════ */
 async function approveBooking(bookingId) {
-    console.log('✅ [APPROVE] Owner approving booking:', bookingId);
+    console.log(' [APPROVE] Owner approving booking:', bookingId);
 
     // Load booking to show confirm dialog
     const { data: booking } = await _supabase
@@ -2557,14 +2557,14 @@ async function approveBooking(bookingId) {
         const data = await res.json();
         if (!res.ok || data.error) throw new Error(data.error || 'Approval failed');
 
-        console.log('✅ [APPROVE] Done:', data);
+        console.log(' [APPROVE] Done:', data);
 
         // approve-booking edge function already emails the guest — no duplicate send needed
 
         if (data.dpo_active) {
-            toast('✅ Approved! Guest received a payment link.', 'success');
+            toast(' Approved! Guest received a payment link.', 'success');
         } else {
-            toast('✅ Approved! Guest received an email with payment link.', 'success');
+            toast(' Approved! Guest received an email with payment link.', 'success');
         }
 
         logAudit({ action: 'booking_approved', entityType: 'booking', entityId: bookingId, description: 'Booking approved for "' + (booking.listings?.title || bookingId) + '"' });
@@ -2573,13 +2573,13 @@ async function approveBooking(bookingId) {
 
     } catch (err) {
         logAudit({ action: 'booking_approved_failed', entityType: 'booking', entityId: bookingId, description: 'Failed to approve booking: ' + err.message, isError: true });
-        console.error('❌ [APPROVE]', err);
+        console.error(' [APPROVE]', err);
         toast(sanitizeError(err), 'error');
     }
 }
 
 async function rejectBooking(bookingId) {
-    console.log('❌ [REJECT] Rejecting booking:', bookingId);
+    console.log(' [REJECT] Rejecting booking:', bookingId);
 
     const { data: booking } = await _supabase
         .from('bookings').select('*, listings(title)').eq('id', bookingId).single();
@@ -2637,13 +2637,13 @@ async function rejectBooking(bookingId) {
 
     } catch (err) {
         logAudit({ action: 'booking_rejected_failed', entityType: 'booking', entityId: bookingId, description: 'Failed to reject booking: ' + err.message, isError: true });
-        console.error('❌ [REJECT]', err);
+        console.error(' [REJECT]', err);
         toast(sanitizeError(err), 'error');
     }
 }
 
 async function demoMarkPaid(bookingId) {
-    console.log("💰 [DEMO] Marking booking as paid:", bookingId);
+    console.log(" [DEMO] Marking booking as paid:", bookingId);
     
     if (!DEMO_MODE) {
         alert('Demo mode off');
@@ -2674,11 +2674,11 @@ async function demoMarkPaid(bookingId) {
         }
         
         toast('Marked as paid (demo).', 'success');
-        console.log("✅ [DEMO] Booking marked as paid");
+        console.log(" [DEMO] Booking marked as paid");
         await loadBookingsTable();
         await loadCounts();
     } catch (err) {
-        console.error("❌ [DEMO] Error marking as paid:", err);
+        console.error(" [DEMO] Error marking as paid:", err);
         alert('Failed to mark as paid.');
     }
 }
@@ -2697,10 +2697,10 @@ async function promoteToOwner(userId) {
         if (error) throw error;
         
         alert('User promoted to owner.');
-        console.log("✅ [ACTION] User promoted successfully");
+        console.log(" [ACTION] User promoted successfully");
         await loadUsersTable();
     } catch (err) {
-        console.error("❌ [ACTION] Error promoting user:", err);
+        console.error(" [ACTION] Error promoting user:", err);
         alert('Failed to promote user.');
     }
 }
@@ -2875,10 +2875,10 @@ async function handleCreateListing() {
             (CURRENT_ROLE === 'owner' ? 'An admin will review and approve it shortly.' : 'It is now pending approval.'),
             'success'
         );
-        console.log('✅ Listing and media created');
+        console.log(' Listing and media created');
 
     } catch (err) {
-        console.error('❌ [LISTING] Error creating listing:', err);
+        console.error(' [LISTING] Error creating listing:', err);
         setStatus(`<i class="fa-solid fa-circle-xmark" style="margin-right:6px;"></i>Failed: ${err.message || 'Something went wrong. Please try again.'}`, 'error');
     } finally {
         if (createBtn) { createBtn.disabled = false; createBtn.textContent = 'Create Listing'; }
@@ -3433,7 +3433,7 @@ async function handleLogout() {
     try {
         await _supabase.auth.signOut();
     } catch (err) {
-        console.error("❌ [AUTH] Error logging out:", err);
+        console.error(" [AUTH] Error logging out:", err);
     }
     // Always clear local state and redirect, even if signOut threw
     localStorage.removeItem('afriStay_role');
@@ -3577,9 +3577,9 @@ async function loadEventsCards(page = 0, searchTerm = '') {
             renderPagination('dashEventsPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadEventsCards(p, searchTerm));
         }
 
-        console.log('✅ [EVENTS] Cards rendered:', data.length);
+        console.log(' [EVENTS] Cards rendered:', data.length);
     } catch (err) {
-        console.error('❌ [EVENTS]', err);
+        console.error(' [EVENTS]', err);
         container.innerHTML = '<div style="grid-column:1/-1;color:red;padding:20px;">' + escapeHtml(err.message) + '</div>';
     }
 }
@@ -3715,7 +3715,7 @@ async function handleCreateEvent() {
         if (modal) modal.style.display = 'none';
         await loadEventsCards();
     } catch (err) {
-        console.error('❌ [EVENTS] create:', err);
+        console.error(' [EVENTS] create:', err);
         toast(sanitizeError(err), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-calendar-plus"></i> Create Event'; }
@@ -3833,9 +3833,9 @@ async function loadPromotionsCards(page = 0, searchTerm = '') {
             renderPagination('dashPromosPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadPromotionsCards(p, searchTerm));
         }
 
-        console.log('✅ [PROMOS] Cards rendered:', data.length);
+        console.log(' [PROMOS] Cards rendered:', data.length);
     } catch (err) {
-        console.error('❌ [PROMOS]', err);
+        console.error(' [PROMOS]', err);
         container.innerHTML = '<div style="grid-column:1/-1;color:red;padding:20px;">' + err.message + '</div>';
     }
 }
@@ -4012,7 +4012,7 @@ async function handleCreatePromo() {
         if (modal) modal.style.display = 'none';
         await loadPromotionsCards();
     } catch (err) {
-        console.error('❌ [PROMOS] create:', err);
+        console.error(' [PROMOS] create:', err);
         toast(sanitizeError(err), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-tag"></i> Create Promotion'; }
@@ -4067,7 +4067,7 @@ async function handleSaveSettings() {
         document.getElementById('newEmail').value = '';
         document.getElementById('newPassword').value = '';
     } catch (err) {
-        console.error("❌ [SETTINGS]", err);
+        console.error(" [SETTINGS]", err);
         toast(sanitizeError(err), 'error');
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
@@ -4195,7 +4195,7 @@ async function loadListingRequests(searchTerm = '', page = 0) {
             container.appendChild(row);
         });
         clearTimeout(_guard);
-        console.log('✅ [REQUESTS] Loaded', data.length, 'pending listings');
+        console.log(' [REQUESTS] Loaded', data.length, 'pending listings');
 
         // ── Pagination ──
         if (window.renderPagination) {
@@ -4208,8 +4208,8 @@ async function loadListingRequests(searchTerm = '', page = 0) {
 
     } catch(err) {
         clearTimeout(_guard);
-        console.error('❌ [REQUESTS]', err);
-        container.innerHTML = emptyState('😕', 'Could not load requests', sanitizeError(err));
+        console.error(' [REQUESTS]', err);
+        container.innerHTML = emptyState('', 'Could not load requests', sanitizeError(err));
     }
 }
 window.loadListingRequests = loadListingRequests;
@@ -4672,14 +4672,17 @@ window.sendOwnerInvite = sendOwnerInvite;
 async function sendCustomEmail() {
     const btn      = document.getElementById('sendCustomBtn');
     const statusEl = document.getElementById('customEmailStatus');
-    const to      = document.getElementById('customTo')?.value.trim();
-    const subject = document.getElementById('customSubject')?.value.trim();
-    const body    = document.getElementById('customBody')?.value.trim();
+    const to       = document.getElementById('customTo')?.value.trim();
+    const subject  = document.getElementById('customSubject')?.value.trim();
+    const body     = document.getElementById('customBody')?.value.trim();
+    const fileInput = document.getElementById('customAttachment');
+    const file     = fileInput?.files?.[0] || null;
 
     if (!to)      { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a recipient email.</p>'; return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(to)) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a valid email address (e.g. name@example.com).</p>'; return; }
     if (!subject) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a subject.</p>'; return; }
     if (!body)    { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please write a message body.</p>'; return; }
+    if (file && file.size > 10 * 1024 * 1024) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Attachment must be under 10 MB.</p>'; return; }
 
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Sending…'; }
     if (statusEl) statusEl.innerHTML = '';
@@ -4687,6 +4690,18 @@ async function sendCustomEmail() {
     try {
         const { data: { session } } = await _supabase.auth.getSession();
         if (!session) throw new Error('Not logged in');
+
+        // Read file as base64 if provided
+        let attachment = null;
+        if (file) {
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload  = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+            attachment = { filename: file.name, content: base64 };
+        }
 
         const res = await fetch(CONFIG.FUNCTIONS_BASE + '/send-email', {
             method:  'POST',
@@ -4700,6 +4715,7 @@ async function sendCustomEmail() {
                 to,
                 subject,
                 body,
+                attachment,
                 sender_name:  CURRENT_PROFILE?.full_name || 'AfriStay Team',
                 sender_email: CURRENT_PROFILE?.email || 'team@afristay.rw',
                 sender_title: localStorage.getItem('afristay_sender_title') || 'AfriStay Team',
@@ -4712,6 +4728,8 @@ async function sendCustomEmail() {
         if (statusEl) statusEl.innerHTML = '<p style="color:#27ae60;font-size:13px;font-weight:600;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>Email sent to ' + to + '!</p>';
         toast('Email sent to ' + to + '!', 'success');
         ['customTo','customSubject','customBody'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        if (fileInput) fileInput.value = '';
+        const prev = document.getElementById('attachmentPreview'); if (prev) prev.textContent = '';
     } catch (err) {
         if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">' + sanitizeError(err) + '</p>';
         toast(sanitizeError(err), 'error');
@@ -4719,6 +4737,22 @@ async function sendCustomEmail() {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Email'; }
     }
 }
+
+// Show filename preview when file is selected
+document.addEventListener('change', function(e) {
+    if (e.target.id !== 'customAttachment') return;
+    const file = e.target.files?.[0];
+    const prev = document.getElementById('attachmentPreview');
+    if (!prev) return;
+    if (file) {
+        const size = file.size < 1024 * 1024
+            ? (file.size / 1024).toFixed(1) + ' KB'
+            : (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+        prev.innerHTML = '<i class="fa-solid fa-paperclip" style="margin-right:4px;color:#EB6753;"></i>' + escapeHtml(file.name) + ' <span style="color:#ccc;">(' + size + ')</span>';
+    } else {
+        prev.textContent = '';
+    }
+});
 window.sendCustomEmail = sendCustomEmail;
 
 async function handleOwnerApplication(appId, userId, newStatus) {
@@ -5141,7 +5175,7 @@ async function loadNewBookings(page = 0) {
 
         if (!data || !data.length) {
             clearTimeout(_guard);
-            container.innerHTML = emptyState('✅', 'All clear!', 'No bookings awaiting approval right now.');
+            container.innerHTML = emptyState('', 'All clear!', 'No bookings awaiting approval right now.');
             return;
         }
 
@@ -5177,15 +5211,15 @@ async function loadNewBookings(page = 0) {
             container.appendChild(row);
         });
         clearTimeout(_guard);
-        console.log('✅ [NEW BOOKINGS] Loaded', data.length);
+        console.log(' [NEW BOOKINGS] Loaded', data.length);
         if (window.renderPagination) {
             const pageCount = Math.ceil((count || data.length) / PAGE_SIZE);
             renderPagination('newBookingsPagination', page, pageCount, count || data.length, PAGE_SIZE, (p) => loadNewBookings(p));
         }
     } catch (err) {
         clearTimeout(_guard);
-        console.error('❌ [NEW BOOKINGS]', err);
-        container.innerHTML = emptyState('😕', 'Could not load bookings', sanitizeError(err));
+        console.error(' [NEW BOOKINGS]', err);
+        container.innerHTML = emptyState('', 'Could not load bookings', sanitizeError(err));
     }
 }
 window.loadNewBookings = loadNewBookings;
@@ -5319,9 +5353,9 @@ async function loadDashPendingListings() {
             el.appendChild(row);
         });
 
-        console.log('✅ [DASH] Pending listings widget loaded:', data.length);
+        console.log(' [DASH] Pending listings widget loaded:', data.length);
     } catch(err) {
-        console.error('❌ [DASH PENDING]', err);
+        console.error(' [DASH PENDING]', err);
         el.innerHTML = '<div style="color:#e74c3c;padding:16px;">' + escapeHtml(err.message) + '</div>';
     }
 }
@@ -5333,7 +5367,7 @@ async function dashApprove(id, btn) {
     try {
         const { error } = await _supabase.from('listings').update({ status: 'approved' }).eq('id', id);
         if (error) throw error;
-        toast('✅ Listing approved — now live!', 'success');
+        toast(' Listing approved — now live!', 'success');
         bustListingCache();
         const row = document.getElementById('dplRow_' + id);
         if (row) { row.style.opacity = '0'; setTimeout(() => row.remove(), 320); }
@@ -5673,11 +5707,11 @@ async function saveOwnerWallet() {
         const { error } = await _supabase.from('owner_wallets').upsert(payload, { onConflict: 'owner_id' });
         if (error) throw error;
 
-        console.log('✅ [WALLET] Saved successfully');
-        toast("✅ Payout wallet saved! Your earnings will be sent here after each booking.", 'success');
+        console.log(' [WALLET] Saved successfully');
+        toast(" Payout wallet saved! Your earnings will be sent here after each booking.", 'success');
         await loadOwnerWallet(); // refresh to show verified state
     } catch (err) {
-        console.error('❌ [WALLET] Save error:', err);
+        console.error(' [WALLET] Save error:', err);
         toast(sanitizeError(err), 'error');
     }
 }
@@ -6380,7 +6414,7 @@ console.log("✨ [ADMIN] Dashboard.js loaded and ready!");
    DOWNLOAD RECEIPT (PDF) — client-side via jsPDF
    ═══════════════════════════════════════════════ */
 window.downloadReceipt = async function(bookingId) {
-    console.log('📄 [RECEIPT] Downloading receipt for booking:', bookingId);
+    console.log(' [RECEIPT] Downloading receipt for booking:', bookingId);
     toast('Preparing receipt...', 'info');
 
     try {
@@ -6393,7 +6427,7 @@ window.downloadReceipt = async function(bookingId) {
             .maybeSingle();
 
         if (dbReceipt) {
-            console.log('✅ [RECEIPT] Found saved receipt:', dbReceipt.receipt_number);
+            console.log(' [RECEIPT] Found saved receipt:', dbReceipt.receipt_number);
             receiptData = dbReceipt;
         } else {
             // ── Generate from booking + listing data ───────────────
@@ -6653,11 +6687,11 @@ window.downloadReceipt = async function(bookingId) {
         }
 
         doc.save('AfriStay-Receipt-' + receiptData.receipt_number + '.pdf');
-        toast('📄 Receipt downloaded!', 'success');
-        console.log('✅ [RECEIPT] PDF saved:', receiptData.receipt_number);
+        toast(' Receipt downloaded!', 'success');
+        console.log(' [RECEIPT] PDF saved:', receiptData.receipt_number);
 
     } catch (err) {
-        console.error('❌ [RECEIPT] Error:', err);
+        console.error(' [RECEIPT] Error:', err);
         toast(sanitizeError(err), 'error');
     }
 };
@@ -6730,7 +6764,7 @@ async function loadOwnerPromotions(page = 0) {
         }
 
     } catch (err) {
-        console.error('❌ [OWNER PROMOS]', err);
+        console.error(' [OWNER PROMOS]', err);
         container.innerHTML = '<div style="grid-column:1/-1;color:red;padding:20px;">' + escapeHtml(err.message) + '</div>';
     }
 }
@@ -6924,7 +6958,7 @@ async function loadFinancialData(page = 0, searchTerm = '') {
         }
 
     } catch (err) {
-        console.error('❌ [FINANCIAL]', err);
+        console.error(' [FINANCIAL]', err);
         tbody.innerHTML = `<tr><td colspan="10" style="color:red;padding:20px;">Error: ${escapeHtml(err.message)}</td></tr>`;
     }
 }

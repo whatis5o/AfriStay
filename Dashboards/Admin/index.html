@@ -245,14 +245,16 @@
         <button class="nav-btn" data-tab="attention" id="attentionNavBtn"><i class="fa-solid fa-bell"></i> Attention <span class="nav-badge" id="attentionBadge" style="display:none;"></span></button>
         <button class="nav-btn" data-tab="owner-applications"><i class="fa-solid fa-user-plus"></i> Owner Applications <span class="nav-badge" id="badge-owner-applications" style="display:none;"></span></button>
         <button class="nav-btn" data-tab="broadcast"><i class="fa-solid fa-paper-plane"></i> Broadcast</button>
-        <button class="nav-btn" data-tab="invite-owner"><i class="fa-solid fa-envelope-open-text"></i> Invite Owner</button>
+        <button class="nav-btn" data-tab="invite-owner"><i class="fa-solid fa-envelope-open-text"></i> Send Email</button>
         <div class="nav-sec">Finance</div>
         <button class="nav-btn" data-tab="financial"><i class="fa-solid fa-chart-line"></i> Financial</button>
+        <button class="nav-btn" data-tab="payouts"><i class="fa-solid fa-money-bill-transfer"></i> Payouts <span class="nav-badge" id="badge-payouts" style="display:none;"></span></button>
         <button class="nav-btn" data-tab="receipts"><i class="fa-solid fa-receipt"></i> Receipts</button>
         <div class="nav-sec">Content</div>
         <button class="nav-btn" data-tab="events"><i class="fa-solid fa-calendar-days"></i> Events</button>
         <button class="nav-btn" data-tab="promotions"><i class="fa-solid fa-tag"></i> Promotions</button>
         <button class="nav-btn" data-tab="messages"><i class="fa-solid fa-envelope"></i> Messages <span class="nav-badge" id="badge-messages" style="display:none;"></span></button>
+        <button class="nav-btn" data-tab="feedback"><i class="fa-solid fa-comments"></i> Feedback <span class="nav-badge" id="badge-feedback" style="display:none;"></span></button>
         <button class="nav-btn" data-tab="archive"><i class="fa-solid fa-box-archive"></i> Archive / Trash</button>
         <div class="nav-sec">Account</div>
         <button class="nav-btn" data-tab="settings"><i class="fa-solid fa-gear"></i> Settings</button>
@@ -570,6 +572,11 @@
                             <label>Body</label>
                             <textarea class="fi" id="customBody" style="min-height:160px;resize:vertical;" placeholder="Write your message here..."></textarea>
                         </div>
+                        <div class="fg">
+                            <label>Attachment <span style="font-size:11px;color:#aaa;font-weight:400;">(optional — PDF, image, Word, etc. Max 10 MB)</span></label>
+                            <input type="file" id="customAttachment" class="fi" style="padding:8px 12px;cursor:pointer;" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp">
+                            <div id="attachmentPreview" style="margin-top:6px;font-size:12px;color:#888;"></div>
+                        </div>
                         <button class="btn-p" id="sendCustomBtn" onclick="sendCustomEmail()">
                             <i class="fa-solid fa-paper-plane"></i> Send Email
                         </button>
@@ -587,6 +594,92 @@
         <!-- PROMOTIONS -->
         <div class="content-panel" id="promotionsPanel">
             <!-- Populated dynamically by loadPromotionsCards() -->
+        </div>
+
+        <!-- PAYOUTS -->
+        <div class="content-panel" id="payoutsPanel">
+            <!-- Bulk action bar -->
+            <div id="payoutsBulkBar" style="display:none;background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:12px;margin-bottom:12px;align-items:center;gap:12px;flex-wrap:wrap;">
+                <span id="payoutsBulkCount" style="font-weight:700;font-size:14px;">0 selected</span>
+                <button class="btn-s" onclick="processSelectedPayouts()" style="background:#EB6753;color:#fff;border:none;"><i class="fa-solid fa-money-bill-transfer"></i> Initiate Payout</button>
+                <button class="btn-s" onclick="markSelectedPayoutsPaid()" style="background:#27ae60;color:#fff;border:none;"><i class="fa-solid fa-circle-check"></i> Mark as Paid</button>
+                <button class="btn-s" onclick="clearPayoutSelection()" style="margin-left:auto;">Clear</button>
+            </div>
+            <div class="data-section">
+                <div class="sec-head" style="flex-wrap:wrap;gap:12px;">
+                    <h2><i class="fa-solid fa-money-bill-transfer" style="color:var(--primary);margin-right:8px;"></i>Payout Management</h2>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <select id="payoutFilterStatus" class="fi" style="width:auto;padding:7px 12px;font-size:13px;" onchange="loadPayoutsTable()">
+                            <option value="all">All Paid Bookings</option>
+                            <option value="pending">Not Yet Paid Out</option>
+                            <option value="processing">Processing</option>
+                            <option value="paid">Paid Out</option>
+                        </select>
+                        <div class="tab-search-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="payoutSearchInput" placeholder="Guest, owner, listing..." oninput="loadPayoutsTable()">
+                        </div>
+                        <button class="btn-s" onclick="loadPayoutsTable()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                        <button class="btn-s" onclick="exportPayoutsCSV('all')"><i class="fa-solid fa-file-csv"></i> All</button>
+                        <button class="btn-s" onclick="exportPayoutsCSV('pending')"><i class="fa-solid fa-clock"></i> Unpaid</button>
+                        <button class="btn-s" onclick="exportPayoutsCSV('paid')"><i class="fa-solid fa-circle-check"></i> Paid</button>
+                    </div>
+                </div>
+                <!-- Summary cards -->
+                <div id="payoutSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;padding:16px 24px;border-bottom:1px solid #f5f5f5;"></div>
+                <div style="overflow-x:auto;">
+                    <table class="dt" id="payoutsTable">
+                        <thead>
+                            <tr>
+                                <th style="width:36px;"><input type="checkbox" id="payoutSelectAll" onchange="toggleAllPayouts(this.checked)" title="Select all"></th>
+                                <th>#</th>
+                                <th>Booking ID</th>
+                                <th>Guest</th>
+                                <th>Guest Phone</th>
+                                <th>Listing</th>
+                                <th>Nights</th>
+                                <th>Unit Price</th>
+                                <th>Total</th>
+                                <th>Owner</th>
+                                <th>Owner Phone</th>
+                                <th>Payout Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payoutsTableBody">
+                            <tr><td colspan="12" style="text-align:center;padding:40px;color:#aaa;">Click Refresh to load</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="payoutsPagination" style="margin-top:8px;"></div>
+            </div>
+        </div>
+
+        <!-- FEEDBACK -->
+        <div class="content-panel" id="feedbackPanel">
+            <div class="data-section">
+                <div class="sec-head">
+                    <h2><i class="fa-solid fa-comments" style="color:var(--primary);margin-right:8px;"></i>User Feedback &amp; Bug Reports</h2>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <select id="feedbackFilterType" class="fi" style="width:auto;padding:7px 12px;font-size:13px;" onchange="loadFeedback()">
+                            <option value="all">All Types</option>
+                            <option value="bug">Bugs</option>
+                            <option value="suggestion">Suggestions</option>
+                            <option value="confusion">Confusion</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <select id="feedbackFilterStatus" class="fi" style="width:auto;padding:7px 12px;font-size:13px;" onchange="loadFeedback()">
+                            <option value="all">All Status</option>
+                            <option value="new">New</option>
+                            <option value="reviewed">Reviewed</option>
+                            <option value="resolved">Resolved</option>
+                        </select>
+                        <button class="btn-s" onclick="loadFeedback()"><i class="fa-solid fa-rotate-right"></i> Refresh</button>
+                    </div>
+                </div>
+                <div class="sec-body" id="feedbackContainer">
+                    <p style="color:#bbb;text-align:center;padding:30px;">Click Refresh to load feedback</p>
+                </div>
+            </div>
         </div>
 
         <!-- FINANCIAL -->
@@ -966,14 +1059,16 @@
     <script src="/js/maintenance.js"></script>
     <script src="/js/scroll-animations.js"></script>
 <script src="/js/dashboard.js?v=4"></script>
+<script src="/js/payout-feedback.js?v=1"></script>
 <script>
 const PTITLES={
     dashboardPanel:'Dashboard',usersPanel:'Users',listingsPanel:'Listings',
     bookingsPanel:'Bookings','listing-requestsPanel':'Listing Requests',
     attentionPanel:'Attention','owner-applicationsPanel':'Owner Applications',
     broadcastPanel:'Broadcast Notification',
-    financialPanel:'Financial',receiptsPanel:'Receipts',eventsPanel:'Events',promotionsPanel:'Promotions',
-    messagesPanel:'Messages',archivePanel:'Archive / Trash',settingsPanel:'Settings'
+    financialPanel:'Financial',payoutsPanel:'Payout Management',receiptsPanel:'Receipts',
+    eventsPanel:'Events',promotionsPanel:'Promotions',
+    messagesPanel:'Messages',feedbackPanel:'Feedback & Bug Reports',archivePanel:'Archive / Trash',settingsPanel:'Settings'
 };
 
 document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
@@ -985,6 +1080,8 @@ document.querySelectorAll('.nav-btn[data-tab]').forEach(btn=>{
         if(tab==='settings'){waitForProfile(prefillAdminProfile);setTimeout(loadPlatformConfig,300);}
         if(tab==='financial'){setTimeout(loadFinancialData,100);setTimeout(loadPayoutOwners,200);}
         if(tab==='receipts'){setTimeout(loadReceiptsSearch,100);}
+        if(tab==='payouts'){setTimeout(loadPayoutsTable,100);}
+        if(tab==='feedback'){setTimeout(loadFeedback,100);}
     });
 });
 

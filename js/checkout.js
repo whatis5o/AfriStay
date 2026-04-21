@@ -21,7 +21,7 @@ let BOOKING_PARAMS = {};
 
 document.addEventListener('DOMContentLoaded', async () => {
     _supabase = window.supabaseClient;
-    if (!_supabase) { console.error('❌ [CHECKOUT] No Supabase client'); return; }
+    if (!_supabase) { console.error(' [CHECKOUT] No Supabase client'); return; }
 
     // ── Auth check ────────────────────────────────────────────
     const { data: { user } } = await _supabase.auth.getUser();
@@ -171,7 +171,7 @@ window.confirmBooking = async function () {
             return;
         }
 
-        console.log('✅ [CHECKOUT] Booking created:', data.booking_id, 'Ref:', data.reference);
+        console.log(' [CHECKOUT] Booking created:', data.booking_id, 'Ref:', data.reference);
 
         // Lock listing — unavailable_until is end_date + 1 day buffer for turnaround
         if (BOOKING_PARAMS.listing_id) {
@@ -225,7 +225,7 @@ window.confirmBooking = async function () {
         setTimeout(() => showSuccessScreen(data), 1000);
 
     } catch(err) {
-        console.error('❌ [CHECKOUT]', err);
+        console.error(' [CHECKOUT]', err);
         showErr('Something went wrong. Please check your connection and try again.');
         btn.disabled = false;
         btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send Booking Request';
@@ -244,7 +244,7 @@ function showSuccessScreen(data) {
       <div style="width:88px;height:88px;border-radius:50%;background:#dcfce7;display:flex;align-items:center;justify-content:center;margin:0 auto 24px">
         <i class="fa-solid fa-paper-plane" style="font-size:40px;color:#16a34a"></i>
       </div>
-      <h2 style="font-size:26px;font-weight:800;color:#1a1a1a;margin:0 0 10px">Request Sent! 🎉</h2>
+      <h2 style="font-size:26px;font-weight:800;color:#1a1a1a;margin:0 0 10px">Request Sent! </h2>
       <p style="color:#666;font-size:15px;line-height:1.7;margin:0 0 28px;max-width:420px;margin-left:auto;margin-right:auto">
         Your booking request for <strong>${escHtml(BOOKING_PARAMS.title)}</strong> is now with the host.
         You'll get an email as soon as they respond — usually within a few hours.
@@ -309,4 +309,4 @@ function disableBtn() {
     if (btn) btn.disabled = true;
 }
 
-console.log('✅ [CHECKOUT] checkout.js ready');
+console.log(' [CHECKOUT] checkout.js ready');
