@@ -2035,7 +2035,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
     tbody.innerHTML = '<tr><td colspan="8">Loading...</td></tr>';
 
     try {
-        let q = _supabase.from('bookings').select('id, listing_id, start_date, end_date, total_amount, status, payment_status, payment_method, user_id, guest_name, guest_email, created_at, category_slug, price_zone', { count: 'exact' });
+        let q = _supabase.from('bookings').select('id, listing_id, start_date, end_date, total_amount, status, payment_status, payment_method, payment_deadline, user_id, guest_name, guest_email, created_at, category_slug, price_zone', { count: 'exact' });
 
         if (CURRENT_ROLE === 'owner') {
             console.log("  Filtering for owner's listing bookings");
@@ -2116,6 +2116,8 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
             const fmtAmt = Number(r.total_amount || 0).toLocaleString('en-RW');
             const pmLabel = (r.payment_method || '—').replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
 
+            const ps = _paymentBadge(r);
+            row.style.borderLeft = `3px solid ${ps.borderColor}`;
             row.innerHTML = `
                 <td><input type="checkbox" class="booking-cb" data-id="${r.id}" onchange="toggleBookingCheck('${r.id}',this.checked)" style="width:15px;height:15px;accent-color:var(--primary,#EB6753);"></td>
                 <td>${i + 1}.</td>
@@ -2130,6 +2132,9 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
                 <td style="font-weight:700;color:#EB6753;">${fmtAmt} RWF<br><span style="font-size:11px;color:#aaa;font-weight:400;">${pmLabel}</span></td>
                 <td>
                     <span class="status-badge status-${r.status}" style="white-space:nowrap;">${statusLabel}</span>
+                    <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;background:${ps.bg};color:${ps.color};margin-top:5px;">
+                        <i class="${ps.icon}"></i>${ps.label}
+                    </span>
                     <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;">
                         ${canApprove ? `
                             <button class="btn-small" style="background:#e8f8f0;color:#27ae60;border:1px solid #a9dfbf;font-weight:600;gap:5px;" onclick="approveBooking('${r.id}')">
@@ -3459,6 +3464,47 @@ function filterTable(inputId, tableBodyId) {
 /* ===========================
     UTILITY FUNCTIONS
    =========================== */
+function _paymentBadge(b) {
+    const paid      = b.payment_status === 'paid';
+    const approved  = b.status === 'approved';
+    const deadline  = b.payment_deadline ? new Date(b.payment_deadline) : null;
+    const now       = new Date();
+    const msLeft    = deadline ? deadline - now : null;
+    const expired   = msLeft !== null && msLeft <= 0;
+
+    if (paid || b.status === 'confirmed' || b.status === 'completed') {
+        return { label: 'Paid', icon: 'fa-solid fa-circle-check', color: '#166534', bg: '#dcfce7', borderColor: '#22c55e' };
+    }
+    if (b.status === 'cancelled') {
+        return { label: 'Cancelled', icon: 'fa-solid fa-ban', color: '#991b1b', bg: '#fee2e2', borderColor: '#ef4444' };
+    }
+    if (b.status === 'rejected') {
+        return { label: 'Rejected by host', icon: 'fa-solid fa-circle-xmark', color: '#991b1b', bg: '#fee2e2', borderColor: '#ef4444' };
+    }
+    if (approved && expired) {
+        return { label: 'Payment link expired', icon: 'fa-solid fa-link-slash', color: '#991b1b', bg: '#fee2e2', borderColor: '#ef4444' };
+    }
+    if (approved && msLeft !== null) {
+        const h = Math.floor(msLeft / 3600000);
+        const m = Math.floor((msLeft % 3600000) / 60000);
+        const urgent = msLeft < 3 * 3600000;
+        return {
+            label: `Pay within ${h}h ${m}m`,
+            icon: urgent ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-hourglass-half',
+            color: urgent ? '#92400e' : '#9a3412',
+            bg: urgent ? '#fef3c7' : '#ffedd5',
+            borderColor: '#f97316',
+        };
+    }
+    if (approved) {
+        return { label: 'Payment pending', icon: 'fa-solid fa-clock', color: '#92400e', bg: '#ffedd5', borderColor: '#f97316' };
+    }
+    if (b.status === 'pending' || b.status === 'awaiting_approval') {
+        return { label: 'Awaiting host approval', icon: 'fa-solid fa-hourglass-start', color: '#854d0e', bg: '#fef9c3', borderColor: '#eab308' };
+    }
+    return { label: 'Unpaid', icon: 'fa-solid fa-circle-exclamation', color: '#92400e', bg: '#ffedd5', borderColor: '#f97316' };
+}
+
 function shortId(id) {
     if (!id) return '—';
     return String(id).slice(0, 8) + '…';

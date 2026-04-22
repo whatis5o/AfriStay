@@ -224,6 +224,7 @@ function ownerNotificationHtml(p: {
 }
 
 serve(async (req) => {
+  try {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } });
   }
@@ -371,4 +372,8 @@ serve(async (req) => {
   }
 
   return new Response('OK', { status: 200 });
+  } catch (err) {
+    console.error('[WEBHOOK] Unhandled error:', err);
+    return new Response('Internal error: ' + (err as Error).message, { status: 500 });
+  }
 });

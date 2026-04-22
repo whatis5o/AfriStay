@@ -16,6 +16,52 @@
 
 const STORAGE_BASE = 'https://xuxzeinufjpplxkerlsd.supabase.co/storage/v1/object/public/listing_images';
 
+/* ── Payment status badge helper ─────────────────────────────────────
+   Returns { label, icon, color, bg, borderColor } for any booking.
+   Used on cards (profile) and table rows (owner/admin dashboards).
+─────────────────────────────────────────────────────────────────── */
+function _paymentBadge(b) {
+    const paid      = b.payment_status === 'paid';
+    const cancelled = ['cancelled', 'rejected'].includes(b.status);
+    const approved  = b.status === 'approved';
+    const deadline  = b.payment_deadline ? new Date(b.payment_deadline) : null;
+    const now       = new Date();
+    const msLeft    = deadline ? deadline - now : null;
+    const expired   = msLeft !== null && msLeft <= 0;
+
+    if (paid || b.status === 'confirmed' || b.status === 'completed') {
+        return { label: 'Paid', icon: 'fa-solid fa-circle-check', color: '#166534', bg: '#dcfce7', borderColor: '#22c55e' };
+    }
+    if (b.status === 'cancelled') {
+        return { label: 'Cancelled', icon: 'fa-solid fa-ban', color: '#991b1b', bg: '#fee2e2', borderColor: '#ef4444' };
+    }
+    if (b.status === 'rejected') {
+        return { label: 'Rejected by host', icon: 'fa-solid fa-circle-xmark', color: '#991b1b', bg: '#fee2e2', borderColor: '#ef4444' };
+    }
+    if (approved && expired) {
+        return { label: 'Payment link expired', icon: 'fa-solid fa-link-slash', color: '#991b1b', bg: '#fee2e2', borderColor: '#ef4444' };
+    }
+    if (approved && msLeft !== null) {
+        const h = Math.floor(msLeft / 3600000);
+        const m = Math.floor((msLeft % 3600000) / 60000);
+        const urgent = msLeft < 3 * 3600000;
+        return {
+            label: `Pay within ${h}h ${m}m`,
+            icon: urgent ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-hourglass-half',
+            color: urgent ? '#92400e' : '#9a3412',
+            bg: urgent ? '#fef3c7' : '#ffedd5',
+            borderColor: '#f97316',
+        };
+    }
+    if (approved) {
+        return { label: 'Payment pending', icon: 'fa-solid fa-clock', color: '#92400e', bg: '#ffedd5', borderColor: '#f97316' };
+    }
+    if (b.status === 'pending' || b.status === 'awaiting_approval') {
+        return { label: 'Awaiting host approval', icon: 'fa-solid fa-hourglass-start', color: '#854d0e', bg: '#fef9c3', borderColor: '#eab308' };
+    }
+    return { label: 'Unpaid', icon: 'fa-solid fa-circle-exclamation', color: '#92400e', bg: '#ffedd5', borderColor: '#f97316' };
+}
+
 let _sb      = null;
 let _user    = null;
 let _profile = null;
@@ -191,51 +237,21 @@ async function loadActiveBookings() {
 
     await renderBookingCards(container, data, true);
 
-    // Inject payment deadline countdown banners for approved bookings
+    // Live countdown tick for approved/unpaid bookings with a deadline
     data.forEach(b => {
-        if (b.status !== 'approved' || !b.payment_deadline) return;
+        if (b.status !== 'approved' || b.payment_status === 'paid' || !b.payment_deadline) return;
         const card = document.getElementById('booking-card-' + b.id);
         if (!card) return;
-
-        const deadline = new Date(b.payment_deadline);
-        const now      = new Date();
-        const msLeft   = deadline - now;
-
-        const banner = document.createElement('div');
-        banner.id = 'countdown-' + b.id;
-        banner.style.cssText = 'grid-column:1/-1;padding:10px 14px;border-radius:0 0 12px 12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;';
-
-        if (msLeft <= 0) {
-            banner.style.background = '#fdecea';
-            banner.style.color      = '#c0392b';
-            banner.innerHTML = '<i class="fa-solid fa-clock" style="color:#e74c3c;"></i> Payment window closed — booking may be cancelled soon.';
-        } else {
-            const hoursLeft = Math.floor(msLeft / 3600000);
-            const minsLeft  = Math.floor((msLeft % 3600000) / 60000);
-            const urgent    = msLeft < 3 * 3600000; // < 3 hours — red
-            banner.style.background = urgent ? '#fff3cd' : '#fff8f3';
-            banner.style.color      = urgent ? '#92400e' : '#9a3412';
-            banner.innerHTML = `<i class="fa-solid fa-hourglass-half" style="color:${urgent?'#d97706':'#EB6753'};"></i> Pay within <strong>${hoursLeft}h ${minsLeft}m</strong> to confirm your booking.`;
-
-            // Live tick every minute
-            const interval = setInterval(() => {
-                const remaining = new Date(b.payment_deadline) - new Date();
-                if (remaining <= 0) {
-                    clearInterval(interval);
-                    banner.style.background = '#fdecea'; banner.style.color = '#c0392b';
-                    banner.innerHTML = '<i class="fa-solid fa-clock" style="color:#e74c3c;"></i> Payment window closed — booking may be cancelled soon.';
-                    return;
-                }
-                const h = Math.floor(remaining / 3600000);
-                const m = Math.floor((remaining % 3600000) / 60000);
-                const u = remaining < 3 * 3600000;
-                banner.style.background = u ? '#fff3cd' : '#fff8f3';
-                banner.style.color      = u ? '#92400e' : '#9a3412';
-                banner.innerHTML = `<i class="fa-solid fa-hourglass-half" style="color:${u?'#d97706':'#EB6753'};"></i> Pay within <strong>${h}h ${m}m</strong> to confirm your booking.`;
-            }, 60000);
-        }
-
-        card.appendChild(banner);
+        const badge = card.querySelector('[data-payment-badge]');
+        if (!badge) return;
+        const interval = setInterval(() => {
+            const ps = _paymentBadge(b);
+            badge.style.background = ps.bg;
+            badge.style.color      = ps.color;
+            badge.innerHTML        = `<i class="${ps.icon}"></i>${ps.label}`;
+            card.style.borderLeft  = `4px solid ${ps.borderColor}`;
+            if (ps.borderColor === '#e74c3c') clearInterval(interval); // expired — stop ticking
+        }, 60000);
     });
 }
 
@@ -330,11 +346,15 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
 
         const viewBtnHtml = `<a class="booking-view-btn" href="/Listings/Detail/?id=${b.listing_id}" onclick="event.stopPropagation()"><i class="fa-solid fa-arrow-up-right-from-square"></i> View</a>`;
 
+        // Payment status banner config
+        const ps = _paymentBadge(b);
+
         // Use div (not <a>) so button clicks don't accidentally navigate
         const card = document.createElement('div');
         card.className = 'booking-card';
         card.id = 'booking-card-' + b.id;
         card.style.cursor = 'pointer';
+        card.style.borderLeft = `4px solid ${ps.borderColor}`;
         card.addEventListener('click', () => window.location.href = `/Listings/Detail/?id=${b.listing_id}`);
         card.innerHTML = `
             ${imgHtml}
@@ -345,6 +365,11 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
                     <span><i class="fa-solid fa-calendar"></i>${fmt(b.start_date)} → ${fmt(b.end_date)}</span>
                     <span><i class="fa-solid fa-moon"></i>${nights} ${unit}${nights > 1 ? 's' : ''}</span>
                     ${payLbl ? `<span><i class="fa-solid fa-credit-card"></i>${esc(payLbl)}</span>` : ''}
+                </div>
+                <div style="display:flex;align-items:center;gap:7px;padding:6px 0 2px;flex-wrap:wrap;">
+                    <span data-payment-badge style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:700;background:${ps.bg};color:${ps.color};">
+                        <i class="${ps.icon}"></i>${ps.label}
+                    </span>
                 </div>
                 <div class="booking-footer">
                     <div class="booking-price">${priceFmt} <span>${currency}</span></div>
