@@ -3,7 +3,6 @@ RewriteEngine On
 # Clean URL: /payment/webhook → webhook.php
 RewriteRule ^payment/webhook$ webhook.php [L,QSA]
 
-# Block everything else from browsing /api/
-RewriteCond %{REQUEST_URI} !^/api/webhook\.php$
-RewriteCond %{REQUEST_URI} !^/api/payment/webhook$
+# Block direct access to webhook.php itself (must go through clean URL)
+RewriteCond %{THE_REQUEST} ^[A-Z]+\s/webhook\.php [NC]
 RewriteRule ^ - [F,L]
