@@ -289,17 +289,32 @@ serve(async (req) => {
 
   const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-  // Confirm booking and fetch full details including owner
-  const { data: booking, error } = await sb
+  // Fetch booking first (idempotent — works on retries even if already confirmed)
+  const { data: booking, error: fetchErr } = await sb
     .from('bookings')
-    .update({ status: 'confirmed', payment_status: 'paid', paid_at: new Date().toISOString(), payment_reference: paymentRef })
-    .eq('id', transactionId)
     .select('*, listings(title, owner_id, currency)')
+    .eq('id', transactionId)
     .single();
 
-  if (error || !booking) {
-    console.error('[WEBHOOK] Booking update failed:', error?.message, 'id:', transactionId);
+  if (fetchErr || !booking) {
+    console.error('[WEBHOOK] Booking not found:', fetchErr?.message, 'id:', transactionId);
     return new Response('Booking not found', { status: 404 });
+  }
+
+  // Only update if not already confirmed (prevents duplicate emails on retries)
+  const alreadyConfirmed = booking.payment_status === 'paid' && booking.status === 'confirmed';
+  if (!alreadyConfirmed) {
+    const { error: updateErr } = await sb
+      .from('bookings')
+      .update({ status: 'confirmed', payment_status: 'paid', paid_at: new Date().toISOString(), payment_reference: paymentRef })
+      .eq('id', transactionId);
+    if (updateErr) {
+      console.error('[WEBHOOK] Booking update failed:', updateErr.message);
+      return new Response('Update failed', { status: 500 });
+    }
+  } else {
+    console.log('[WEBHOOK] Already confirmed, skipping update (retry):', transactionId);
+    return new Response('OK', { status: 200 });
   }
 
   console.log('[WEBHOOK] Booking confirmed:', booking.id);
