@@ -334,7 +334,7 @@ async function renderBookingCards(container, bookings, showReceipt = false) {
         };
         const statusLabel = STATUS_LABELS[b.status] || b.status;
 
-        const canCancel = ['pending', 'awaiting_approval', 'approved', 'confirmed'].includes(b.status);
+        const canCancel = ['pending', 'awaiting_approval', 'approved'].includes(b.status) && b.payment_status !== 'paid';
         const cancelBtnHtml = canCancel
             ? `<button class="cancel-booking-btn" onclick="event.stopPropagation();cancelBooking('${b.id}',this)"><i class="fa-solid fa-xmark"></i> Cancel</button>`
             : '';

@@ -2097,7 +2097,7 @@ async function loadBookingsTable(page = 0, searchTerm = '') {
             const isAdminRow  = CURRENT_ROLE === 'admin';
             const needsAction = isOwnerRow || isAdminRow;
             const canApprove  = needsAction && ['awaiting_approval', 'pending'].includes(r.status);
-            const canReject   = needsAction && (r.status === 'awaiting_approval' || r.status === 'pending' || r.status === 'confirmed');
+            const canReject   = needsAction && ['awaiting_approval', 'pending', 'approved'].includes(r.status) && r.payment_status !== 'paid';
             const isPaid      = r.status === 'confirmed' || r.status === 'approved' || r.status === 'completed';
             const hasFailed   = r.status === 'payment_failed';
 
