@@ -4583,6 +4583,14 @@ window.loadOwnerApplications = loadOwnerApplications;
    INVITE OWNER — Admin email tool (Resend API via edge function)
    ═══════════════════════════════════════════════════════════════ */
 
+const DEV_EMAIL = 'dev@afristay.rw';
+// Display names for send-as addresses — add new entries here and they appear in the dropdown automatically
+const SEND_AS_ALIASES = {
+    'aminakeza@afristay.rw':       'Amina Keza',
+    'emmanuel.butera@afristay.rw': 'Emmanuel Butera',
+    'inezamelissa@afristay.rw':    'Ineza Melissa',
+};
+
 const _BUSINESS_SUGGESTIONS = {
     hotel:      ['Hotel', 'Guest House', 'Boutique Hotel', 'Lodge', 'Resort', 'Inn', 'Hostel'],
     apartment:  ['Apartment', 'Studio Apartment', 'Furnished Apartment', 'Serviced Apartment', 'Flat', 'Penthouse'],
@@ -4644,6 +4652,16 @@ function initInviteOwnerTab() {
         const phoneEl = document.getElementById('senderPhone');
         if (phoneEl && !phoneEl.value) phoneEl.value = savedPhone;
     }
+    // Populate Send As dropdowns from SEND_AS_ALIASES for all admins
+    const myEmail = CURRENT_PROFILE?.email || '';
+    const aliasOptions = Object.entries(SEND_AS_ALIASES).map(([email, name]) =>
+        `<option value="${email}">${name} &lt;${email}&gt;</option>`
+    ).join('');
+    [['sendAsEmailInvite', myEmail], ['sendAsEmailCustom', myEmail]].forEach(([selectId, me]) => {
+        const sel = document.getElementById(selectId);
+        if (!sel) return;
+        sel.innerHTML = `<option value="">— Use my account (${me || 'me'}) —</option>` + aliasOptions;
+    });
 }
 window.initInviteOwnerTab = initInviteOwnerTab;
 
@@ -4656,6 +4674,7 @@ async function sendOwnerInvite() {
     const business = document.getElementById('inviteeBusiness')?.value.trim();
     const senderTitle = document.getElementById('senderTitle')?.value.trim();
     const senderPhone = document.getElementById('senderPhone')?.value.trim();
+    const sendAs   = document.getElementById('sendAsEmailInvite')?.value?.trim() || '';
 
     if (!name)     { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter the invitee\'s name.</p>'; return; }
     if (!email)    { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter the invitee\'s email address.</p>'; return; }
@@ -4691,8 +4710,8 @@ async function sendOwnerInvite() {
                 business:     business,
                 category:     category,
                 invite_token: inviteToken,
-                sender_name:  CURRENT_PROFILE?.full_name || 'AfriStay Team',
-                sender_email: CURRENT_PROFILE?.email || 'team@afristay.rw',
+                sender_name:  sendAs ? (SEND_AS_ALIASES[sendAs] || sendAs.split('@')[0]) : (CURRENT_PROFILE?.full_name || 'AfriStay Team'),
+                sender_email: sendAs || CURRENT_PROFILE?.email || 'team@afristay.rw',
                 sender_title: senderTitle || localStorage.getItem('afristay_sender_title') || 'AfriStay Team',
                 sender_phone: senderPhone || localStorage.getItem('afristay_sender_phone') || '',
             }),
@@ -4718,14 +4737,18 @@ window.sendOwnerInvite = sendOwnerInvite;
 async function sendCustomEmail() {
     const btn       = document.getElementById('sendCustomBtn');
     const statusEl  = document.getElementById('customEmailStatus');
-    const to        = document.getElementById('customTo')?.value.trim();
+    const toRaw     = document.getElementById('customTo')?.value.trim();
+    const toList    = (toRaw || '').split(',').map(e => e.trim()).filter(Boolean);
+    const to        = toList.length === 1 ? toList[0] : toList;
     const subject   = document.getElementById('customSubject')?.value.trim();
     const body      = document.getElementById('customBody')?.value.trim();
     const fileInput = document.getElementById('customAttachment');
     const files     = Array.from(fileInput?.files || []);
+    const sendAs    = document.getElementById('sendAsEmailCustom')?.value?.trim() || '';
 
-    if (!to)      { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a recipient email.</p>'; return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(to)) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a valid email address (e.g. name@example.com).</p>'; return; }
+    if (!toList.length) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a recipient email.</p>'; return; }
+    const badEmail = toList.find(e => !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e));
+    if (badEmail) { if (statusEl) statusEl.innerHTML = `<p style="color:#e74c3c;font-size:13px;">"${escapeHtml(badEmail)}" is not a valid email address.</p>`; return; }
     if (!subject) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please enter a subject.</p>'; return; }
     if (!body)    { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Please write a message body.</p>'; return; }
     if (files.length > 5) { if (statusEl) statusEl.innerHTML = '<p style="color:#e74c3c;font-size:13px;">Max 5 attachments at a time.</p>'; return; }
@@ -4766,8 +4789,8 @@ async function sendCustomEmail() {
                 subject,
                 body,
                 attachments,
-                sender_name:  CURRENT_PROFILE?.full_name || 'AfriStay Team',
-                sender_email: CURRENT_PROFILE?.email || 'team@afristay.rw',
+                sender_name:  sendAs ? (SEND_AS_ALIASES[sendAs] || sendAs.split('@')[0]) : (CURRENT_PROFILE?.full_name || 'AfriStay Team'),
+                sender_email: sendAs || CURRENT_PROFILE?.email || 'team@afristay.rw',
                 sender_title: localStorage.getItem('afristay_sender_title') || 'AfriStay Team',
                 sender_phone: localStorage.getItem('afristay_sender_phone') || '',
             }),
@@ -4775,8 +4798,9 @@ async function sendCustomEmail() {
         const result = await res.json();
         if (!res.ok || result.error) throw new Error(result.error || 'Failed to send email');
 
-        if (statusEl) statusEl.innerHTML = '<p style="color:#27ae60;font-size:13px;font-weight:600;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>Email sent to ' + to + '!</p>';
-        toast('Email sent to ' + to + '!', 'success');
+        const recipientLabel = toList.join(', ');
+        if (statusEl) statusEl.innerHTML = '<p style="color:#27ae60;font-size:13px;font-weight:600;"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>Email sent to ' + escapeHtml(recipientLabel) + '!</p>';
+        toast('Email sent to ' + recipientLabel + '!', 'success');
         ['customTo','customSubject','customBody'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
         if (fileInput) fileInput.value = '';
         const prev = document.getElementById('attachmentPreview'); if (prev) prev.innerHTML = '';

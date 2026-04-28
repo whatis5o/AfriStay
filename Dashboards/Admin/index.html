@@ -548,6 +548,12 @@
                             <label>Your Phone (shown in email footer — saved for next time)</label>
                             <input type="tel" class="fi" id="senderPhone" placeholder='e.g. "+250 788 000 000"'>
                         </div>
+                        <div id="sendAsWrapperInvite" class="fg">
+                            <label>Send as</label>
+                            <select class="fi" id="sendAsEmailInvite">
+                                <option value="">— Use my account —</option>
+                            </select>
+                        </div>
                         <div style="background:#f8fafc;border-radius:12px;padding:14px 16px;margin-bottom:20px;border:1px solid #e8e8e8;">
                             <p style="margin:0;font-size:12px;color:#888;"><i class="fa-solid fa-circle-info" style="color:#EB6753;margin-right:6px;"></i>
                             The email will be sent from your logged-in AfriStay admin account (<strong id="senderEmailPreview">—</strong>).</p>
@@ -561,8 +567,8 @@
                     <!-- ── CUSTOM EMAIL FORM ── -->
                     <div id="customEmailSection" style="display:none;">
                         <div class="fg">
-                            <label>To (email address)</label>
-                            <input type="email" class="fi" id="customTo" placeholder="recipient@example.com">
+                            <label>To <span style="font-size:11px;color:#aaa;font-weight:400;">(separate multiple emails with commas)</span></label>
+                            <input type="text" class="fi" id="customTo" placeholder="one@example.com, two@example.com">
                         </div>
                         <div class="fg">
                             <label>Subject</label>
@@ -576,6 +582,12 @@
                             <label>Attachments <span style="font-size:11px;color:#aaa;font-weight:400;">(optional — PDF, image, Word, etc. Max 10 MB each, up to 5 files)</span></label>
                             <input type="file" id="customAttachment" class="fi" style="padding:8px 12px;cursor:pointer;" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp" multiple>
                             <div id="attachmentPreview" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+                        </div>
+                        <div id="sendAsWrapperCustom" class="fg">
+                            <label>Send as</label>
+                            <select class="fi" id="sendAsEmailCustom">
+                                <option value="">— Use my account —</option>
+                            </select>
                         </div>
                         <button class="btn-p" id="sendCustomBtn" onclick="sendCustomEmail()">
                             <i class="fa-solid fa-paper-plane"></i> Send Email

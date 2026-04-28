@@ -30,7 +30,7 @@ const CAT: Record<string, string> = {
 };
 
 async function sendEmail(apiKey: string, payload: {
-  from: string; to: string; subject: string; html: string;
+  from: string; to: string | string[]; subject: string; html: string;
   attachments?: { filename: string; content: string }[];
 }) {
   const res = await fetch('https://api.resend.com/emails', {
