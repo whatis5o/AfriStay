@@ -8,7 +8,7 @@
  *   - External CDN (FA, Google Fonts, jsDelivr): cache-first
  */
 
-const SHELL_CACHE = 'afristay-shell-v3';
+const SHELL_CACHE = 'afristay-shell-v4';
 const IMG_CACHE   = 'afristay-imgs-v1';
 const OFFLINE_URL = '/offline.html';
 
@@ -161,12 +161,25 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // 4. HTML navigation — network-first, fall back to cached page then offline
+    // 4. HTML navigation — network-first with 7s timeout, cache on success, offline fallback
     if (request.mode === 'navigate') {
-        event.respondWith(
-            fetch(request)
-                .catch(() => caches.match(request).then(c => c || caches.match(OFFLINE_URL)))
-        );
+        event.respondWith((async () => {
+            const networkFetch = fetch(request).then(res => {
+                if (res && res.status === 200 && res.type === 'basic') {
+                    caches.open(SHELL_CACHE).then(c => c.put(request, res.clone()));
+                }
+                return res;
+            });
+            const timeout = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('sw-timeout')), 7000)
+            );
+            try {
+                return await Promise.race([networkFetch, timeout]);
+            } catch {
+                const cached = await caches.match(request);
+                return cached || await caches.match(OFFLINE_URL);
+            }
+        })());
         return;
     }
 
